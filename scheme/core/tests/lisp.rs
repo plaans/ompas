@@ -75,7 +75,7 @@ async fn test_lisp_integration() -> lruntimeerror::Result<()> {
             Err(e) => {
                 return Err(LRuntimeError::new(
                     "test_lisp_integration",
-                    format!("{}:{}:{:?}", element.0, element.1, e).to_string(),
+                    format!("{}:{}:{:?}", element.0, element.1, e),
                 ))
             }
         };

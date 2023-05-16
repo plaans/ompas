@@ -259,8 +259,8 @@ mod tests {
         let geq: RelationTypeBit = 0b101.into();
         let _neq: RelationTypeBit = 0b110.into();
         let _tautology: RelationTypeBit = 0b111.into();
-        assert_eq!(eq, &eq & &leq);
-        assert_eq!(eq, &eq & &geq);
+        assert_eq!(eq, eq & leq);
+        assert_eq!(eq, eq & geq);
     }
 
     #[test]
@@ -273,20 +273,20 @@ mod tests {
         let geq: RelationTypeBit = 0b101.into();
         let _neq: RelationTypeBit = 0b110.into();
         let _tautology: RelationTypeBit = 0b111.into();
-        assert_eq!(leq, &eq | &lt);
-        assert_eq!(geq, &eq | &gt);
+        assert_eq!(leq, eq | lt);
+        assert_eq!(geq, eq | gt);
     }
 
     #[test]
     pub fn test_relation_and() {
-        assert_eq!(RelationType::Eq, &RelationType::Eq & &RelationType::LEq);
-        assert_eq!(RelationType::Eq, &RelationType::Eq & &RelationType::GEq);
+        assert_eq!(RelationType::Eq, RelationType::Eq & RelationType::LEq);
+        assert_eq!(RelationType::Eq, RelationType::Eq & RelationType::GEq);
     }
 
     #[test]
     pub fn test_relation_or() {
-        assert_eq!(RelationType::LEq, &RelationType::Eq | &RelationType::LT);
-        assert_eq!(RelationType::GEq, &RelationType::Eq | &RelationType::GT);
+        assert_eq!(RelationType::LEq, RelationType::Eq | RelationType::LT);
+        assert_eq!(RelationType::GEq, RelationType::Eq | RelationType::GT);
     }
 
     #[test]

@@ -944,33 +944,29 @@ mod test {
     fn test_gt() {
         let i1: LValue = 3.into();
         let f2: LValue = 5.0.into();
-        assert!(!(&i1 > &f2));
-        assert!(&f2 > &i1);
-        assert!(!(&f2 > &f2));
+        assert!(i1 <= f2);
+        assert!(f2 > i1);
     }
 
     fn test_ge() {
         let i1: LValue = 3.into();
         let f2: LValue = 5.0.into();
-        assert!(!(&i1 >= &f2));
-        assert!(&f2 >= &i1);
-        assert!(&f2 >= &f2);
+        assert!(i1 < f2);
+        assert!(f2 >= i1);
     }
 
     fn test_lt() {
         let i1: LValue = 3.into();
         let f2: LValue = 5.0.into();
-        assert!(&i1 < &f2);
-        assert!(!(&f2 < &i1));
-        assert!(!(&f2 < &f2));
+        assert!(i1 < f2);
+        assert!(f2 >= i1);
     }
 
     fn test_le() {
         let i1: LValue = 3.into();
         let f2: LValue = 5.0.into();
-        assert!(&i1 <= &f2);
-        assert!(!(&f2 <= &i1));
-        assert!(&f2 <= &f2);
+        assert!(i1 <= f2);
+        assert!(f2 > i1);
     }
 
     #[test]

@@ -160,17 +160,3 @@ pub fn set_current_dir(dir: String) -> Result<(), String> {
         Err(e) => Err(format!("Error setting current dir: {e}")),
     }
 }
-
-//TODO: finish writing tests for io
-#[cfg(test)]
-pub mod tests {
-    #[test]
-    pub fn test_read() {
-        assert!(true)
-    }
-
-    #[test]
-    pub fn test_write() {
-        assert!(true)
-    }
-}

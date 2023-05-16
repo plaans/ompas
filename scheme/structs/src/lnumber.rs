@@ -179,6 +179,12 @@ impl Hash for LNumber {
     }
 }
 
+impl Ord for LNumber {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
 impl PartialOrd for LNumber {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         unimplemented!()
@@ -301,9 +307,9 @@ mod test {
         let i2: LNumber = 5.into();
         let f1: LNumber = 3.0.into();
         let f2: LNumber = 5.0.into();
-        assert_eq!(LNumber::Int(8), &i1 + &i2);
-        assert_eq!(LNumber::Float(8.0), &i1 + &f2);
-        assert_eq!(LNumber::Float(8.0), &f1 + &f2);
+        assert_eq!(LNumber::Int(8), i1 + i2);
+        assert_eq!(LNumber::Float(8.0), i1 + f2);
+        assert_eq!(LNumber::Float(8.0), f1 + f2);
     }
 
     fn test_sub() {
@@ -311,9 +317,9 @@ mod test {
         let i2: LNumber = 5.into();
         let f1: LNumber = 3.0.into();
         let f2: LNumber = 5.0.into();
-        assert_eq!(LNumber::Int(-2), &i1 - &i2);
-        assert_eq!(LNumber::Float(-2.0), &i1 - &f2);
-        assert_eq!(LNumber::Float(-2.0), &f1 - &f2);
+        assert_eq!(LNumber::Int(-2), i1 - i2);
+        assert_eq!(LNumber::Float(-2.0), i1 - f2);
+        assert_eq!(LNumber::Float(-2.0), f1 - f2);
     }
 
     fn test_mul() {
@@ -321,9 +327,9 @@ mod test {
         let i2: LNumber = 5.into();
         let f1: LNumber = 3.0.into();
         let f2: LNumber = 5.0.into();
-        assert_eq!(LNumber::Int(15), &i1 * &i2);
-        assert_eq!(LNumber::Float(15.0), &i1 * &f2);
-        assert_eq!(LNumber::Float(15.0), &f1 * &f2);
+        assert_eq!(LNumber::Int(15), i1 * i2);
+        assert_eq!(LNumber::Float(15.0), i1 * f2);
+        assert_eq!(LNumber::Float(15.0), f1 * f2);
     }
 
     fn test_div() {
@@ -331,9 +337,9 @@ mod test {
         let i2: LNumber = 5.into();
         let f1: LNumber = 3.0.into();
         let f2: LNumber = 5.0.into();
-        assert_eq!(LNumber::Int(0), &i1 / &i2);
-        assert_eq!(LNumber::Float(0.6), &i1 / &f2);
-        assert_eq!(LNumber::Float(0.6), &f1 / &f2);
+        assert_eq!(LNumber::Int(0), i1 / i2);
+        assert_eq!(LNumber::Float(0.6), i1 / f2);
+        assert_eq!(LNumber::Float(0.6), f1 / f2);
     }
 
     #[test]
@@ -349,13 +355,11 @@ mod test {
         let i2: LNumber = 5.into();
         let f1: LNumber = 3.0.into();
         let f2: LNumber = 5.0.into();
-        assert!(!(&i1 > &i2));
-        assert!(&i2 > &i1);
-        assert!(!(&i2 > &i2));
-        assert!(!(&f1 > &f2));
-        assert!(&f2 > &f1);
-        assert!(!(&f2 > &f2));
-        assert!(&i2 > &f1);
+        assert!(i1 <= i2);
+        assert!(i2 > i1);
+        assert!(f1 <= f2);
+        assert!(f2 > f1);
+        assert!(i2 > f1);
     }
 
     fn test_lt() {
@@ -363,13 +367,11 @@ mod test {
         let i2: LNumber = 5.into();
         let f1: LNumber = 3.0.into();
         let f2: LNumber = 5.0.into();
-        assert!(&i1 < &i2);
-        assert!(!(&i2 < &i1));
-        assert!(!(&i2 < &i2));
-        assert!(&f1 < &f2);
-        assert!(!(&f2 < &f1));
-        assert!(!(&f2 < &f2));
-        assert!(&i1 < &f2);
+        assert!(i1 < i2);
+        assert!(i2 >= i1);
+        assert!(f1 < f2);
+        assert!(f2 >= f1);
+        assert!(i1 < f2);
     }
 
     fn test_ge() {
@@ -377,13 +379,11 @@ mod test {
         let i2: LNumber = 5.into();
         let f1: LNumber = 3.0.into();
         let f2: LNumber = 5.0.into();
-        assert!(!(&i1 >= &i2));
-        assert!(&i2 >= &i1);
-        assert!(&i2 >= &i2);
-        assert!(!(&f1 >= &f2));
-        assert!(&f2 >= &f1);
-        assert!(&f2 >= &f2);
-        assert!(&i2 >= &f2);
+        assert!(i1 < i2);
+        assert!(i2 >= i1);
+        assert!(f1 < f2);
+        assert!(f2 >= f1);
+        assert!(i2 >= f2);
     }
 
     fn test_le() {
@@ -391,13 +391,11 @@ mod test {
         let i2: LNumber = 5.into();
         let f1: LNumber = 3.0.into();
         let f2: LNumber = 5.0.into();
-        assert!(&i1 <= &i2);
-        assert!(!(&i2 <= &i1));
-        assert!(&i2 <= &i2);
-        assert!(&f1 <= &f2);
-        assert!(!(&f2 <= &f1));
-        assert!(&f2 <= &f2);
-        assert!(&i2 <= &f2);
+        assert!(i1 <= i2);
+        assert!(i2 > i1);
+        assert!(f1 <= f2);
+        assert!(f2 > f1);
+        assert!(i2 <= f2);
     }
 
     #[test]

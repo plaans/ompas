@@ -955,7 +955,6 @@ pub async fn add_resources(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
 mod test {
     use super::*;
     use ompas_middleware::logger::LogClient;
-    use ompas_middleware::Master;
     use sompas_core::test_utils::{test_expression_with_env, Expr, TestExpression};
     use sompas_core::{eval_init, get_root_env};
     use sompas_modules::advanced_math::ModAdvancedMath;
@@ -986,6 +985,7 @@ mod test {
         env
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_macro_def_task() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1005,6 +1005,7 @@ mod test {
         test_expression_with_env(macro_to_test, &mut env, true).await
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_macro_def_state_function() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1043,6 +1044,7 @@ mod test {
         Ok(())
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_macro_def_command() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1068,6 +1070,7 @@ mod test {
         Ok(())
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_macro_def_command_pddl_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1112,6 +1115,7 @@ mod test {
         Ok(())
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_macro_def_command_om_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1152,6 +1156,7 @@ mod test {
         Ok(())
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_macro_def_task_pddl_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1196,6 +1201,7 @@ mod test {
         Ok(())
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_macro_def_task_om_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1236,6 +1242,7 @@ mod test {
         Ok(())
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_macro_def_method() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {

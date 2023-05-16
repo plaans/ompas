@@ -314,7 +314,7 @@ pub mod utils {
     pub const DOC_CADADR: &str = "Combine car, cdr, car and cdr";
     pub const MACRO_CADADR: &str = "(lambda (x) `(car (cdr (car (cdr ,x)))))";
 
-    pub const CADADDR: &str = "cdaddr";
+    pub const CADADDR: &str = "cadaddr";
     pub const DOC_CADADDR: &str = "Combien car, cdr, car, cdr and cdr";
     pub const MACRO_CADADDR: &str = "(lambda (x) `(car (cdr (car (cdr (cdr ,x))))))";
 
@@ -458,10 +458,6 @@ pub mod utils {
     pub const DOC_MAPF: &str =
         "Apply a function to all elements of a list, and return a list of all the results";
     pub const DOC_MAPF_VERBOSE: &str = "Example: (mapf square '(1 2 3)) => (1 4 9)";
-    /*pub const LAMBDA_MAPF: &str = "(lambda (f seq)
-    (if (null? seq)
-    nil
-    (cons (eval (cons f (list (car seq)))) (mapf f (cdr seq)))))";*/
 
     pub const LAMBDA_MAPF: &str = "(lambda _args_
     (let ((f (car _args_))

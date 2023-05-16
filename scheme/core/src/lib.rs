@@ -911,11 +911,6 @@ pub async fn eval(
                 let args = &exps[1..];
                 match proc {
                     LValue::Lambda(l) => {
-                        queue.push(StackFrame::new(CoreOperatorFrame::Lambda, interruptibility));
-                        queue.push(StackFrame::new_lvalue(
-                            l.get_body().clone(),
-                            interruptibility,
-                        ));
                         let temp_env = match l.get_new_env(scopes.get_last().clone(), args) {
                             Ok(e) => e,
                             Err(e) => {
@@ -923,6 +918,11 @@ pub async fn eval(
                                 break Err(e);
                             }
                         };
+                        queue.push(StackFrame::new(CoreOperatorFrame::Lambda, interruptibility));
+                        queue.push(StackFrame::new_lvalue(
+                            l.get_body().clone(),
+                            interruptibility,
+                        ));
                         scopes.new_defined_scope(temp_env);
                     }
                     LValue::Fn(fun) => {

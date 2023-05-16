@@ -247,24 +247,11 @@ pub fn range(start: i64, end: i64) -> Vec<i64> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use sompas_core::test_utils::{test_expression, TestExpression};
+    use sompas_core::test_utils::{test_expression, Expr, TestExpression};
     use sompas_core::{get_root_env, parse};
+    use sompas_structs::lenv::LEnv;
     use sompas_structs::lruntimeerror;
 
-    #[tokio::test]
-    async fn test_arbitrary() -> lruntimeerror::Result<()> {
-        let env = get_root_env().await;
-
-        let lv = &[vec![1, 2, 3].into()];
-        let result = arbitrary(&env, lv).await?;
-        assert_eq!(result, LValue::from(1));
-
-        let lv = &[vec![1, 2, 3].into(), SECOND.into()];
-        let result = arbitrary(&env, lv).await?;
-        assert_eq!(result, LValue::from(2));
-
-        Ok(())
-    }
     #[test]
     fn test_contains() -> lruntimeerror::Result<()> {
         let lv: &[LValue] = &[vec![1, 2, 3, 4, 5, 6].into(), 6.into()];
@@ -287,7 +274,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_and() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_AND,
+            inner: Expr::_macro(AND, MACRO_AND),
             dependencies: vec![],
             expression: "(and (= (+ 1 1) 2) (< 3 4))",
             expected: "(if (= (+ 1 1) 2) (< 3 4) nil)",
@@ -298,22 +285,9 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_test_macro() -> lruntimeerror::Result<()> {
-        let macro_to_test = TestExpression {
-            inner: MACRO_TEST_MACRO,
-            dependencies: vec![MACRO_AND],
-            expression: "(test-macro \"(and (= 1 2) (> 3 4))\")",
-            expected: "(expand (parse \"(and (= 1 2) (> 3 4))\"))",
-            result: "(if (= 1 2) (> 3 4) nil)",
-        };
-
-        test_expression(macro_to_test).await
-    }
-
-    #[tokio::test]
     async fn test_macro_or() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_OR,
+            inner: Expr::_macro(OR, MACRO_OR),
             dependencies: vec![],
             expression: "(or (= (+ 1 1) 2) (< 3 4))",
             expected: "(if (= (+ 1 1) 2) true (< 3 4))",
@@ -326,7 +300,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_caar() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CAAR,
+            inner: Expr::_macro(CAAR, MACRO_CAAR),
             dependencies: vec![],
             expression: "(caar '((1 2) (3 4)))",
             expected: "(car (car (quote ((1 2) (3 4)))))",
@@ -339,7 +313,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_cadr() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CADR,
+            inner: Expr::_macro(CADR, MACRO_CADR),
             dependencies: vec![],
             expression: "(cadr '((1 2) (3 4)))",
             expected: "(car (cdr (quote ((1 2) (3 4)))))",
@@ -352,7 +326,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_cdar() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CDAR,
+            inner: Expr::_macro(CDAR, MACRO_CDAR),
             dependencies: vec![],
             expression: "(cdar '((1 2) (3 4)))",
             expected: "(cdr (car (quote ((1 2) (3 4)))))",
@@ -365,7 +339,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_cddr() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CDDR,
+            inner: Expr::_macro(CDDR, MACRO_CDDR),
             dependencies: vec![],
             expression: "(cddr '((1 2) (3 4) 5))",
             expected: "(cdr (cdr (quote ((1 2) (3 4) 5))))",
@@ -378,7 +352,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_cadar() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CADAR,
+            inner: Expr::_macro(CADAR, MACRO_CADAR),
             dependencies: vec![],
             expression: "(cadar '((1 2) (3 4) 5))",
             expected: "(car (cdr (car '((1 2) (3 4) 5))))",
@@ -391,7 +365,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_caddr() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CADDR,
+            inner: Expr::_macro(CADDR, MACRO_CADDR),
             dependencies: vec![],
             expression: "(caddr '((1 2) (3 4) 5))",
             expected: "(car (cdr (cdr '((1 2) (3 4) 5))))",
@@ -404,7 +378,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_cdadr() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CDADR,
+            inner: Expr::_macro(CDADR, MACRO_CDADR),
             dependencies: vec![],
             expression: "(cdadr '((1 2) (3 4) 5))",
             expected: "(cdr (car (cdr '((1 2) (3 4) 5))))",
@@ -417,7 +391,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_caadr() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CAADR,
+            inner: Expr::_macro(CAADR, MACRO_CAADR),
             dependencies: vec![],
             expression: "(caadr '((1 2) (3 4) 5))",
             expected: "(car (car (cdr '((1 2) (3 4) 5))))",
@@ -430,7 +404,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_cadadr() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CADADR,
+            inner: Expr::_macro(CADADR, MACRO_CADADR),
             dependencies: vec![],
             expression: "(cadadr '((1 2) (3 4) 5))",
             expected: "(car (cdr (car (cdr '((1 2) (3 4) 5)))))",
@@ -443,7 +417,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_cadaddr() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_CADADDR,
+            inner: Expr::_macro(CADADDR, MACRO_CADADDR),
             dependencies: vec![],
             expression: "(cadaddr '((1 2) (3 4) ((5 6) 7)))",
             expected: "(car (cdr (car (cdr (cdr '((1 2) (3 4) ((5 6) 7)))))))",
@@ -456,7 +430,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_await_async() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_AWAIT_ASYNC,
+            inner: Expr::_macro(AWAIT_ASYNC, MACRO_AWAIT_ASYNC),
             dependencies: vec![],
             expression: "(await-async (+ 1 4))",
             expected: "(await (async (+ 1 4)))",
@@ -467,13 +441,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_macro_apply() -> lruntimeerror::Result<()> {
+    async fn test_lambda_apply() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_APPLY,
+            inner: Expr::_lambda(APPLY, LAMBDA_APPLY),
             dependencies: vec![],
-            expression: "(apply + (1 4))",
-            expected: "(+ 1 4)",
-            result: "5",
+            expression: "(apply + 3 '(1 4))",
+            expected: "(apply + 3 '(1 4))",
+            result: "8",
         };
 
         test_expression(macro_to_test).await
@@ -482,8 +456,11 @@ mod test {
     #[tokio::test]
     async fn test_macro_cond() -> lruntimeerror::Result<()> {
         let macro_to_test = TestExpression {
-            inner: MACRO_COND,
-            dependencies: vec![MACRO_CAAR, MACRO_CADAR],
+            inner: Expr::_macro(COND, MACRO_COND),
+            dependencies: vec![
+                Expr::_macro(CAAR, MACRO_CAAR),
+                Expr::_macro(CADAR, MACRO_CADAR),
+            ],
             expression: "(begin
                     (define weather (lambda (t) 
                         (cond ((< t 0) cold)
@@ -512,18 +489,12 @@ mod test {
     #[tokio::test]
     async fn test_macro_loop() -> lruntimeerror::Result<()> {
         let expression = "(loop (+ 1 1))";
-        let expected = "(begin
-            (define __loop__
-                (lambda nil
-                    (begin
-                        (+ 1 1)
-                        (__loop__))))
-            (__loop__))))";
+        let expected = "(_loop_ (quote (+ 1 1)))";
 
         let mut env = get_root_env().await;
 
         //Load macro
-        parse(MACRO_LOOP, &mut env).await?;
+        parse(&Expr::_macro(LOOP, MACRO_LOOP).to_string(), &mut env).await?;
 
         //Expand expression
         let expanded = parse(expression, &mut env).await?;
@@ -546,8 +517,8 @@ mod test {
     #[tokio::test]
     async fn test_lambda_zip() -> lruntimeerror::Result<()> {
         let test_lambda = TestExpression {
-            inner: LAMBDA_ZIP,
-            dependencies: vec![MACRO_OR],
+            inner: Expr::_lambda(ZIP, LAMBDA_ZIP),
+            dependencies: vec![Expr::_macro(OR, MACRO_OR)],
             expression: "(zip '(1 2 3 4) '(5 6 7 8))",
             expected: "(zip '(1 2 3 4) '(5 6 7 8))",
             result: "((1 5) (2 6) (3 7) (4 8))",
@@ -559,8 +530,12 @@ mod test {
     #[tokio::test]
     async fn test_lambda_unzip() -> lruntimeerror::Result<()> {
         let test_lambda = TestExpression {
-            inner: LAMBDA_UNZIP,
-            dependencies: vec![MACRO_CAAR, MACRO_CADAR, MACRO_APPLY],
+            inner: Expr::_lambda(UNZIP, LAMBDA_UNZIP),
+            dependencies: vec![
+                Expr::_macro(CAAR, MACRO_CAAR),
+                Expr::_macro(CADAR, MACRO_CADAR),
+                Expr::_lambda(APPLY, LAMBDA_APPLY),
+            ],
             expression: "(unzip '((1 5) (2 6) (3 7) (4 8)))",
             expected: "(unzip '((1 5) (2 6) (3 7) (4 8)))",
             result: "((1 2 3 4) (5 6 7 8))",
@@ -572,14 +547,16 @@ mod test {
     #[tokio::test]
     async fn test_lambda_mapf() -> lruntimeerror::Result<()> {
         let test_lambda = TestExpression {
-            inner: LAMBDA_MAPF,
-            dependencies: vec![],
-            expression: "(begin
-                            (define square (lambda (x)  (* x x)))
-                            (mapf square '(1 2 3 4 5)))",
-            expected: "(begin
-                            (define square (lambda (x)  (* x x)))
-                            (mapf square '(1 2 3 4 5)))",
+            inner: Expr::_lambda(MAPF, LAMBDA_MAPF),
+            dependencies: vec![
+                Expr::_macro(CADR, MACRO_CADR),
+                Expr::_macro(CDAR, MACRO_CDAR),
+                Expr::_macro(CAAR, MACRO_CAAR),
+                Expr::_lambda(UNZIP, LAMBDA_UNZIP),
+                Expr::_macro(LET, MACRO_LET),
+            ],
+            expression: "(mapf (lambda (x) (* x x)) '(1 2 3 4 5))",
+            expected: "(mapf (lambda (x) (* x x)) '(1 2 3 4 5))",
             result: "(1 4 9 16 25)",
         };
 
@@ -589,8 +566,13 @@ mod test {
     #[tokio::test]
     async fn test_macro_let() -> lruntimeerror::Result<()> {
         let test_lambda = TestExpression {
-            inner: MACRO_LET,
-            dependencies: vec![MACRO_CAAR, MACRO_CADAR, MACRO_CADR, LAMBDA_UNZIP],
+            inner: Expr::_macro(LET, MACRO_LET),
+            dependencies: vec![
+                Expr::_macro(CAAR, MACRO_CAAR),
+                Expr::_macro(CADAR, MACRO_CADAR),
+                Expr::_macro(CADR, MACRO_CADR),
+                Expr::_lambda(UNZIP, LAMBDA_UNZIP),
+            ],
             expression: "(let ((x 1)
                                (y 2))
                               (+ x y))",
@@ -604,8 +586,11 @@ mod test {
     #[tokio::test]
     async fn test_macro_let_star() -> lruntimeerror::Result<()> {
         let test_lambda = TestExpression {
-            inner: MACRO_LET_STAR,
-            dependencies: vec![MACRO_CAAR, MACRO_CDAR],
+            inner: Expr::_macro(LET_STAR, MACRO_LET_STAR),
+            dependencies: vec![
+                Expr::_macro(CAAR, MACRO_CAAR),
+                Expr::_macro(CDAR, MACRO_CDAR),
+            ],
             expression: "(let* ((x 1)\
                                (y (+ x 1)))\
                               (+ x y))",

@@ -11,7 +11,7 @@ use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
-use sompas_repl::lisp_interpreter::{ChannelToLispInterpreter, LispInterpreter};
+use sompas_repl::lisp_interpreter::LispInterpreter;
 use sompas_structs::lruntimeerror;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -23,9 +23,8 @@ pub const LOG_LEVEL: LogLevel = LogLevel::Debug;
 struct Opt {
     #[structopt(short = "d", long = "domain")]
     domain: Option<PathBuf>,
-
-    #[structopt(short = "o", long = "optimal")]
-    opt: bool,
+    /*#[structopt(short = "o", long = "optimal")]
+    opt: bool,*/
 }
 
 #[tokio::main]
@@ -70,7 +69,7 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
     .await;
     li.import_namespace(ctx_rae);
 
-    let mut channel: ChannelToLispInterpreter = li.subscribe();
+    //let mut channel: ChannelToLispInterpreter = li.subscribe();
 
     //li.set_config(LispInterpreterConfig::new(true));
 

@@ -416,6 +416,10 @@ impl Master {
     pub async fn get_log_level() -> LogLevel {
         MASTER.logger.get_max_log_level().await.into()
     }
+
+    pub fn reinit() {
+        lazy_static::initialize(&MASTER)
+    }
 }
 
 pub type ProcessTopicLabel = String;

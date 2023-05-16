@@ -103,7 +103,7 @@ fn test_action_cancel() -> lruntimeerror::Result<()> {
     let action_msg = GodotMessageSerde {
         _type: GodotMessageType::ActionCancel,
         data: GodotMessageSerdeData::ActionCancel(SerdeActionCancel {
-            temp_id: 0,
+            action_id: 0,
             cancelled: false,
         }),
     };

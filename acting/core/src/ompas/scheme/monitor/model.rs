@@ -954,7 +954,9 @@ pub async fn add_resources(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
 #[cfg(test)]
 mod test {
     use super::*;
-    use sompas_core::test_utils::{test_expression_with_env, TestExpression};
+    use ompas_middleware::logger::LogClient;
+    use ompas_middleware::Master;
+    use sompas_core::test_utils::{test_expression_with_env, Expr, TestExpression};
     use sompas_core::{eval_init, get_root_env};
     use sompas_modules::advanced_math::ModAdvancedMath;
     use sompas_modules::io::ModIO;
@@ -962,17 +964,22 @@ mod test {
     use sompas_structs::lenv::ImportType::WithoutPrefix;
     use sompas_structs::lenv::LEnv;
 
-    async fn init_env_and_ctxs() -> LEnv {
+    async fn init_env() -> LEnv {
+        //Master::reinit();
         let mut env = get_root_env().await;
+        let log: LogClient = LogClient::new("TEST", "TEST").await;
+        env.log = log;
 
         env.import_module(ModUtils::default(), WithoutPrefix);
 
         env.import_module(ModAdvancedMath::default(), WithoutPrefix);
 
-        let mut ctx = ModModel::default();
-        ctx.empty_env = ModModel::init_empty_env().await;
+        let mut monitor = ModMonitor::default();
+        monitor.init_empty_env().await;
 
-        env.import_module(ctx, WithoutPrefix);
+        let mod_model = ModModel::new(&monitor);
+
+        env.import_module(mod_model, WithoutPrefix);
 
         env.import_module(ModIO::default(), WithoutPrefix);
         eval_init(&mut env).await;
@@ -982,7 +989,7 @@ mod test {
     #[tokio::test]
     async fn test_macro_def_task() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_TASK,
+            inner: Expr::_macro(DEF_TASK, MACRO_DEF_TASK),
             dependencies: vec![],
             expression: "(def-task t_navigate_to (:params (?r robot) (?x int) (?y int)))",
             expected: "(add-task \
@@ -992,14 +999,16 @@ mod test {
             result: "nil",
         };
 
-        let mut env = init_env_and_ctxs().await;
+        let mut env = init_env().await;
+
+        eval(&parse("(def-types robot)", &mut env).await?, &mut env, None).await?;
         test_expression_with_env(macro_to_test, &mut env, true).await
     }
 
     #[tokio::test]
     async fn test_macro_def_state_function() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_STATE_FUNCTION,
+            inner: Expr::_macro(DEF_STATE_FUNCTION, MACRO_DEF_STATE_FUNCTION),
             dependencies: vec![],
             expression:
                 "(def-state-function sf (:params (?a object) (?b object)) (:result object))",
@@ -1011,7 +1020,7 @@ mod test {
             result: "nil",
         };
 
-        let mut env = init_env_and_ctxs().await;
+        let mut env = init_env().await;
         match test_expression_with_env(macro_to_test, &mut env, true).await {
             Ok(_) => {}
             Err(e) => {
@@ -1021,7 +1030,7 @@ mod test {
         };
 
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_STATE_FUNCTION,
+            inner: Expr::_macro(DEF_STATE_FUNCTION, MACRO_DEF_STATE_FUNCTION),
             dependencies: vec![],
             expression: "(def-state-function sf (:result object))",
             expected: "(add-state-function \
@@ -1030,19 +1039,14 @@ mod test {
                             (:result (object)))))",
             result: "nil",
         };
-        match test_expression_with_env(macro_to_test, &mut env, true).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                println!("err : {}", e);
-                Err(e)
-            }
-        }
+        test_expression_with_env(macro_to_test, &mut env, true).await?;
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_macro_def_command() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_COMMAND,
+            inner: Expr::_macro(DEF_COMMAND, MACRO_DEF_COMMAND),
             dependencies: vec![],
             expression: "(def-command pick_package (:params (?r robot) (?p package)))",
             expected: "(add-command \
@@ -1052,21 +1056,23 @@ mod test {
             result: "nil",
         };
 
-        let mut env = init_env_and_ctxs().await;
-        match test_expression_with_env(macro_to_test, &mut env, true).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                println!("err : {}", e);
-                Err(e)
-            }
-        }
+        let mut env = init_env().await;
+
+        eval(
+            &parse("(def-types robot package)", &mut env).await?,
+            &mut env,
+            None,
+        )
+        .await?;
+        test_expression_with_env(macro_to_test, &mut env, true).await?;
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_macro_def_command_pddl_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_COMMAND_PDDL_MODEL,
-            dependencies: vec![MACRO_DEF_COMMAND],
+            inner: Expr::_macro(DEF_COMMAND_PDDL_MODEL, MACRO_DEF_COMMAND_PDDL_MODEL),
+            dependencies: vec![Expr::_macro(DEF_COMMAND, MACRO_DEF_COMMAND)],
             expression: "(def-command-pddl-model pick
                           (:params (?obj ball) (?room room) (?gripper gripper))
                           (:pre-conditions
@@ -1087,11 +1093,13 @@ mod test {
             result: "nil",
         };
 
-        let mut env = init_env_and_ctxs().await;
+        let mut env = init_env().await;
 
         eval(
             &parse(
-                "(def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))",
+                "(begin (def-types ball room gripper)\n
+                (def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))\
+                )",
                 &mut env,
             )
             .await?,
@@ -1100,22 +1108,17 @@ mod test {
         )
         .await?;
 
-        match test_expression_with_env(macro_to_test, &mut env, true).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                println!("err : {}", e);
-                Err(e)
-            }
-        }
+        test_expression_with_env(macro_to_test, &mut env, true).await?;
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_macro_def_command_om_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_COMMAND_OM_MODEL,
-            dependencies: vec![MACRO_DEF_COMMAND],
+            inner: Expr::_macro(DEF_COMMAND_OM_MODEL, MACRO_DEF_COMMAND_OM_MODEL),
+            dependencies: vec![Expr::_macro(DEF_COMMAND, MACRO_DEF_COMMAND)],
             expression: "(def-command-om-model pick
-                            (:params (?r robot))
+                            (:params (?obj object) (?room object) (?gripper object))
                             (:body
                                 (do
                                     (check (> (robot.battery ?r) 0.4))
@@ -1124,17 +1127,19 @@ mod test {
                          (map '(
                             (:name pick) 
                             (:model-type om) 
-                            (:params ((?r robot))) 
+                            (:params ((?obj object) (?room object) (?gripper object)))
                             (:body ((do 
                               (check (> (robot.battery ?r) 0.4)) 
                               (assert (robot.busy ?r) true)))))))",
             result: "nil",
         };
 
-        let mut env = init_env_and_ctxs().await;
+        let mut env = init_env().await;
         eval(
             &parse(
-                "(def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))",
+                "(begin (def-types ball room gripper)\n
+                (def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))\n
+                )",
                 &mut env,
             )
             .await?,
@@ -1142,20 +1147,16 @@ mod test {
             None,
         )
         .await?;
-        match test_expression_with_env(macro_to_test, &mut env, true).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                println!("err : {}", e);
-                Err(e)
-            }
-        }
+        test_expression_with_env(macro_to_test, &mut env, true).await?;
+        //Master::wait_end().await;
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_macro_def_task_pddl_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_TASK_PDDL_MODEL,
-            dependencies: vec![MACRO_DEF_TASK],
+            inner: Expr::_macro(DEF_TASK_PDDL_MODEL, MACRO_DEF_TASK_PDDL_MODEL),
+            dependencies: vec![Expr::_macro(DEF_TASK, MACRO_DEF_TASK)],
             expression: "(def-task-pddl-model pick
                           (:params (?obj ball) (?room room) (?gripper gripper))
                           (:pre-conditions
@@ -1172,15 +1173,17 @@ mod test {
                     (:model-type pddl)\
                     (:params ((?obj ball) (?room room) (?gripper gripper)))\
                     (:pre-conditions ((= (at ?obj) ?room) (= (at-robby) ?room) (= (carry ?gripper) no_ball)))\
-                    (:effects ((begin (assert 'carry ?gripper ?obj) (assert `at ?obj no_place)))))))",
+                    (:effects ((begin (assert 'carry ?gripper ?obj) (assert 'at ?obj no_place)))))))",
             result: "nil",
         };
 
-        let mut env = init_env_and_ctxs().await;
+        let mut env = init_env().await;
 
         eval(
             &parse(
-                "(def-task pick (:params (?obj ball) (?room room) (?gripper gripper)))",
+                "(begin (def-types ball room gripper)\n
+                (def-task pick (:params (?obj ball) (?room room) (?gripper gripper)))\
+                )",
                 &mut env,
             )
             .await?,
@@ -1189,22 +1192,17 @@ mod test {
         )
         .await?;
 
-        match test_expression_with_env(macro_to_test, &mut env, true).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                println!("err : {}", e);
-                Err(e)
-            }
-        }
+        test_expression_with_env(macro_to_test, &mut env, true).await?;
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_macro_def_command_om_model() -> Result<(), LRuntimeError> {
+    async fn test_macro_def_task_om_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_TASK_OM_MODEL,
-            dependencies: vec![MACRO_DEF_TASK],
+            inner: Expr::_macro(DEF_TASK_OM_MODEL, MACRO_DEF_TASK_OM_MODEL),
+            dependencies: vec![Expr::_macro(DEF_TASK, MACRO_DEF_TASK)],
             expression: "(def-task-om-model pick
-                            (:params (?r robot))
+                            (:params (?obj ball) (?room room) (?gripper gripper))
                             (:body
                                 (do
                                     (check (> (robot.battery ?r) 0.4))
@@ -1213,17 +1211,19 @@ mod test {
                          (map '(
                             (:name pick) 
                             (:model-type om) 
-                            (:params ((?r robot))) 
+                            (:params ((?obj ball) (?room room) (?gripper gripper)))
                             (:body ((do 
                               (check (> (robot.battery ?r) 0.4)) 
                               (assert (robot.busy ?r) true)))))))",
             result: "nil",
         };
 
-        let mut env = init_env_and_ctxs().await;
+        let mut env = init_env().await;
         eval(
             &parse(
-                "(def-task pick (:params (?obj ball) (?room room) (?gripper gripper)))",
+                "(begin (def-types ball room gripper)\n
+                (def-task pick (:params (?obj ball) (?room room) (?gripper gripper)))\
+                )",
                 &mut env,
             )
             .await?,
@@ -1231,20 +1231,16 @@ mod test {
             None,
         )
         .await?;
-        match test_expression_with_env(macro_to_test, &mut env, true).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                println!("err : {}", e);
-                Err(e)
-            }
-        }
+        test_expression_with_env(macro_to_test, &mut env, true).await?;
+        //Master::wait_end().await;
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_macro_def_method() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
-            inner: MACRO_DEF_METHOD,
-            dependencies: vec![MACRO_DEF_TASK],
+            inner: Expr::_macro(DEF_METHOD, MACRO_DEF_METHOD),
+            dependencies: vec![Expr::_macro(DEF_TASK, MACRO_DEF_TASK)],
             expression: "(def-method m_navigate_to (:task t_navigate_to)
             (:params (?r robot) (?x float) (?y float))
             (:pre-conditions (robot.available ?r) (< ?x 10) (< ?y 10))
@@ -1265,11 +1261,12 @@ mod test {
             result: "nil",
         };
 
-        let mut env = init_env_and_ctxs().await;
-
+        let mut env = init_env().await;
         eval(
             &parse(
-                "(def-task t_navigate_to (:params (?r robot) (?x float) (?y float)))",
+                "(begin (def-types robot)\n
+                (def-task t_navigate_to (:params (?r robot) (?x float) (?y float)))\
+                )",
                 &mut env,
             )
             .await?,
@@ -1277,12 +1274,6 @@ mod test {
             None,
         )
         .await?;
-        match test_expression_with_env(macro_to_test, &mut env, true).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                println!("err : {}", e);
-                Err(e)
-            }
-        }
+        test_expression_with_env(macro_to_test, &mut env, true).await
     }
 }

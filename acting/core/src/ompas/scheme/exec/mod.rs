@@ -209,3 +209,35 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
 
     Ok(value)
 }
+
+/*
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::ompas::scheme::monitor::ModMonitor;
+    use sompas_core::get_root_env;
+    use sompas_language::list::SECOND;
+    use sompas_structs::lenv::ImportType;
+    use sompas_structs::lruntimeerror;
+
+    #[skip]
+    #[tokio::test]
+    async fn test_arbitrary() -> lruntimeerror::Result<()> {
+        let mut env: LEnv = get_root_env().await;
+        env.import_module(
+            ModExec::new(&ModControl::new(&ModMonitor::default())).await,
+            ImportType::WithoutPrefix,
+        );
+
+        let lv = &[vec![1, 2, 3].into()];
+        let result = arbitrary(&env, lv).await?;
+        assert_eq!(result, LValue::from(1));
+
+        let lv = &[vec![1, 2, 3].into(), SECOND.into()];
+        let result = arbitrary(&env, lv).await?;
+        assert_eq!(result, LValue::from(2));
+
+        Ok(())
+    }
+}
+*/

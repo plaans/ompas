@@ -93,8 +93,14 @@ impl From<InstanceCollection> for PartialState {
 
 impl InstanceCollection {
     pub fn add_type(&mut self, t: &str, p: Option<&str>) {
-        let parents = if let Some(t) = p {
-            vec![self.st.get_type_id(t).unwrap()]
+        let parents = if let Some(parent) = p {
+            let parent_id = match self.st.get_type_id(parent) {
+                Some(id) => id,
+                None => self
+                    .st
+                    .add_type(parent, vec![self.st.get_type_id(TYPE_OBJECT).unwrap()]),
+            };
+            vec![parent_id]
         } else {
             vec![self.st.get_type_id(TYPE_OBJECT).unwrap()]
         };

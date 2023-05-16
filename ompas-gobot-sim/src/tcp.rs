@@ -323,7 +323,6 @@ const LOCATION_TILE: &str = "location_tile";
 const TILE_PREFIX: &str = "tile";
 
 const TRAVEL_DISTANCE: &str = "travel_distance";
-const TRAVEL_TIME: &str = "travel_time";
 
 #[derive(Eq, Hash, PartialEq, Clone)]
 struct Tile {
@@ -347,7 +346,13 @@ fn post_process_state(
     r#type: StateVariableType,
     global: &mut Global,
 ) -> Vec<PlatformUpdate> {
-    fn update_tiles(new: Tile, tiles: &mut HashSet<Tile>) -> Vec<StateVariable> {
+    let mut updates = vec![];
+
+    fn update_tiles(
+        new: Tile,
+        tiles: &mut HashSet<Tile>,
+        updates: &mut Vec<PlatformUpdate>,
+    ) -> Vec<StateVariable> {
         let mut state_variables = vec![];
 
         if !tiles.contains(&new) {
@@ -363,18 +368,24 @@ fn post_process_state(
                 });
                 state_variables.push(StateVariable {
                     r#type: StateVariableType::Static.into(),
-                    state_function: TRAVEL_TIME.to_string(),
+                    state_function: TRAVEL_DISTANCE.to_string(),
                     parameters: vec![new.to_string().into(), tile.to_string().into()],
                     value: Some(Atom::from(distance).into()),
                 });
             }
+            updates.push(
+                Instance {
+                    r#type: TILE_PREFIX.to_string(),
+                    object: new.to_string(),
+                }
+                .into(),
+            );
             tiles.insert(new);
         }
 
         state_variables
     }
 
-    let mut updates = vec![];
     let mut state_variables = vec![];
     for (k, v) in &state.inner {
         match k {
@@ -417,7 +428,11 @@ fn post_process_state(
 
                     let value = tile.to_string();
 
-                    state_variables.append(&mut update_tiles(tile, &mut global.tiles));
+                    state_variables.append(&mut update_tiles(
+                        tile,
+                        &mut global.tiles,
+                        &mut updates,
+                    ));
 
                     state_variables.push(StateVariable {
                         r#type: r#type.into(),
@@ -478,7 +493,11 @@ fn post_process_state(
 
                     let value = tile.to_string();
 
-                    state_variables.append(&mut update_tiles(tile, &mut global.tiles));
+                    state_variables.append(&mut update_tiles(
+                        tile,
+                        &mut global.tiles,
+                        &mut updates,
+                    ));
 
                     state_variables.push(StateVariable {
                         r#type: r#type.into(),

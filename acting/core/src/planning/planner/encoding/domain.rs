@@ -18,9 +18,8 @@ use crate::model::acting_domain::model::ActingModel;
 use crate::ompas::manager::state::instance::InstanceCollectionSnapshot;
 use crate::planning::planner::encoding::{
     atom_from_cst, get_type, try_variable_into_fvar, var_id_into_atom, PlannerDomain,
-    OMPAS_TIME_SCALE,
 };
-use crate::{OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_ENCODING_OPTIMIZATION_ON};
+use crate::OMPAS_PLAN_ENCODING_OPTIMIZATION_ON;
 use anyhow::anyhow;
 use aries::core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
@@ -36,7 +35,7 @@ use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleKind as aChronicleKind,
     ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect, StateFun, SubTask,
-    VarType,
+    VarType, TIME_SCALE,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use function_name::named;
@@ -85,6 +84,7 @@ pub fn encode_ctx(
     for t in &new_types {
         let sym = lattice.format_type(t);
         let parent = lattice.format_type(lattice.get_parent(t).first().unwrap());
+        //println!("type: {}, parent: {}", sym, parent);
         types.push((sym.to_string().into(), Some(parent.into())));
         symbols.push(TypedSymbol::new(sym, TYPE_OBJECT_TYPE));
     }
@@ -652,7 +652,7 @@ pub fn read_chronicle(
             let fvar = ctx.model.new_optional_fvar(
                 0,
                 INT_CST_MAX,
-                OMPAS_TIME_SCALE,
+                TIME_SCALE.get(),
                 prez,
                 container / VarType::Parameter(label),
             );
@@ -676,7 +676,6 @@ pub fn read_chronicle(
                 (INT_CST_MIN, INT_CST_MAX)
             };
 
-
             let ivar =
                 ctx.model
                     .new_optional_ivar(lb, ub, prez, container / VarType::Parameter(label));
@@ -686,7 +685,7 @@ pub fn read_chronicle(
             let fvar = ctx.model.new_optional_fvar(
                 INT_CST_MIN,
                 INT_CST_MAX,
-                OMPAS_TIME_SCALE, //Not sure of that
+                TIME_SCALE.get(), //Not sure of that
                 prez,
                 container / VarType::Parameter(label),
             );

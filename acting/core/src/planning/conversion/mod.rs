@@ -19,6 +19,7 @@ use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::planner::problem::{
     ChronicleInstance, PlanningDomain, PlanningInstance, PlanningProblem, TaskChronicle,
 };
+use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON};
 use aries_planning::chronicles::ChronicleOrigin;
 use chrono::{DateTime, Utc};
 #[allow(unused)]
@@ -37,7 +38,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::SystemTime;
 
 pub mod chronicle;
@@ -98,29 +99,36 @@ pub async fn _convert(
     p_env: &mut PLEnv,
     st: RefSymTable,
 ) -> Result<Chronicle, LRuntimeError> {
-    //let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
+    let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
     let mut graph = FlowGraph::new(st);
-    //debug_println!("conversion n{n_conversion}...");
+
+    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
+        println!("conversion n{n_conversion}:\n{}", lv.format(0));
+    }
     let flow = convert_lv(lv, &mut graph, &mut Default::default())?;
-    //debug_println!("convert({n_conversion}) = ok!");
     let time = SystemTime::now();
     graph.flow = flow;
     flow_graph_post_processing(&mut graph)?;
-    //debug_println!("flow_graph_post_processing({n_conversion}) = ok!");
+    /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
+        println!("flow_graph_post_processing({n_conversion}) = ok!");
+    }*/
     let max_capacity = match p_env.env.get_context::<ModExec>(MOD_EXEC) {
         Ok(m) => m.acting_manager.resource_manager.get_max_capacity() as i64,
         Err(_) => 1,
     };
 
-    //println!("_convert/max_capacity = {}", max_capacity);
+    /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
+        println!("_convert/max_capacity = {}", max_capacity);
+    }*/
 
     let cv = &ConvertParameters { max_capacity };
 
     let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env, cv)?;
-    //debug_println!("convert_graph({n_conversion}) = ok!");
-    //debug_println!("lv: {}\nchronicle: {}", lv.format(4), ch);
+
     post_processing(&mut ch, &p_env.env).await?;
-    //debug_println!("post_processing({n_conversion}) = ok!");
+    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
+        println!("chronicle: {}", ch);
+    }
     graph.flat_bindings();
     ch.meta_data.flow_graph = graph;
     ch.meta_data.convert_time = time.elapsed().unwrap();

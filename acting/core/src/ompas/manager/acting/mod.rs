@@ -377,7 +377,7 @@ impl ActingManager {
 
     pub async fn start_continuous_planning(&self, env: LEnv, opt: Option<PMetric>) {
         self.planning
-            .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
             .unwrap_or_else(|_| {
                 eprintln!("error compare exchange in start_continuous_planning");
                 false

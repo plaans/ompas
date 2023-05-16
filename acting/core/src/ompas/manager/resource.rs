@@ -410,7 +410,7 @@ impl ResourceManager {
                     eprintln!("error on compare_exchange in new_resource");
                     b
                 });
-            println!("updated max capacity: {} -> {}", value, capacity)
+            //println!("updated max capacity: {} -> {}", value, capacity)
         }
     }
 

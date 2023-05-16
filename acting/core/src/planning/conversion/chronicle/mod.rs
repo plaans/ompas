@@ -18,7 +18,7 @@ use crate::model::sym_table::VarId;
 use crate::planning::conversion::flow_graph::flow::{FlowId, FlowKind};
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::conversion::ConvertParameters;
-use crate::OMPAS_CHRONICLE_DEBUG_ON;
+use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON};
 use function_name::named;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::sym_table::{COND, EPSILON};
@@ -223,7 +223,7 @@ pub fn convert_into_chronicle(
 
         if start != end {
             if let Some(duration) = duration {
-                if OMPAS_CHRONICLE_DEBUG_ON.get() {
+                if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
                     println!("duration encoded");
                 }
                 ch.add_constraint(Constraint::eq(end, Computation::add(vec![start, duration])));

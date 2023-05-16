@@ -163,16 +163,22 @@ impl ExecPlatform {
 
                                         for sv in state.state_variables {
 
-                                            let mut key : Vec<LValueS> = vec![sv.state_function.into()];
-                                            for p in sv.parameters {
-                                                key.push(p.borrow().try_into().unwrap());
-                                            }
+                                            let key: LValueS = if sv.parameters.is_empty() {
+                                                sv.state_function.into()
+                                            }else {
+                                                let mut key : Vec<LValueS> = vec![sv.state_function.into()];
+                                                for p in sv.parameters {
+                                                    key.push(p.borrow().try_into().unwrap());
+                                                }
+                                                key.into()
+                                            };
+
                                             match StateVariableType::from_i32(sv.r#type).unwrap() {
                                                 StateVariableType::Static => {
-                                                    r#static.insert(key.into(), sv.value.unwrap().borrow().try_into().unwrap())
+                                                    r#static.insert(key.clone(), sv.value.unwrap().borrow().try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)))
                                                 }
                                                 StateVariableType::Dynamic => {
-                                                    dynamic.insert(key.clone().into(), sv.value.unwrap().borrow().try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)))
+                                                    dynamic.insert(key.clone(), sv.value.unwrap().borrow().try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)))
                                                 }
                                             }
                                         }

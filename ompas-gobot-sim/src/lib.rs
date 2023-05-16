@@ -30,6 +30,13 @@ pub fn default_gobot_sim_plan_domain() -> String {
     )
 }
 
+pub fn default_gobot_sim_plan_domain_e() -> String {
+    format!(
+        "{}/ompas-gobot-sim/planning_domain/domain_plan_extended.lisp",
+        ompas_path()
+    )
+}
+
 pub fn default_gobot_sim_plan_exec_domain() -> String {
     format!(
         "{}/ompas-gobot-sim/planning_domain/domain.lisp",

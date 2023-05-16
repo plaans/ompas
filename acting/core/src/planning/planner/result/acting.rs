@@ -4,8 +4,8 @@ use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::interval::{Interval, Timepoint};
 use crate::ompas::manager::resource::WaiterPriority;
-use crate::planning::planner::encoding::OMPAS_TIME_SCALE;
 use crate::planning::planner::problem::ChronicleInstance;
+use aries_planning::chronicles::TIME_SCALE;
 use itertools::Itertools;
 use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
@@ -107,8 +107,8 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             .as_float()
             .unwrap();
         let start: Timepoint = Timepoint::new_with_factor(
-            (start * OMPAS_TIME_SCALE as f64) as u128,
-            OMPAS_TIME_SCALE as u64,
+            (start * TIME_SCALE.get() as f64) as u128,
+            TIME_SCALE.get() as u64,
         );
         let end = st
             .get_domain_of_var(&interval.get_end())
@@ -117,8 +117,8 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             .as_float()
             .unwrap();
         let end: Timepoint = Timepoint::new_with_factor(
-            (end * OMPAS_TIME_SCALE as f64) as u128,
-            OMPAS_TIME_SCALE as u64,
+            (end * TIME_SCALE.get() as f64) as u128,
+            TIME_SCALE.get() as u64,
         );
 
         let interval = Interval::new(start, Some(end));
@@ -156,8 +156,8 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         .as_float()
                         .unwrap();
                     let start: Timepoint = Timepoint::new_with_factor(
-                        (start * OMPAS_TIME_SCALE as f64) as u128,
-                        OMPAS_TIME_SCALE as u64,
+                        (start * TIME_SCALE.get() as f64) as u128,
+                        TIME_SCALE.get() as u64,
                     );
                     let end = st
                         .get_domain_of_var(&s.interval.get_end())
@@ -166,8 +166,8 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         .as_float()
                         .unwrap();
                     let end: Timepoint = Timepoint::new_with_factor(
-                        (end * OMPAS_TIME_SCALE as f64) as u128,
-                        OMPAS_TIME_SCALE as u64,
+                        (end * TIME_SCALE.get() as f64) as u128,
+                        TIME_SCALE.get() as u64,
                     );
 
                     let interval = Interval::new(start, Some(end));
@@ -189,8 +189,8 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         .as_float()
                         .unwrap();
                     let request: Timepoint = Timepoint::new_with_factor(
-                        (request * OMPAS_TIME_SCALE as f64) as u128,
-                        OMPAS_TIME_SCALE as u64,
+                        (request * TIME_SCALE.get() as f64) as u128,
+                        TIME_SCALE.get() as u64,
                     );
 
                     let start_acquisition = st
@@ -200,8 +200,8 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         .as_float()
                         .unwrap();
                     let start_acquisition: Timepoint = Timepoint::new_with_factor(
-                        (start_acquisition * OMPAS_TIME_SCALE as f64) as u128,
-                        OMPAS_TIME_SCALE as u64,
+                        (start_acquisition * TIME_SCALE.get() as f64) as u128,
+                        TIME_SCALE.get() as u64,
                     );
 
                     let end_acq = st
@@ -211,8 +211,8 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         .as_float()
                         .unwrap();
                     let end_acq: Timepoint = Timepoint::new_with_factor(
-                        (end_acq * OMPAS_TIME_SCALE as f64) as u128,
-                        OMPAS_TIME_SCALE as u64,
+                        (end_acq * TIME_SCALE.get() as f64) as u128,
+                        TIME_SCALE.get() as u64,
                     );
                     let acquisition = Interval::new(start_acquisition, Some(end_acq));
 

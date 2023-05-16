@@ -1,7 +1,7 @@
 # Environment variables of the OMPAS project
 
 # print the generates chronicles
-export OMPAS_ACTIVATE_CHRONICLE_DEBUG=false
+export OMPAS_CHRONICLE_DEBUG=full
 
 # print the plan formatted for the acting tree
 export OMPAS_PLAN_OUTPUT=false
@@ -17,6 +17,10 @@ export OMPAS_LOG=false
 
 # Environment variables for scheme
 export SOMPAS_DEBUG=false
+
+export ARIES_LCP_TIME_SCALE=1000
+
+export ARIES_PRINT_INITIAL_PROPAGATION=true
 
 # Environemnt variables for ompas-gobot-sim
 #export GODOT3_PATH=$HOME/godot3

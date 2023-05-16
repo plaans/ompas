@@ -25,7 +25,7 @@ use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::run_solver;
 use crate::planning::planner::solver::PMetric;
-use crate::{OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON};
+use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON};
 use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries::model::lang::{Atom, Variable};
 use aries::model::Model;
@@ -135,14 +135,14 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                             env.update_context(ModState::new_from_snapshot(ep.state.clone()));
 
                             let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
-                            if OMPAS_CHRONICLE_DEBUG_ON.get() {
+                            if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
                                 for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin, i.am.chronicle.as_ref().unwrap())) {
                                     println!("{:?}:{}", origin, chronicle)
                                 }
                             }
 
                             let aries_problem: chronicles::Problem = encode(&mut table, &st, &pp).await.unwrap();
-                            if OMPAS_CHRONICLE_DEBUG_ON.get() {
+                            if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
                                 for instance in &aries_problem.chronicles {
                                     Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);
                                 }
@@ -256,14 +256,17 @@ pub async fn populate_problem(
                     },
                 )
             }
+        }
+        for effect in chronicle.get_effects() {
+            let label = effect.sv[0].format(st, true);
+            /*if label != "max-q" && label != "quantity" {
+                println!("detected sf: {}", label);
+            }*/
+            sf_labels.insert(label);
+        }
 
-            for effect in chronicle.get_effects() {
-                sf_labels.insert(effect.sv[0].format(st, true));
-            }
-
-            for condition in chronicle.get_conditions() {
-                sf_labels.insert(condition.sv[0].format(st, true));
-            }
+        for condition in chronicle.get_conditions() {
+            sf_labels.insert(condition.sv[0].format(st, true));
         }
     };
 
@@ -338,7 +341,6 @@ pub async fn populate_problem(
             .get(action.args[0].lvalues().to_string().as_str())
         {
             commands.insert(command.get_label().to_string());
-
             let model_lambda: LLambda = command
                 .get_model(&ModelKind::PlanModel)
                 .unwrap()
@@ -373,6 +375,10 @@ pub async fn populate_problem(
             }
         })
         .collect();
+
+    /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
+        println!("sf_labels: {:?}\nstate functions {:?}", sf_labels, sf)
+    }*/
 
     Ok(PlannerProblem {
         instances,

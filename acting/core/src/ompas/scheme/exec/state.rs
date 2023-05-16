@@ -85,14 +85,21 @@ impl From<ModState> for LModule {
 
 ///Add a fact to fact state
 #[async_scheme_fn]
-async fn assert(env: &LEnv, key: LValue, value: LValue) -> Result<(), LRuntimeError> {
+async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    if args.len() < 3 {
+        Err(LRuntimeError::wrong_number_of_args(
+            TRANSITIVE_ASSERT,
+            args,
+            2..usize::MAX,
+        ))?
+    }
     let state = env.get_context::<ModState>(MOD_STATE)?;
-    /*let key: LValue = if args.len() > 2 {
+    let key: LValue = if args.len() > 2 {
         args[0..args.len() - 1].into()
     } else {
         args[0].clone()
     };
-    let value = args.last().unwrap();*/
+    let value = args.last().unwrap();
     state
         .state
         .add_fact(key.try_into()?, value.try_into()?)
@@ -101,19 +108,24 @@ async fn assert(env: &LEnv, key: LValue, value: LValue) -> Result<(), LRuntimeEr
 }
 
 #[async_scheme_fn]
-async fn transitive_assert(
-    env: &LEnv,
-    key: LValueS,
-    value: LValueS,
-    duration: f64,
-) -> Result<(), LRuntimeError> {
+async fn transitive_assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    if args.len() < 3 {
+        return Err(LRuntimeError::wrong_number_of_args(
+            TRANSITIVE_ASSERT,
+            args,
+            3..usize::MAX,
+        ));
+    }
     let state = env.get_context::<ModState>(MOD_STATE)?;
-    /*let key: LValue = if args.len() > 2 {
-        args[0..args.len() - 1].into()
+    let key: LValueS = if args.len() > 3 {
+        LValue::from(&args[0..args.len() - 2])
     } else {
         args[0].clone()
-    };
-    let value = args.last().unwrap();*/
+    }
+    .try_into()?;
+
+    let duration: f64 = args.last().unwrap().try_into()?;
+    let value: LValueS = args.get(args.len() - 2).unwrap().try_into()?;
     state.state.add_fact(key.clone(), UNKNOWN.into()).await;
     tokio::time::sleep(Duration::from_micros((duration * 1_000_000.0) as u64)).await;
     state.state.add_fact(key, value).await;

@@ -2,7 +2,7 @@ use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::lit::{AcquireLit, Lit, LitSet};
 use crate::model::process_ref::Label;
-use crate::model::sym_domain::basic_type::BasicType::{Boolean, True};
+use crate::model::sym_domain::basic_type::BasicType::{Boolean, Float, True};
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::closure::Update;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
@@ -20,7 +20,8 @@ use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::RELEASE;
 use ompas_language::exec::state::{
-    ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, TRANSITIVE_ASSERT, WAIT_FOR,
+    ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, READ_STATIC_STATE, TRANSITIVE_ASSERT,
+    WAIT_FOR,
 };
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
@@ -67,6 +68,7 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(ASSERT_SHORT, convert_assert);
         d.add_conversion(TRANSITIVE_ASSERT, convert_transitive_assert);
         d.add_conversion(READ_STATE, convert_read_state);
+        d.add_conversion(READ_STATIC_STATE, convert_read_state);
         d.add_conversion(EQ, convert_eq);
         d.add_conversion(LEQ, convert_leq);
         d.add_conversion(LT, convert_lt);
@@ -336,7 +338,10 @@ fn convert_add(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
     let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::add(args)));
-
+    fl.st.set_domain(
+        &fl.st.get_domain_id(&fl.get_flow_result(&flow_apply)),
+        Float,
+    );
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -347,7 +352,10 @@ fn convert_sub(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
     let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::sub(args)));
-
+    fl.st.set_domain(
+        &fl.st.get_domain_id(&fl.get_flow_result(&flow_apply)),
+        Float,
+    );
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -358,7 +366,10 @@ fn convert_mul(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
     let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::mul(args)));
-
+    fl.st.set_domain(
+        &fl.st.get_domain_id(&fl.get_flow_result(&flow_apply)),
+        Float,
+    );
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -369,7 +380,10 @@ fn convert_div(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
     let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::div(args)));
-
+    fl.st.set_domain(
+        &fl.st.get_domain_id(&fl.get_flow_result(&flow_apply)),
+        Float,
+    );
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }

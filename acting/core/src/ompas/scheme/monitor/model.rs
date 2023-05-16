@@ -859,12 +859,14 @@ pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
                 if list.len() < 2 {
                     return Err(lruntimeerror!(
                         ADD_TYPES,
-                        format!("an objects is defined by a symbol and a type, got {}", arg)
+                        format!(
+                            "A type is defined by a symbol and a parent type, got {}",
+                            arg
+                        )
                     ));
                 }
                 let last = list.last().unwrap();
                 for t in &list[0..list.len() - 1] {
-                    //println!("new type: {}", t);
                     add_type(env, &[t.clone(), last.clone()]).await?;
                 }
             }

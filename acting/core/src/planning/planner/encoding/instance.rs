@@ -138,13 +138,17 @@ fn initialize_goal_task(init_ch: &mut Chronicle, goal_tasks: &[LValueS], ctx: &m
         let start = ctx.model.new_optional_fvar(
             0,
             INT_CST_MAX,
-            TIME_SCALE,
+            TIME_SCALE.get(),
             prez,
             c / VarType::TaskStart(0),
         );
-        let end =
-            ctx.model
-                .new_optional_fvar(0, INT_CST_MAX, TIME_SCALE, prez, c / VarType::TaskEnd(0));
+        let end = ctx.model.new_optional_fvar(
+            0,
+            INT_CST_MAX,
+            TIME_SCALE.get(),
+            prez,
+            c / VarType::TaskEnd(0),
+        );
         let start = FAtom::from(start);
         let end = FAtom::from(end);
         let id = None;

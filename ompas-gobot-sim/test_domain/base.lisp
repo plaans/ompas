@@ -1,6 +1,6 @@
 (begin
     ;types declaration
-    (def-types machine robot package belt parking_area interact_area)
+    (def-types machine robot package belt (parking_area interact_area area))
 
     ;state function declaration
     (def-state-function robot.coordinates (:params (?r robot)) (:result (tuple int int)))

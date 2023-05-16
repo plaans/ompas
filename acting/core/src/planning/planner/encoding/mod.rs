@@ -12,7 +12,6 @@ use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::generate_instances;
 use crate::planning::planner::problem::ChronicleInstance;
 use anyhow::Result;
-use aries::core::IntCst;
 use aries::core::Lit as aLit;
 use aries::model::extensions::Shaped;
 use aries::model::lang::{
@@ -32,10 +31,8 @@ pub mod domain;
 pub mod instance;
 pub mod problem_generation;
 
-//pub const FLOAT_SCALE: IntCst = TIME_SCALE;
+//pub const TIME_SCALE.get(): IntCst = TIME_SCALE;
 /// Resolution of ms
-pub const OMPAS_TIME_SCALE: IntCst = TIME_SCALE;
-pub const FLOAT_SCALE: IntCst = OMPAS_TIME_SCALE;
 
 pub struct PlannerProblem {
     pub instances: Vec<ChronicleInstance>,
@@ -110,7 +107,7 @@ pub fn get_type(
         Domain::Simple(t) => match *t {
             TYPE_ID_BOOLEAN => Ok(aType::Bool),
             TYPE_ID_INT => Ok(aType::Int),
-            TYPE_ID_FLOAT => Ok(aType::Fixed(FLOAT_SCALE)),
+            TYPE_ID_FLOAT => Ok(aType::Fixed(TIME_SCALE.get())),
             t => {
                 let other: String = lattice.format_type(&t);
                 match st.types.id_of(&other) {
@@ -144,8 +141,8 @@ pub fn atom_from_cst(ctx: &Ctx, cst: &Cst) -> aAtom {
     match cst {
         Cst::Int(i) => IAtom::from(*i as i32).into(),
         Cst::Float(f) => {
-            let f: i32 = (f * FLOAT_SCALE as f64) as i32;
-            FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
+            let f: i32 = (f * TIME_SCALE.get() as f64) as i32;
+            FAtom::new(IAtom::from(f), TIME_SCALE.get()).into()
         }
         Cst::Symbol(s) => {
             let id = ctx
@@ -173,8 +170,8 @@ pub fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
         }
         LValueS::Int(i) => IAtom::from(*i as i32).into(),
         LValueS::Float(f) => {
-            let f: i32 = (f * FLOAT_SCALE as f64) as i32;
-            FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
+            let f: i32 = (f * TIME_SCALE.get() as f64) as i32;
+            FAtom::new(IAtom::from(f), TIME_SCALE.get()).into()
         }
         LValueS::Bool(b) => match b {
             false => aLit::FALSE.into(),
@@ -202,12 +199,12 @@ pub fn var_id_into_atom(
         match cst {
             Cst::Int(i) => IAtom::from(*i as i32).into(),
             Cst::Float(f) => {
-                let f: i32 = (f * FLOAT_SCALE as f64) as i32;
-                FAtom::new(IAtom::from(f), FLOAT_SCALE).into()
+                let f: i32 = (f * TIME_SCALE.get() as f64) as i32;
+                FAtom::new(IAtom::from(f), TIME_SCALE.get()).into()
             }
             Cst::Symbol(s) => {
                 if s.as_str() == EPSILON {
-                    (FVar::new(IVar::ZERO, FLOAT_SCALE) + FAtom::EPSILON).into()
+                    (FVar::new(IVar::ZERO, TIME_SCALE.get()) + FAtom::EPSILON).into()
                 } else {
                     ctx.typed_sym(
                         ctx.model

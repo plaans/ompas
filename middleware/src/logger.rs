@@ -11,10 +11,15 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::SystemTime;
-use std::{fs, mem};
+use std::{env, fs, mem};
 use tokio::sync::{broadcast, mpsc, RwLock};
 
-const DEFAULT_LOG_DIRECTORY: &str = "/home/jeremy/ompas_logs";
+fn default_log_directory() -> String {
+    format!(
+        "{}/ompas_logs",
+        env::var("HOME").unwrap_or("/tmp".to_string())
+    )
+}
 const DEFAULT_MAX_LOG_LEVEL: Level = Level::Info;
 pub const END_SIGNAL: EndSignal = EndSignal {};
 pub const PROCESS_LOGGER: &str = "__PROCESS_LOGGER__";
@@ -295,19 +300,23 @@ impl Logger {
         let path: String = match &file_descriptor {
             None => format!(
                 "{}/{}/{}.txt",
-                DEFAULT_LOG_DIRECTORY, self.current_log_dir, name
+                default_log_directory(),
+                self.current_log_dir,
+                name
             ),
             Some(FileDescriptor::AbsolutePath(ap)) => ap.to_str().unwrap().to_string(),
             Some(FileDescriptor::RelativePath(rp)) => format!(
                 "{}/{}/{}.txt",
-                DEFAULT_LOG_DIRECTORY,
+                default_log_directory(),
                 self.current_log_dir,
                 rp.to_str().unwrap()
             ),
             Some(FileDescriptor::Directory(d)) => format!("{}/{}.txt", d.to_str().unwrap(), name),
             Some(FileDescriptor::Name(n)) => format!(
                 "{}/{}/{}.txt",
-                DEFAULT_LOG_DIRECTORY, self.current_log_dir, n
+                default_log_directory(),
+                self.current_log_dir,
+                n
             ),
         };
 

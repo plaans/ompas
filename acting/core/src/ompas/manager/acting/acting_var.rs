@@ -244,11 +244,10 @@ impl ActingVarCollection {
         if let Some(val) = &execution_var.val {
             val.as_cst().unwrap().to_string()
         } else if let Some(var) = &execution_var.plan_var_id {
-                self.plan_vars[*var].to_string()
+            self.plan_vars[*var].to_string()
         } else {
             "".to_string()
         }
-
     }
 
     pub async fn clear(&mut self) {

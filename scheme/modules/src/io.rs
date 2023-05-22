@@ -1,6 +1,7 @@
 use ompas_middleware::logger::LogClient;
+use sompas_core::parse;
 use sompas_language::io::*;
-use sompas_macros::scheme_fn;
+use sompas_macros::{async_scheme_fn, scheme_fn};
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
@@ -68,6 +69,7 @@ impl From<ModIO> for LModule {
         module.add_fn(WRITE, write, DOC_WRITE, false);
         module.add_fn(GET_CURRENT_DIR, get_current_dir, DOC_GET_CURRENT_DIR, false);
         module.add_fn(SET_CURRENT_DIR, set_current_dir, DOC_SET_CURRENT_DIR, false);
+        module.add_async_fn(GET_ENV_VAR, get_env_var, DOC_GET_ENV_VAR, false);
         module.add_macro(READ, MACRO_READ, DOC_READ);
 
         module
@@ -158,5 +160,13 @@ pub fn set_current_dir(dir: String) -> Result<(), String> {
     match env::set_current_dir(dir) {
         Ok(_) => Ok(()),
         Err(e) => Err(format!("Error setting current dir: {e}")),
+    }
+}
+
+#[async_scheme_fn]
+pub async fn get_env_var(env: &LEnv, var: String) -> LResult {
+    match env::var(var) {
+        Ok(o) => parse(&o, &mut env.clone()).await,
+        Err(e) => Err(LRuntimeError::new("", e.to_string())),
     }
 }

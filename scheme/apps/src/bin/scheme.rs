@@ -64,8 +64,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
         li.import_namespace(ctx_io);
         li.import_namespace(ctx_math);
 
-        li.import(ctx_string);
-        li.import(ctx_time);
+        li.import_namespace(ctx_string);
+        li.import_namespace(ctx_time);
     }
 
     li.set_config(LispInterpreterConfig::new(true));

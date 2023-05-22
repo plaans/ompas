@@ -111,7 +111,7 @@ pub async fn lisp_interpreter(opt: Opt) {
     li.import_namespace(ctx_math);
     li.import_namespace(mod_time);
 
-    li.import(ctx_string);
+    li.import_namespace(ctx_string);
 
     let mut log = if let Some(pb) = &opt.log {
         pb.clone()

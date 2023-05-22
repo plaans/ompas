@@ -65,7 +65,7 @@ async fn lisp_interpreter(opt: Opt) {
     li.import_namespace(ctx_utils);
     li.import_namespace(ctx_io);
     li.import_namespace(ctx_math);
-    li.import(ctx_string);
+    li.import_namespace(ctx_string);
     li.import_namespace(ModTime::new(2));
 
     let ctx_rae = ModMonitor::new(

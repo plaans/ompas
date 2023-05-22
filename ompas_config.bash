@@ -1,7 +1,7 @@
 # Environment variables of the OMPAS project
 
 # print the generates chronicles
-export OMPAS_CHRONICLE_DEBUG=full
+export OMPAS_CHRONICLE_DEBUG=on
 
 # print the plan formatted for the acting tree
 export OMPAS_PLAN_OUTPUT=false

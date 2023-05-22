@@ -949,6 +949,9 @@ pub mod io {
 
     pub const SET_CURRENT_DIR: &str = "set-current-dir";
     pub const DOC_SET_CURRENT_DIR: &str = "Set the current working dir.";
+
+    pub const GET_ENV_VAR: &str = "get-env-var";
+    pub const DOC_GET_ENV_VAR: &str = "Get the current value of an environment variable.";
 }
 
 pub const PROCESS_TOPIC_INTERPRETER: &str = "__PROCESS_TOPIC_INTERPRETER__";

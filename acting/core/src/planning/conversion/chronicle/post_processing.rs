@@ -2,6 +2,7 @@ use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::lit::{lvalue_to_lit, Lit};
 use crate::model::chronicle::{Chronicle, ChronicleSet};
 use crate::model::sym_domain::basic_type::BasicType;
+use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, GetVariables};
 use crate::model::sym_table::{EmptyDomains, VarId};
@@ -9,7 +10,9 @@ use crate::planning::conversion::point_algebra::problem::{
     try_into_pa_relation, PAGraph, PAProblem,
 };
 use crate::planning::conversion::point_algebra::remove_useless_timepoints;
+use crate::planning::conversion::TEST_CONVERSION;
 use im::HashSet;
+use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::TYPE_TIMEPOINT;
 use sompas_core::{eval, parse};
 use sompas_structs::lenv::LEnv;
@@ -18,15 +21,18 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::Write;
 use std::ops::Deref;
+
 const TRY_EVAL_APPLY: &str = "try_eval_apply";
 
 pub async fn post_processing(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
     c.st.flat_bindings();
     merge_conditions(c)?;
     try_eval_apply(c, env).await?;
+    rm_useless_var(c);
     simplify_constraints(c)?;
     rm_useless_var(c);
     simplify_timepoints(c)?;
+    simplify_conditions(c)?;
     rm_useless_var(c);
     c.flat_bindings();
     Ok(())
@@ -206,6 +212,42 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
         c.rm_set_constraint(to_remove);
     }
 
+    Ok(())
+}
+
+pub fn simplify_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
+    let mut vec = vec![];
+    let st = c.st.clone();
+    let instance_id = st.get_sym_id(INSTANCE).unwrap();
+    println!("instance: {}", instance_id);
+    for (i, condition) in c.conditions.iter().enumerate() {
+        let parent = st.get_var_parent(&condition.sv[0]);
+        println!("condition: {}, {}", condition.format(&st, true), parent,);
+        if instance_id == parent && !TEST_CONVERSION.get() {
+            println!("condition is instance");
+            assert_eq!(condition.sv.len(), 2);
+            let target_domain: String = condition.value.format(&st, true);
+            let domain_id = st.get_domain_id(&condition.sv[1]);
+            let t_domain = Domain::Simple(
+                *st.get_lattice()
+                    .get_type_id(&target_domain)
+                    .unwrap_or_else(|| panic!("{} is not defined as a type", target_domain)),
+            );
+            match st.meet_to_domain(&domain_id, t_domain) {
+                EmptyDomains::None => vec.push(i),
+                EmptyDomains::Some(_) => {
+                    panic!(
+                        "{} of type {} is not compatible with type {}",
+                        condition.sv[1].format(&st, true),
+                        st.format_domain_id(&domain_id),
+                        target_domain
+                    )
+                }
+            }
+        }
+    }
+
+    c.rm_set_conditions(vec);
     Ok(())
 }
 

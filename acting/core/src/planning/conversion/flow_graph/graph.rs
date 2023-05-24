@@ -6,11 +6,7 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, GetVariables};
 use crate::model::sym_table::VarId;
-use crate::planning::conversion::flow_graph::flow::{
-    BranchingFlow, Flow, FlowId, FlowKind, FlowPause,
-};
-use im::HashSet;
-use ompas_language::sym_table::TYPE_RESSOURCE_HANDLE;
+use crate::planning::conversion::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind};
 use std::collections::HashMap;
 use std::fmt::Write;
 
@@ -178,14 +174,6 @@ impl FlowGraph {
                 set
             }
             FlowKind::FlowHandle(f) => self.get_atom_of_flow(f),
-            FlowKind::FlowPause(fw) => {
-                let mut set: HashSet<VarId> = Default::default();
-                if let Some(duration) = fw.duration {
-                    set.insert(duration);
-                }
-                set
-            }
-            FlowKind::FlowResourceHandle(fa) => self.get_atom_of_flow(fa),
         };
 
         set.insert(flow.result);
@@ -240,27 +228,6 @@ impl FlowGraph {
         self.new_flow(FlowKind::FlowHandle(flow), interval, result)
     }
 
-    pub fn new_wait(&mut self, duration: Option<VarId>) -> FlowId {
-        let interval = Interval::new(self.st.new_timepoint(), self.st.new_timepoint());
-        let result = self.st.new_nil();
-        self.new_flow(
-            FlowKind::FlowPause(FlowPause { duration }),
-            interval,
-            result,
-        )
-    }
-
-    pub fn new_resource_handle(&mut self, flow: FlowId) -> FlowId {
-        let interval = Interval::new_instantaneous(self.st.new_timepoint());
-        let result = self.st.new_result();
-        let domain_result = self.st.get_domain_id(&result);
-        self.st.set_domain(
-            &domain_result,
-            self.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
-        );
-        self.new_flow(FlowKind::FlowResourceHandle(flow), interval, result)
-    }
-
     fn new_flow(
         &mut self,
         flow_kind: impl Into<FlowKind>,
@@ -294,12 +261,6 @@ impl FlowGraph {
                 self.flows[branching.true_flow].parent = Some(id);
             }
             FlowKind::FlowHandle(h) => self.flows[*h].parent = Some(id),
-            FlowKind::FlowPause(fw) => {
-                if let Some(duration) = fw.duration {
-                    vars.push(duration)
-                }
-            }
-            FlowKind::FlowResourceHandle(rh) => self.flows[*rh].parent = Some(id),
         }
         for v in vars {
             match self.map_atom_id_flow_id.get_mut(&v) {
@@ -515,46 +476,6 @@ impl FlowGraph {
                 start = Some(*id);
                 end = Some(*id);
             }
-            FlowKind::FlowPause(fw) => {
-                match &fw.duration {
-                    Some(duration) => {
-                        writeln!(
-                            dot,
-                            "V{id} [label= \"{}:{}={}+{}\", color = {color}];",
-                            interval.format(st, false),
-                            interval.get_end().format(st, false),
-                            interval.get_start().format(st, false),
-                            duration.format(st, false),
-                        )
-                        .unwrap();
-                    }
-                    None => {
-                        writeln!(
-                            dot,
-                            "V{id} [label= \"{}\", color = {color}];",
-                            interval.format(st, false),
-                        )
-                        .unwrap();
-                    }
-                }
-                start = Some(*id);
-                end = Some(*id);
-            }
-            FlowKind::FlowResourceHandle(rh) => {
-                let (f_dot, (handle_start, _)) = self.export_flow(rh);
-                writeln!(dot, "RH_{rh} -> V{handle_start};",).unwrap();
-                write!(dot, "{f_dot}").unwrap();
-                writeln!(
-                    dot,
-                    "V{id} [label= \"{}: {} <- resource-handle({rh})\", color = {color}];",
-                    interval.format(st, false),
-                    result.format(st, false),
-                )
-                .unwrap();
-
-                start = Some(*id);
-                end = Some(*id);
-            }
         }
 
         (dot, (start.unwrap(), end.unwrap()))
@@ -574,16 +495,8 @@ impl FlowGraph {
         for f in &mut self.flows {
             f.interval.flat_bindings(st);
             f.result.flat_bindings(st);
-            match &mut f.kind {
-                FlowKind::Lit(lit) => {
-                    lit.flat_bindings(st);
-                }
-                FlowKind::FlowPause(fw) => {
-                    if let Some(duration) = &mut fw.duration {
-                        duration.flat_bindings(st)
-                    }
-                }
-                _ => {}
+            if let FlowKind::Lit(lit) = &mut f.kind {
+                lit.flat_bindings(st);
             }
         }
     }

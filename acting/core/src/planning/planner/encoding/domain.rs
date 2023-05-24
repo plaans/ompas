@@ -15,7 +15,7 @@ use crate::model::sym_table::VarId;
 use crate::ompas::manager::acting::planning::ActingVarRefTable;
 
 use crate::model::acting_domain::model::ActingModel;
-use crate::ompas::manager::state::instance::InstanceCollectionSnapshot;
+use crate::ompas::manager::state::instance::InstanceCollection;
 use crate::planning::planner::encoding::{
     atom_from_cst, get_type, try_variable_into_fvar, var_id_into_atom, PlannerDomain,
 };
@@ -55,7 +55,7 @@ use std::sync::Arc;
 pub fn encode_ctx(
     st: &RefSymTable,
     domain: &PlannerDomain,
-    instance: &InstanceCollectionSnapshot,
+    instance: &InstanceCollection,
 ) -> anyhow::Result<Ctx> {
     let st = st.clone();
     let lattice = st.get_lattice();

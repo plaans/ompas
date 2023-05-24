@@ -21,8 +21,6 @@ pub enum FlowKind {
     Seq(Vec<FlowId>),
     Branching(BranchingFlow),
     FlowHandle(FlowId),
-    FlowResourceHandle(FlowId),
-    FlowPause(FlowPause),
 }
 
 impl From<Lit> for FlowKind {
@@ -42,9 +40,4 @@ pub struct BranchingFlow {
     pub cond_flow: FlowId,
     pub true_flow: FlowId,
     pub false_flow: FlowId,
-}
-
-#[derive(Clone)]
-pub struct FlowPause {
-    pub duration: Option<VarId>,
 }

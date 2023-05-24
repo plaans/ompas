@@ -18,7 +18,6 @@ use crate::model::sym_table::VarId;
 use crate::planning::conversion::flow_graph::flow::{FlowId, FlowKind};
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::conversion::ConvertParameters;
-use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON};
 use function_name::named;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::sym_table::{COND, EPSILON};
@@ -223,9 +222,9 @@ pub fn convert_into_chronicle(
 
         if start != end {
             if let Some(duration) = duration {
-                if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
                     println!("duration encoded");
-                }
+                }*/
                 ch.add_constraint(Constraint::eq(end, Computation::add(vec![start, duration])));
             } else {
                 ch.add_constraint(Constraint::leq(start, end))
@@ -429,10 +428,11 @@ pub fn convert_into_chronicle(
                                 //println!("setting types");
                                 let mut types = types.clone();
                                 types.push(*r.clone());
-                                for (f, t) in args.iter().zip(types) {
+                                for (i, (f, t)) in args.iter().zip(types).enumerate() {
                                     let r = fl.st.get_domain_id(f);
-                                    if !fl.st.meet_to_domain(&r, t).is_none() {
-                                        panic!("brrruuuuuh")
+                                    let domain_debug = st.get_domain(&r);
+                                    if !fl.st.meet_to_domain(&r, t.clone()).is_none() {
+                                        panic!("Error checking domain of {} which is not compatible with arg {} of sf {}: expected {}, got {}", f.format(&st, true), i, sf.format(&st, true), st.format_domain(&t), st.format_domain(&domain_debug))
                                     };
                                 }
                             }
@@ -457,10 +457,11 @@ pub fn convert_into_chronicle(
                                 //println!("setting types");
                                 let mut types = types.clone();
                                 types.push(*r.clone());
-                                for (f, t) in args.iter().zip(types) {
+                                for (i, (f, t)) in args.iter().zip(types).enumerate() {
                                     let r = fl.st.get_domain_id(f);
-                                    if !fl.st.meet_to_domain(&r, t).is_none() {
-                                        panic!("brrruuuuuh")
+                                    let domain_debug = st.get_domain(&r);
+                                    if !fl.st.meet_to_domain(&r, t.clone()).is_none() {
+                                        panic!("Error checking domain of {} which is not compatible with arg {} of sf {}: expected {}, got {}", f.format(&st, true), i, sf.format(&st, true),st.format_domain(&t),st.format_domain(&domain_debug) )
                                     };
                                 }
                             }
@@ -519,7 +520,18 @@ pub fn convert_into_chronicle(
                     Lit::Set(_) => panic!("set not supported yet"),
                 }
             }
-            FlowKind::Seq(seq) => queue.append(&mut VecDeque::from(seq)),
+            FlowKind::Seq(seq) => {
+                let mut precedent = start;
+                for f in &seq {
+                    let start = fl.get_flow_start(f);
+                    if start != precedent {
+                        ch.add_constraint(Constraint::leq(precedent, start));
+                    }
+                    precedent = fl.get_flow_end(f);
+                }
+
+                queue.append(&mut VecDeque::from(seq))
+            }
             FlowKind::Branching(branching) => {
                 let cond = fl.get_flow_result(&branching.cond_flow);
                 let cond_domain = st.get_domain_of_var(&cond);
@@ -675,34 +687,6 @@ pub fn convert_into_chronicle(
                 }
 
                 //ch.add_constraint(Constraint::leq(fl.get_flow_end(&h), Constraint::Max(drops)))
-            }
-            FlowKind::FlowPause(_) => {
-                unreachable!("flow pause should no longer be used");
-            }
-            FlowKind::FlowResourceHandle(_) => {
-                unreachable!()
-                /*queue.push_back(h);
-                let domain_id = st.get_domain_id(&result);
-
-                ch.add_constraint(Constraint::leq(start, fl.get_flow_start(&h)));
-
-                let drops: Vec<VarId> = st
-                    .get_domain_vars(&domain_id)
-                    .drain(..)
-                    .filter_map(|a| st.get_drop(&st.get_var_parent(&a)))
-                    .collect();
-
-                for drop in drops {
-                    ht.add_drop(&h, drop)
-                }*/
-
-                /*let drops: Vec<Lit> = st
-                    .get_domain_vars(&domain_id)
-                    .drain(..)
-                    .filter_map(|a| st.get_drop(&st.get_var_parent(&a)).map(|d| Lit::from(d)))
-                    .unique()
-                    .collect();
-                ch.add_constraint(Constraint::eq(fl.get_flow_end(&h), Constraint::Max(drops)))*/
             }
         }
     }

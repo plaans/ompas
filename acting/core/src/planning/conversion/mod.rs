@@ -24,6 +24,7 @@ use aries_planning::chronicles::ChronicleOrigin;
 use chrono::{DateTime, Utc};
 #[allow(unused)]
 use debug_print::debug_println;
+use env_param::EnvParam;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::MOD_EXEC;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
@@ -49,6 +50,7 @@ pub mod point_algebra;
 #[allow(dead_code)]
 static N_CONVERSION: AtomicU32 = AtomicU32::new(0);
 const MAX_QUANTITY_VALUE: i64 = 1000;
+pub static TEST_CONVERSION: EnvParam<bool> = EnvParam::new("OMPAS_TEST_CONVERSION", "false");
 
 pub struct ConvertParameters {
     pub max_capacity: i64,

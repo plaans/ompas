@@ -82,7 +82,6 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(WAIT_FOR, convert_wait_for);
         d.add_conversion(SLEEP, convert_sleep);
         d.add_conversion(ACQUIRE, convert_acquire);
-        d.add_conversion(RESSOURCE_HANDLE, convert_ressource_handle);
         d.add_conversion(RELEASE, convert_release);
         d.add_conversion(ADD, convert_add);
         d.add_conversion(SUB, convert_sub);
@@ -491,13 +490,6 @@ fn convert_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, L
 
     seq.push(acquire);
     Ok(fl.new_seq(seq))
-}
-
-fn convert_ressource_handle(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
-    let rh = fl.new_resource_handle(seq[1]);
-    fl.handles.insert(fl.get_flow_result(&rh), seq[1]);
-
-    Ok(rh)
 }
 
 fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {

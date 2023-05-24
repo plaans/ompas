@@ -23,27 +23,27 @@
     (def-task-om-model t_carry_to_machine
         (:params (?r robot) (?p package) (?m machine))
         (:body
+            ;(robot_move ?r (package.location ?p))
+            ;(robot_move ?r (machine.input_belt ?m))
             (begin
-                (define d1 (location_tile (package.location ?p)))
-                (robot_move ?r (location_tile ?m))
+                (define d1 (package.location ?p))
+                (robot_move ?r d1)
                 (assert 'package.location ?p ?r)
-                (define input_belt (machine.input_belt ?m))
-                (define d2 (location_tile input_belt))
+                (define d2 (machine.input_belt ?m))
                 (robot_move ?r d2)
-                (assert 'package.location ?p input_belt)
+                (assert 'package.location ?p d2)
+            )
             ))
-    )
 
-    (def-command robot_move (:params (?r robot) (?dest tile)))
+    (def-command robot_move (:params (?r robot) (?dest location)))
     (def-command-om-model robot_move
-        (:params (?r robot) (?dest tile))
+        (:params (?r robot) (?dest location))
         (:body
             (begin
-                (define t_r (location_tile ?r))
-                (define time 
-                    (/ (travel_distance t_r ?dest)
-                       (globals.robot_standard_velocity)))
-                (transitive-assert 'location_tile ?r ?dest time)
+                ;(define t_r (robot.location ?r))
+                ;(define time (travel-time t_r ?dest))
+                ;(transitive-assert 'robot.location ?r ?dest time)
+                (transitive-assert 'robot.location ?r ?dest 1)
             ))
     )
 

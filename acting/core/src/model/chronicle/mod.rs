@@ -55,7 +55,7 @@ pub struct Chronicle {
     result: VarId,
     pub variables: HashSet<VarId>,
     pub constraints: Vec<Constraint>,
-    conditions: Vec<Condition>,
+    pub conditions: Vec<Condition>,
     effects: Vec<Effect>,
     subtasks: Vec<SubTask>,
     pub bindings: ActingBindingCollection,
@@ -221,6 +221,14 @@ impl Chronicle {
         indexes.reverse();
         for index in indexes {
             self.rm_constraint(index);
+        }
+    }
+
+    pub fn rm_set_conditions(&mut self, mut indexes: Vec<usize>) {
+        indexes.sort_unstable();
+        indexes.reverse();
+        for index in indexes {
+            self.rm_condition(index);
         }
     }
 

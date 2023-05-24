@@ -81,7 +81,7 @@ impl ModModel {
 impl From<ModModel> for LModule {
     fn from(m: ModModel) -> Self {
         let prelude = m.domain_description.clone();
-        let mut module = LModule::new(m, MOD_DOMAIN, DOC_MOD_DOMAIN);
+        let mut module = LModule::new(m, MOD_MODEL, DOC_MOD_DOMAIN);
         module.add_async_fn(
             GENERATE_TEST_TYPE_EXPR,
             generate_test_type_expr,
@@ -280,7 +280,7 @@ pub async fn add_state_function(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let st: RefSymTable = ctx.st.clone();
     let mut new_env = ctx.get_empty_env();
     let label = map.get(&NAME.into()).unwrap();
@@ -329,7 +329,7 @@ pub async fn add_static_state_function(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let st: RefSymTable = ctx.st.clone();
     let mut new_env = ctx.get_empty_env();
     let label = map.get(&NAME.into()).unwrap();
@@ -373,7 +373,7 @@ pub async fn add_static_state_function(
 }
 
 async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
 
     let st: RefSymTable = ctx.st.clone();
     let env = &mut ctx.get_empty_env();
@@ -456,7 +456,7 @@ pub async fn add_command(
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let st: RefSymTable = ctx.st.clone();
     let mut env = ctx.get_empty_env();
     let mut command = Command::default();
@@ -518,7 +518,7 @@ pub async fn add_command_model(
     env: &LEnv,
     model: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = create_model(env, model).await?;
     let kind = ModelKind::PlanModel;
@@ -537,7 +537,7 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let st: RefSymTable = ctx.st.clone();
 
     let mut env = ctx.get_empty_env();
@@ -604,7 +604,7 @@ pub async fn add_task_model(
     env: &LEnv,
     model: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = create_model(env, model).await?;
     let kind = ModelKind::PlanModel;
@@ -625,7 +625,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
             1..usize::MAX,
         ));
     }
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let st: RefSymTable = ctx.st.clone();
     let mut new_env = ctx.get_empty_env();
     let parameters = map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil).clone();
@@ -757,7 +757,7 @@ impl TryFrom<&str> for ModelType {
 /// Defines a lambda in RAE environment.
 #[async_scheme_fn]
 pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN).unwrap();
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
     let mut env = ctx.get_empty_env();
     let expanded = expand(lambda, true, &mut env).await?;
     let mut e = get_root_env().await;
@@ -770,7 +770,7 @@ pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<()
 
 #[async_scheme_fn]
 pub async fn add_env(env: &LEnv, label: String, value: &LValue) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN).unwrap();
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
     let mut env = ctx.get_empty_env();
     let expanded = expand(value, true, &mut env).await?;
     let mut e = get_root_env().await;
@@ -783,7 +783,7 @@ pub async fn add_env(env: &LEnv, label: String, value: &LValue) -> Result<(), LR
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
 pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
-    let state = &env.get_context::<ModModel>(MOD_DOMAIN)?.state;
+    let state = &env.get_context::<ModModel>(MOD_MODEL)?.state;
 
     let mut inner_dynamic = PartialState {
         inner: Default::default(),
@@ -820,7 +820,7 @@ pub async fn add_static_facts(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let state = &env.get_context::<ModModel>(MOD_DOMAIN)?.state;
+    let state = &env.get_context::<ModModel>(MOD_MODEL)?.state;
 
     let mut inner_static = PartialState {
         inner: Default::default(),
@@ -838,7 +838,7 @@ pub async fn add_static_facts(
 
 #[async_scheme_fn]
 pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN).unwrap();
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
 
     let (t, parent) = match args.len() {
         1 => (args[0].to_string(), None),
@@ -880,7 +880,7 @@ pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
 
 #[async_scheme_fn]
 pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN).unwrap();
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
 
     ctx.state.add_instance(&object, &t).await;
 
@@ -909,7 +909,7 @@ pub async fn add_objects(env: &LEnv, args: Vec<Vec<LValue>>) -> Result<(), LRunt
 
 #[async_scheme_fn]
 pub async fn add_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN).unwrap();
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
 
     let label: String = args
         .get(0)

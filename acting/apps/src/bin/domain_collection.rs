@@ -40,7 +40,22 @@ fn sub(dc: &TypeLattice, ta: impl Into<DomainTest>, tb: impl Into<DomainTest>) -
 fn main() {
     println!("Hello, world!");
     //let tn = &TypeNetwork::default();
-    let dc = &TypeLattice::new();
+    let mut dc = TypeLattice::new();
+    let symbol = dc.get_type_id(TYPE_OBJECT).unwrap();
+    let location = dc.add_type("location", vec![*symbol]);
+    let _ = dc.add_type("robot", vec![location]);
+    let _ = dc.add_type("parking_area", vec![location]);
+    let _ = dc.add_type("belt", vec![location]);
+
+    meet(
+        &dc,
+        Cst(
+            Box::new(New("robot".to_string())),
+            cst::Cst::Symbol("robot0".to_string()),
+        ),
+        New("location".to_string()),
+    );
+
     /*meet(
         dc,
         sub(dc, Any, Err(None)),
@@ -50,14 +65,14 @@ fn main() {
     //meet(dc, union(dc, True, Nil), union(dc, True, Nil));
     //meet(dc, sub(dc, Any, Err(None)), sub(dc, Any, Err(None)));
     meet(
-        dc,
+        &dc,
         Cst(Box::new(Symbol), cst::Cst::Symbol("r1".to_string())),
         New(TYPE_OBJECT.to_string()),
     );
 
     //meet(dc, Symbol, New(TYPE_OBJECT.to_string()));
 
-    output_domain_collection("/tmp/domain".into(), dc, true);
+    output_domain_collection("/tmp/domain".into(), &dc, true);
 }
 
 fn output_domain_collection(path: PathBuf, dc: &TypeLattice, view: bool) {

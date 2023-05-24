@@ -21,7 +21,7 @@ use crate::planning::planner::problem::PlanningDomain;
 use crate::planning::planner::solver::PMetric;
 use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
 use ompas_language::monitor::control::*;
-use ompas_language::monitor::model::MOD_DOMAIN;
+use ompas_language::monitor::model::MOD_MODEL;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_language::select::*;
 use ompas_language::supervisor::*;
@@ -295,7 +295,7 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
 /// Launch main loop of rae in an other asynchronous task.
 #[async_scheme_fn]
 pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     //let mut context: ConversionContext = ctx.get_conversion_context().await;
     let plan_env: LEnv = ctx.get_plan_env().await;
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();

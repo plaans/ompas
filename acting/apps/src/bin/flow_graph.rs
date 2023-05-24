@@ -6,8 +6,10 @@ use ompas_core::model::sym_table::r#ref::RefSymTable;
 use ompas_core::model::sym_table::SymTable;
 use ompas_core::planning::conversion::flow_graph::algo::annotate::annotate;
 use ompas_core::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
-use ompas_core::planning::conversion::flow_graph::algo::pre_processing::pre_processing;
-use ompas_core::planning::conversion::{_convert, debug_with_markdown};
+use ompas_core::planning::conversion::flow_graph::algo::pre_processing::{
+    lambda_expansion, pre_processing,
+};
+use ompas_core::planning::conversion::{_convert, debug_with_markdown, TEST_CONVERSION};
 use sompas_core::{get_root_env, parse};
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -34,6 +36,8 @@ async fn main() -> Result<(), LRuntimeError> {
 Graph flow converter for SOMPAS code!\n
     "
     );
+
+    TEST_CONVERSION.set(true);
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
@@ -68,7 +72,7 @@ Graph flow converter for SOMPAS code!\n
             .await
             .unwrap_or_else(|r| panic!("{}", r.to_string()));
 
-        let ch: ActingModel = convert(
+        let ch: ActingModel = __convert(
             lv,
             PLEnv {
                 env,
@@ -106,15 +110,18 @@ Graph flow converter for SOMPAS code!\n
     Ok(())
 }
 
-pub async fn convert(lv: LValue, mut p_env: PLEnv) -> Result<ActingModel, LRuntimeError> {
+pub async fn __convert(lv: LValue, mut p_env: PLEnv) -> Result<ActingModel, LRuntimeError> {
     let mut lattice = TypeLattice::new();
     lattice.add_type("robot", vec![TYPE_ID_SYMBOL]);
     let st: RefSymTable = SymTable::new_from(lattice).into();
 
+    //convert(None, &lv, &mut p_env, st).await
+
     let lv_om = annotate(lv.clone());
     //debug_println!("annotate =>\n{}", lv_om.format(0));
 
-    let pp_lv = pre_processing(&lv_om, &p_env).await?;
+    let pp_lv = lambda_expansion(&lv_om, &p_env).await?;
+    let pp_lv = pre_processing(&pp_lv, &p_env).await?;
     //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
 
     let chronicle = match _convert(None, &pp_lv, &mut p_env, st).await {

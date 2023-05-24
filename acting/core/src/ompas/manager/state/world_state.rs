@@ -1,5 +1,5 @@
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::ompas::manager::state::instance::{InstanceCollection, InstanceCollectionSnapshot};
+use crate::ompas::manager::state::instance::InstanceCollection;
 use crate::ompas::manager::state::partial_state::PartialState;
 use sompas_core::modules::map::union_map;
 use sompas_structs::lruntimeerror;
@@ -48,13 +48,13 @@ impl WorldState {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct WorldStateSnapshot {
     pub r#static: PartialState,
     pub dynamic: PartialState,
     pub inner_static: PartialState,
     pub inner_dynamic: PartialState,
-    pub instance: InstanceCollectionSnapshot,
+    pub instance: InstanceCollection,
 }
 
 impl WorldStateSnapshot {
@@ -94,7 +94,7 @@ impl From<WorldStateSnapshot> for WorldState {
             dynamic: Arc::new(RwLock::new(w.dynamic)),
             inner_static: Arc::new(RwLock::new(w.inner_static)),
             inner_dynamic: Arc::new(RwLock::new(w.inner_dynamic)),
-            instance: Arc::new(RwLock::new(w.instance.into())),
+            instance: Arc::new(RwLock::new(w.instance)),
             sem_update: Arc::new(Mutex::new(None)),
         }
     }

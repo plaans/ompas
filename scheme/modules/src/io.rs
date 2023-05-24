@@ -166,7 +166,7 @@ pub fn set_current_dir(dir: String) -> Result<(), String> {
 #[async_scheme_fn]
 pub async fn get_env_var(env: &LEnv, var: String) -> LResult {
     match env::var(var) {
-        Ok(o) => parse(&o, &mut env.clone()).await,
+        Ok(o) => parse(&format!("\"{o}\""), &mut env.clone()).await,
         Err(e) => Err(LRuntimeError::new("", e.to_string())),
     }
 }

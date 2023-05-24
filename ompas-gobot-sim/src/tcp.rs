@@ -2,7 +2,6 @@ use crate::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeCancelRequest, SerdeCommand,
 };
 use crate::PROCESS_TOPIC_GOBOT_SIM;
-use im::HashSet;
 use ompas_core::ompas::manager::state::partial_state::PartialState;
 use ompas_interface::platform_interface::command_request::Request;
 use ompas_interface::platform_interface::{
@@ -14,6 +13,7 @@ use ompas_interface::platform_interface::{CommandCancelled, ResourceKind};
 use ompas_language::interface::*;
 use ompas_middleware::ProcessInterface;
 use sompas_structs::lvalues::LValueS;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
@@ -157,7 +157,8 @@ async fn async_read_socket(
     )
     .await;
 
-    let mut global = Global::default();
+    //let mut global = Global::default();
+    let mut global_2 = Global2::default();
 
     let mut buf_reader = BufReader::new(stream);
 
@@ -205,7 +206,8 @@ async fn async_read_socket(
                         GodotMessageType::StaticState => {
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
 
-                            let updates = post_process_state(temps_state, StateVariableType::Static, &mut global);
+                            //let updates = post_process_state(temps_state, StateVariableType::Static, &mut global);
+                            let updates = post_process_state_2(temps_state, StateVariableType::Static, &mut global_2);
                             for update in updates {
                                 if state_update_sender.send(update).is_err()
                                 {
@@ -216,7 +218,8 @@ async fn async_read_socket(
                         }
                         GodotMessageType::DynamicState => {
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
-                            let updates = post_process_state(temps_state, StateVariableType::Dynamic, &mut global);
+                            //let updates = post_process_state(temps_state, StateVariableType::Dynamic, &mut global);
+                            let updates = post_process_state_2(temps_state, StateVariableType::Dynamic, &mut global_2);
                             for update in updates {
                                 if state_update_sender.send(update).is_err()
                                 {
@@ -319,12 +322,9 @@ async fn async_read_socket(
     }
 }
 
-const LOCATION_TILE: &str = "location_tile";
 const TILE_PREFIX: &str = "tile";
 
-const TRAVEL_DISTANCE: &str = "travel_distance";
-
-#[derive(Eq, Hash, PartialEq, Clone)]
+#[derive(Copy, Eq, Hash, PartialEq, Clone)]
 struct Tile {
     x: i64,
     y: i64,
@@ -337,9 +337,191 @@ impl Display for Tile {
 }
 
 #[derive(Default)]
+struct Global2 {
+    def_velocity: Option<f64>,
+    locations: HashMap<String, Tile>,
+    exported: bool,
+}
+
+const TRAVEL_TIME: &str = "travel-time";
+
+fn post_process_state_2(
+    state: PartialState,
+    r#type: StateVariableType,
+    global: &mut Global2,
+) -> Vec<PlatformUpdate> {
+    let mut updates = vec![];
+
+    fn find_median_tile(cells: Vec<Tile>) -> Tile {
+        //computation of the geometric center
+        let mut median_x = 0;
+        let mut median_y = 0;
+
+        for cell in cells.iter() {
+            median_x += cell.x;
+            median_y += cell.y;
+        }
+
+        median_x /= cells.len() as i64;
+        median_y /= cells.len() as i64;
+
+        //finding the closest point;
+        let mut shortest_distance = None;
+        let mut closest_cell = None;
+        for cell in cells.iter() {
+            let d: i64 = (cell.x - median_x).pow(2) + (cell.y - median_y).pow(2);
+            if closest_cell.is_none() {
+                closest_cell = Some(cell);
+                shortest_distance = Some(d);
+            } else if let Some(sd) = shortest_distance {
+                if sd > d {
+                    closest_cell = Some(cell);
+                    shortest_distance = Some(d);
+                }
+            }
+        }
+        *closest_cell.unwrap()
+    }
+
+    match r#type {
+        StateVariableType::Static => {
+            if let Some(v) = state.get(&LValueS::from(vec!["globals.robot_standard_velocity"])) {
+                //println!("ok");
+                global.def_velocity = Some(v.try_into().unwrap())
+            }
+            //Store velocity
+        }
+        StateVariableType::Dynamic => {
+            //Update the location of robot: Belts and Parking Areas
+        }
+    }
+
+    let mut state_variables = vec![];
+    for (k, v) in &state.inner {
+        match k {
+            LValueS::List(list) => {
+                let mut sv = list.clone();
+                let state_function = sv.remove(0);
+                let mut parameters: Vec<Atom> = vec![];
+                for e in sv.drain(..) {
+                    parameters.push(e.try_into().unwrap())
+                }
+
+                let state_function = state_function.to_string();
+                if state_function.contains(".instance") {
+                    let obj_label = parameters[0].to_string();
+                    let instance = Instance {
+                        r#type: v.to_string(),
+                        object: obj_label.to_string(),
+                    };
+
+                    //Creation of a new instance
+                    updates.push(instance.into());
+                    let resource: Resource = Resource {
+                        label: obj_label.to_string(),
+                        resource_kind: ResourceKind::Unary.into(),
+                        quantity: 0,
+                    };
+
+                    //Creation of a unary resource corresponding to the instance.
+                    updates.push(resource.into());
+
+                    if v.to_string() == "belt" || v.to_string() == "parking_area" {
+                        let cells = state
+                            .get(&LValueS::from(vec![
+                                format!("{}.cells", v).into(),
+                                list[1].clone(),
+                            ]))
+                            .unwrap();
+                        let mut cells: Vec<LValueS> = cells.try_into().unwrap();
+                        let tiles: Vec<Tile> = cells
+                            .drain(..)
+                            .map(|val| {
+                                let coordinates: Vec<LValueS> = (&val).try_into().unwrap();
+                                Tile {
+                                    x: (&coordinates[0]).try_into().unwrap(),
+                                    y: (&coordinates[1]).try_into().unwrap(),
+                                }
+                            })
+                            .collect();
+                        let tile = find_median_tile(tiles);
+                        global.locations.insert(obj_label, tile);
+                    }
+                }
+
+                state_variables.push(StateVariable {
+                    r#type: r#type.into(),
+                    state_function,
+                    parameters,
+                    value: Some(v.clone().try_into().unwrap()),
+                });
+            }
+            _ => {
+                todo!()
+            }
+        }
+    }
+
+    if let Some(velocity) = global.def_velocity {
+        if !global.exported {
+            global.exported = true;
+            let mut n = 0;
+            //Post processing to return travel-time between two positions
+            for (l1, t1) in &global.locations {
+                for (l2, t2) in &global.locations {
+                    if l1 != l2 {
+                        let time: f64 = ((t1.x - t2.x).pow(2) as f64 + (t1.y - t2.y).pow(2) as f64)
+                            .sqrt()
+                            / velocity;
+
+                        state_variables.push(StateVariable {
+                            r#type: StateVariableType::Static.into(),
+                            state_function: TRAVEL_TIME.to_string(),
+                            parameters: vec![l1.to_string().into(), l2.to_string().into()],
+                            value: Some(Atom::from(time).into()),
+                        });
+
+                        state_variables.push(StateVariable {
+                            r#type: StateVariableType::Static.into(),
+                            state_function: TRAVEL_TIME.to_string(),
+                            parameters: vec![l2.to_string().into(), l1.to_string().into()],
+                            value: Some(Atom::from(time).into()),
+                        });
+                        n += 2;
+                    }
+                }
+            }
+            println!("Exported : {} new state variables.", n);
+        }
+    }
+
+    updates.push(StateUpdate { state_variables }.into());
+
+    updates
+}
+
+/// Transforms slice of u8 (received characters) into a usize giving the size of the following message.
+pub fn read_size_from_buf(buf: &[u8]) -> usize {
+    let mut size = [0; 4];
+    size.clone_from_slice(&buf[0..4]);
+    u32::from_le_bytes(size) as usize
+}
+
+/// Reads the number of character from a slice.
+pub fn read_msg_from_buf(buf: &[u8], size: usize) -> String {
+    String::from_utf8_lossy(&buf[0..size]).to_string()
+}
+
+/*
+
+//const LOCATION_TILE: &str = "location_tile";
+//const TRAVEL_DISTANCE: &str = "travel_distance";
+
+#[derive(Default)]
 struct Global {
     tiles: HashSet<Tile>,
 }
+
 
 fn post_process_state(
     state: PartialState,
@@ -525,16 +707,4 @@ fn post_process_state(
     updates.push(StateUpdate { state_variables }.into());
 
     updates
-}
-
-/// Transforms slice of u8 (received characters) into a usize giving the size of the following message.
-pub fn read_size_from_buf(buf: &[u8]) -> usize {
-    let mut size = [0; 4];
-    size.clone_from_slice(&buf[0..4]);
-    u32::from_le_bytes(size) as usize
-}
-
-/// Reads the number of character from a slice.
-pub fn read_msg_from_buf(buf: &[u8], size: usize) -> String {
-    String::from_utf8_lossy(&buf[0..size]).to_string()
-}
+}*/

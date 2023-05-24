@@ -9,14 +9,11 @@ use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, P
 use crate::planning::conversion::flow_graph::algo::p_eval::{p_eval, P_EVAL};
 use crate::planning::planner::problem::PlanningDomain;
 use crate::planning::planner::solver::PMetric;
+use chrono::{DateTime, Utc};
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::control::MOD_CONTROL;
-use ompas_language::monitor::debug_conversion::{
-    ANNOTATE_TASK, CONVERT_DOMAIN, DOC_ANNOTATE_TASK, DOC_CONVERT_DOMAIN, DOC_MOD_DEBUG_CONVERSION,
-    DOC_PLAN_TASK, DOC_PLAN_TASK_OPT, DOC_PRE_EVAL_EXPR, DOC_PRE_EVAL_TASK, MOD_DEBUG_CONVERSION,
-    PLAN_TASK, PLAN_TASK_OPT, PRE_EVAL_EXPR, PRE_EVAL_TASK,
-};
-use ompas_language::monitor::model::MOD_DOMAIN;
+use ompas_language::monitor::debug_conversion::*;
+use ompas_language::monitor::model::MOD_MODEL;
 use ompas_middleware::logger::LogClient;
 use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
@@ -26,6 +23,12 @@ use sompas_structs::llambda::LLambda;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
+use std::env::set_current_dir;
+use std::fs;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
+use std::process::Command;
 use std::time::SystemTime;
 use tokio::sync::broadcast;
 
@@ -36,6 +39,12 @@ impl From<ModDebugConversion> for LModule {
     fn from(m: ModDebugConversion) -> Self {
         let mut m = LModule::new(m, MOD_DEBUG_CONVERSION, DOC_MOD_DEBUG_CONVERSION);
         m.add_async_fn(CONVERT_DOMAIN, convert_domain, DOC_CONVERT_DOMAIN, false);
+        m.add_async_fn(
+            EXPORT_TYPE_LATTICE,
+            export_type_lattice,
+            DOC_EXPORT_TYPE_LATTICE,
+            false,
+        );
         m.add_async_fn(PLAN_TASK, plan_task, DOC_PLAN_TASK, false);
         m.add_async_fn(PLAN_TASK_OPT, plan_task_opt, DOC_PLAN_TASK_OPT, false);
         m.add_async_fn(PRE_EVAL_TASK, pre_eval_task, DOC_PRE_EVAL_TASK, false);
@@ -47,12 +56,57 @@ impl From<ModDebugConversion> for LModule {
 
 #[async_scheme_fn]
 pub async fn convert_domain(env: &LEnv) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let context: ConversionContext = ctx.get_conversion_context().await;
     let time = SystemTime::now();
     let pd: PlanningDomain = convert_acting_domain(&context).await?;
     let time = time.elapsed().expect("could not get time").as_micros();
     Ok(format!("{}\n\nTime to convert: {} µs.", pd, time))
+}
+
+#[async_scheme_fn]
+pub async fn export_type_lattice(env: &LEnv) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
+    let ctx: ConversionContext = ctx.get_conversion_context().await;
+
+    let mut path: PathBuf = "/tmp".into();
+    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
+    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+    path.push(format!("type_network_{}", string_date));
+    fs::create_dir_all(&path).unwrap();
+    let mut path_dot = path.clone();
+    let dot_file_name = "type_network.dot";
+    path_dot.push(dot_file_name);
+    let mut file = File::create(&path_dot).unwrap();
+    let dot = ctx.st.get_lattice().export_dot();
+    file.write_all(dot.as_bytes()).unwrap();
+    set_current_dir(&path).unwrap();
+    let graph_file_name = "type_network.png";
+    Command::new("dot")
+        .args(["-Tpng", dot_file_name, "-o", graph_file_name])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+    let mut md_path = path.clone();
+    let md_file_name = "type_network.md";
+    md_path.push(md_file_name);
+    let mut md_file = File::create(&md_path).unwrap();
+    let md: String = format!(
+        "# Type Network : \n
+![]({})
+    ",
+        graph_file_name,
+    );
+
+    md_file.write_all(md.as_bytes()).unwrap();
+
+    Command::new("google-chrome")
+        .arg(md_file_name)
+        .spawn()
+        .unwrap();
+
+    Ok(())
 }
 
 async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
@@ -62,7 +116,7 @@ async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
         .get_context::<ModControl>(MOD_CONTROL)?
         .acting_manager
         .clone();
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     //let mut context: ConversionContext = ctx.get_conversion_context().await;
     let mut env: LEnv = ctx.get_plan_env().await;
     let state = ctx.get_plan_state().await;
@@ -97,7 +151,7 @@ pub async fn plan_task_opt(env: &LEnv, args: &[LValue]) -> LResult {
 
 #[async_scheme_fn]
 pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let mut context: ConversionContext = ctx.get_conversion_context().await;
     context
         .env
@@ -148,7 +202,7 @@ pub async fn pre_eval_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
 
 #[async_scheme_fn]
 pub async fn annotate_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let mut context: ConversionContext = ctx.get_conversion_context().await;
     context
         .env
@@ -200,7 +254,7 @@ pub async fn annotate_task(env: &LEnv, task: &[LValue]) -> Result<(), LRuntimeEr
 
 #[async_scheme_fn]
 pub async fn pre_eval_expr(env: &LEnv, lv: LValue) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_DOMAIN)?;
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let mut context: ConversionContext = ctx.get_conversion_context().await;
     context
         .env

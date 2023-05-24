@@ -434,6 +434,11 @@ pub mod monitor {
         pub const CONVERT_DOMAIN: &str = "convert-domain";
         pub const DOC_CONVERT_DOMAIN: &str =
             "Return the planning domain corresponding to the acting domain defined";
+
+        pub const EXPORT_TYPE_LATTICE: &str = "export-type-lattice";
+        pub const DOC_EXPORT_TYPE_LATTICE: &str =
+            "Exports in a google-chrome page the lattice in a dot form";
+
         pub const PLAN_TASK: &str = "plan-task";
         pub const DOC_PLAN_TASK: &str= "Plan a task using the defined planner with the acting domain defined in the environment";
 
@@ -453,7 +458,7 @@ pub mod monitor {
 
     pub mod model {
 
-        pub const MOD_DOMAIN: &str = "domain";
+        pub const MOD_MODEL: &str = "model";
         pub const DOC_MOD_DOMAIN: &str =
             "Collection of functions and macros to define the domain of the platform.";
 

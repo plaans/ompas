@@ -552,7 +552,9 @@ impl SymTable {
         let v1 = self.get_var_parent(v1);
         let v2 = self.get_var_parent(v2);
 
-        let (v1, v2) = if self.variables[v2].parameter {
+        let (v1, v2) = if self.variables[v2].parameter
+            || self.domains[self.variables[v2].domain].domain.is_constant()
+        {
             (v2, v1)
         } else {
             (v1, v2)

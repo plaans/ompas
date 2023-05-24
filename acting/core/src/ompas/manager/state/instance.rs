@@ -8,8 +8,9 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Default, Clone, Debug)]
+/*#[derive(Default, Clone)]
 pub struct InstanceCollectionSnapshot {
+    pub st: RefSymTable,
     pub inner: HashMap<String, HashSet<String>>,
 }
 
@@ -43,19 +44,20 @@ impl InstanceCollectionSnapshot {
     }
 }
 
+impl From<InstanceCollectionSnapshot> for InstanceCollection {
+    fn from(value: InstanceCollectionSnapshot) -> Self {
+        Self {
+            st: value.st,
+            inner: value.inner,
+        }
+    }
+}
+*/
+
 #[derive(Clone, Default)]
 pub struct InstanceCollection {
     pub st: RefSymTable,
     pub inner: HashMap<String, HashSet<String>>,
-}
-
-impl From<InstanceCollectionSnapshot> for InstanceCollection {
-    fn from(value: InstanceCollectionSnapshot) -> Self {
-        Self {
-            st: RefSymTable::default(),
-            inner: value.inner,
-        }
-    }
 }
 
 impl InstanceCollection {
@@ -70,10 +72,12 @@ impl InstanceCollection {
         self.inner.clear()
     }
 
-    pub fn get_snapshot(&self) -> InstanceCollectionSnapshot {
-        InstanceCollectionSnapshot {
+    pub fn get_snapshot(&self) -> Self {
+        self.clone()
+        /*InstanceCollectionSnapshot {
+            st: self.st.clone(),
             inner: self.inner.clone(),
-        }
+        }*/
     }
 }
 
@@ -128,16 +132,46 @@ impl InstanceCollection {
     }
 
     pub fn is_of_type(&self, i: &str, t: &str) -> bool {
-        match self.inner.get(t) {
-            Some(set) => set.contains(i),
-            None => false,
+        //println!("instance {i} {t}");
+        let lattice = self.st.get_lattice();
+        let type_id = if let Some(id) = lattice.get_type_id(t) {
+            id
+        } else {
+            return false;
+        };
+
+        let types = lattice.get_all_childs(type_id);
+        for t in types {
+            let name = lattice.format_type(&t);
+            //println!("{name}?");
+            if let Some(set) = self.inner.get(&name) {
+                if set.contains(i) {
+                    //println!("yup!");
+                    return true;
+                }
+            }
         }
+        false
     }
 
     pub fn get_instances(&self, t: &str) -> Vec<String> {
-        match self.inner.get(t) {
-            Some(set) => set.iter().cloned().collect(),
-            None => vec![],
+        let lattice = self.st.get_lattice();
+        let type_id = if let Some(id) = lattice.get_type_id(t) {
+            id
+        } else {
+            return vec![];
+        };
+        let types = lattice.get_all_childs(type_id);
+        let mut instances: HashSet<String> = Default::default();
+
+        for id in types {
+            let name = lattice.format_type(&id);
+            if let Some(set) = self.inner.get(&name) {
+                for s in set {
+                    instances.insert(s.clone());
+                }
+            }
         }
+        instances.iter().cloned().collect()
     }
 }

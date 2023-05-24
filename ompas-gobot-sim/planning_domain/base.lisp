@@ -1,7 +1,8 @@
 (begin
     ;types declaration
     ;(def-types machine robot package belt (parking_area interact_area area) tile)
-    (def-types machine robot package belt (parking_area interact_area area) tile)
+    (def-types machine package (robot parking_area belt location) interact_area)
+    ;(def-objects (unk location))
 
 
 
@@ -16,15 +17,15 @@
     (def-static-state-function globals.robot_battery_drain_rate_idle_percentage (:result float))
 
     ;synthetic state functions
-    (def-static-state-function travel_distance (:params (?t1 tile) (?t2 tile))(:result float))
-    (def-state-function location_tile (:params object) (:result tile))
-
+    ;(def-static-state-function travel_distance (:params (?t1 tile) (?t2 tile))(:result float))
+    ;(def-state-function location_tile (:params object) (:result tile))
+    (def-static-state-function travel-time (:params (?l1 location) (?l2 location)) (:result float))
 
     ;state function declaration
     ;robot state functions
     (def-state-function robot.coordinates (:params (?r robot)) (:result (tuple int int)))
     (def-static-state-function robot.instance (:params (?r robot)) (:result symbol))
-    (def-state-function robot.coordinates_tile (:params (?r robot)) (:result (tuple int int)))
+    ;(def-state-function robot.coordinates_tile (:params (?r robot)) (:result (tuple int int)))
     (def-state-function robot.battery (:params (?r robot)) (:result float))
     (def-state-function robot.velocity (:params (?r robot)) (:result (tuple float float)))
     (def-state-function robot.rotation_speed (:params (?r robot)) (:result float))
@@ -33,12 +34,12 @@
     (def-static-state-function robot.default_velocity (:params (?r robot)) (:result int))
     (def-static-state-function robot.drain_rate (:params (?r robot)) (:result float))
     (def-static-state-function robot.recharge_rate (:params (?r robot)) (:result float))
-    ;(def-state-function robot.closest_area (:params (?r robot)) (:result area))
-    
+    (def-state-function robot.location (:params (?r robot)) (:result location))
+
     ;machine state functions
     (def-static-state-function machine.instance (:params (?m machine)) (:result  symbol))
     (def-static-state-function machine.coordinates (:params (?m machine)) (:result (tuple int int)))
-    (def-static-state-function machine.coordinates_tile (:params (?m machine)) (:result (tuple int int)))
+    ;(def-static-state-function machine.coordinates_tile (:params (?m machine)) (:result (tuple int int)))
     (def-static-state-function machine.input_belt (:params (?m machine)) (:result belt))
     (def-static-state-function machine.output_belt (:params (?m machine)) (:result belt))
     (def-static-state-function machine.processes_list (:params (?m machine)) (:result (list int)))
@@ -48,7 +49,7 @@
     
     ;package state function
     (def-static-state-function package.instance (:params (?p package)) (:result symbol))
-    (def-state-function package.location (:params (?p package)) (:result object))
+    (def-state-function package.location (:params (?p package)) (:result location))
     (def-state-function package.processes_list (:params (?p package)) (:result (list (tuple int float))))
     (def-static-state-function package.all_processes (:params (?p package)) (:result (list (tuple int float))))
     (def-state-function package.closest_interact_area (:params (?p package)) (:result interact_area))

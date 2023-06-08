@@ -24,7 +24,7 @@ use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::planning::conversion::flow_graph::graph::Dot;
 use crate::planning::planner::problem::ChronicleInstance;
 use crate::TOKIO_CHANNEL_SIZE;
-use aries_planning::chronicles::ChronicleOrigin;
+use aries_planning::chronicles::{ChronicleOrigin, TaskId};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Utc};
 use im::HashSet;
@@ -928,8 +928,11 @@ impl InnerActingManager {
                             ExecChronicle {
                                 id: *task,
                                 origin: ChronicleOrigin::Refinement {
-                                    instance_id,
-                                    task_id,
+                                    refined: vec![TaskId {
+                                        instance_id,
+                                        task_id,
+                                    }],
+                                    template_id: 0,
                                 },
                             },
                         );
@@ -964,8 +967,11 @@ impl InnerActingManager {
                                     ExecChronicle {
                                         id: *id,
                                         origin: ChronicleOrigin::Refinement {
-                                            instance_id,
-                                            task_id: action_binding.task_id,
+                                            refined: vec![TaskId {
+                                                instance_id,
+                                                task_id: action_binding.task_id,
+                                            }],
+                                            template_id: 0,
                                         },
                                     },
                                 );

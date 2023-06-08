@@ -212,11 +212,11 @@ pub fn extract_plan(pr: &PlanResult) -> Plan {
     let get_subtasks_ids = |chronicle_id: usize| -> Vec<usize> {
         let mut vec = vec![];
         for &(i, ch) in &chronicles {
-            match ch.origin {
-                ChronicleOrigin::Refinement { instance_id, .. } if instance_id == chronicle_id => {
+            if let ChronicleOrigin::Refinement { refined, .. } = &ch.origin {
+                let task_id = refined.first().unwrap();
+                if task_id.instance_id == chronicle_id {
                     vec.push(i);
                 }
-                _ => (),
             }
         }
         vec

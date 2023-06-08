@@ -3,7 +3,6 @@ use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::ActingProcessInner;
 use crate::ompas::manager::resource::WaitAcquire;
 use std::fmt::{Display, Formatter};
-use std::mem;
 
 #[derive()]
 pub struct AcquireProcess {
@@ -49,7 +48,8 @@ impl AcquireProcess {
     }
 
     pub fn move_reservation(&mut self) -> Option<WaitAcquire> {
-        mem::replace(&mut self.reservation, None)
+        self.reservation.take()
+        //mem::replace(&mut self.reservation, None)
     }
 
     pub fn set_s_acq(&mut self, val: Timepoint) -> Option<ActingValUpdate> {

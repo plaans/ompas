@@ -31,7 +31,7 @@ use aries::model::lang::{Atom, Variable};
 use aries::model::Model;
 use aries_planning::chronicles;
 use aries_planning::chronicles::printer::Printer;
-use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, VarLabel};
+use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId, VarLabel};
 use itertools::Itertools;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
@@ -136,7 +136,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
 
                             let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
                             if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
-                                for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin, i.am.chronicle.as_ref().unwrap())) {
+                                for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin.clone(), i.am.chronicle.as_ref().unwrap())) {
                                     println!("{:?}:{}", origin, chronicle)
                                 }
                             }
@@ -228,8 +228,11 @@ pub async fn populate_problem(
             // then we add a new chronicle
 
             let origin = ChronicleOrigin::Refinement {
-                instance_id,
-                task_id,
+                refined: vec![TaskId {
+                    instance_id,
+                    task_id,
+                }],
+                template_id: 0,
             };
 
             if !em.iter().any(|ci| ci.origin == origin) {

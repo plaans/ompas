@@ -20,7 +20,7 @@ use crate::planning::planner::problem::{
     ChronicleInstance, PlanningDomain, PlanningInstance, PlanningProblem, TaskChronicle,
 };
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON};
-use aries_planning::chronicles::ChronicleOrigin;
+use aries_planning::chronicles::{ChronicleOrigin, TaskId};
 use chrono::{DateTime, Utc};
 #[allow(unused)]
 use debug_print::debug_println;
@@ -175,8 +175,11 @@ pub async fn p_convert_task(
             instances.push(ChronicleInstance {
                 generated: true,
                 origin: ChronicleOrigin::Refinement {
-                    instance_id: 0,
-                    task_id: 0,
+                    refined: vec![TaskId {
+                        instance_id: 0,
+                        task_id: 0,
+                    }],
+                    template_id: 0,
                 },
                 am: om,
                 pr: Default::default(),
@@ -207,8 +210,11 @@ pub async fn p_convert_task(
                 instances.push(ChronicleInstance {
                     generated: true,
                     origin: ChronicleOrigin::Refinement {
-                        instance_id: 0,
-                        task_id: 0,
+                        refined: vec![TaskId {
+                            instance_id: 0,
+                            task_id: 0,
+                        }],
+                        template_id: 0,
                     },
                     am: om,
                     pr: Default::default(),

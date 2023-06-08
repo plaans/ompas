@@ -88,24 +88,6 @@ Graph flow converter for SOMPAS code!\n
             config.output_path.clone().unwrap(),
             true,
         );
-
-        /*output_markdown(
-            p.to_str().unwrap(),
-            &lv,
-            &ch,
-            config.output_path.clone().unwrap(),
-            true,
-        );*/
-
-        /*flow_graph_post_processing(&mut ch.debug.flow_graph)?;
-
-        output_markdown(
-            format!("{}_post", p.to_str().unwrap()).as_str(),
-            &lv,
-            &ch,
-            config.output_path.clone().unwrap(),
-            true,
-        );*/
     }
     Ok(())
 }

@@ -32,7 +32,7 @@ pub async fn instantiate_chronicles(
         };
         let instance = ChronicleInstance {
             generated: true,
-            origin: instance.origin,
+            origin: instance.origin.clone(),
             am: om,
             pr: instance.pr.clone(),
         };

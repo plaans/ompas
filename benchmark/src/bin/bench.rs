@@ -48,7 +48,7 @@ fn main() {
     //let time = opt.time.unwrap_or(DEFAULT_TIME);
 
     //println!("Benchmark for domain: {}", domain.to_str().unwrap());
-    let domain_path: PathBuf = config.domain_path.clone();
+    let domain_path: &PathBuf = &config.domain_path;
     let mut problems = vec![];
     if config.problems.is_empty() {
         bar.println("Searching for problem files...");

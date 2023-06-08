@@ -87,12 +87,14 @@ pub async fn parse(str: &str, env: &mut LEnv) -> LResult {
 pub fn parse_into_lvalue(se: &SExpr) -> LValue {
     match se {
         SExpr::Atom(atom) => {
-            return match atom.canonical_str().parse::<i64>() {
+            let str = atom.to_string();
+            let canonical = atom.canonical_str();
+            match str.parse::<i64>() {
                 Ok(int) => LValue::Number(LNumber::Int(int)),
-                Err(_) => match atom.canonical_str().parse::<f64>() {
+                Err(_) => match str.parse::<f64>() {
                     //Test if its a float
                     Ok(float) => LValue::Number(LNumber::Float(float)),
-                    Err(_) => match atom.canonical_str() {
+                    Err(_) => match canonical {
                         //Test if its a Boolean
                         TRUE => {
                             //println!("atom is boolean true");
@@ -102,17 +104,17 @@ pub fn parse_into_lvalue(se: &SExpr) -> LValue {
                             //println!("atom is boolean false");
                             LValue::Nil
                         }
-                        s => {
-                            if s.starts_with('\"') && s.ends_with('\"') {
+                        _ => {
+                            if str.starts_with('\"') && str.ends_with('\"') {
                                 //println!("new string: {}", s);
-                                string!(s[1..s.len() - 1].to_string())
+                                string!(str[1..str.len() - 1].to_string())
                             } else {
-                                symbol!(s.to_string())
+                                symbol!(canonical.to_string())
                             }
                         }
                     },
                 },
-            };
+            }
         }
         SExpr::List(list) => {
             //println!("expression is a list");

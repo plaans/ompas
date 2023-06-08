@@ -177,9 +177,10 @@ pub fn generate_instances(
     let mut new_instances: Vec<ACI> = vec![];
 
     for (id, instance) in instances.iter().enumerate() {
-        let scope = match instance.origin {
-            ChronicleOrigin::Refinement { instance_id, .. } => {
-                new_instances[instance_id].chronicle.presence
+        let scope = match &instance.origin {
+            ChronicleOrigin::Refinement { refined, .. } => {
+                let task_id = refined.first().unwrap();
+                new_instances[task_id.instance_id].chronicle.presence
             }
             ChronicleOrigin::Original => Lit::TRUE,
             _ => panic!(),
@@ -199,7 +200,7 @@ pub fn generate_instances(
                 .iter()
                 .map(|v| aAtom::from(*v))
                 .collect(),
-            origin: instance.origin,
+            origin: instance.origin.clone(),
             chronicle: template.chronicle,
         });
     }

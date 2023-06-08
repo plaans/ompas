@@ -436,22 +436,7 @@ fn convert_constraint(
                             lsum += term;
                         }
                         lsum += cst;
-                        aConstraint::sum(Sum {
-                            sum: lsum,
-                            value: ctx
-                                .model
-                                .new_optional_ivar(
-                                    0,
-                                    0,
-                                    prez,
-                                    container
-                                        / VarType::Parameter(format!(
-                                            "r_sum_{}",
-                                            constraints.len()
-                                        )),
-                                )
-                                .into(),
-                        })
+                        aConstraint::sum(Sum { sum: lsum })
                     }
                 }
             }

@@ -124,7 +124,7 @@ To run a binary, you can use the following command: `cargo run --bin <name> -- <
 
 
 ## Env variables
-- `OMPAS_CHRONICLE_DEBUG={off,on,full}`: print in stdout the steps of the chronicle translation processes.
+- `OMPAS_CHRONICLE_DEBUG={off,on,full}`: print in stdout the steps of the chronicle translation process.
 - `OMPAS_PLAN_OUTPUT=<bool>`: print in stdout the plan formatted for *OMPAS*.
 - `OMPAS_DEBUG=<bool>`: print in stdout the debug steps of *OMPAS*.
 - `OMPAS_PATH=<path>`: path to the source files of *OMPAS*. Used to automatically find domain and problem files. 

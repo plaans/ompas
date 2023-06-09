@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - stable
+      - dev
       - workflow
   pull_request:
 

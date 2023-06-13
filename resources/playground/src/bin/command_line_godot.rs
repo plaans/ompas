@@ -1,12 +1,14 @@
+use ompas_core::ompas_path;
 use std::process::Command;
 use std::thread;
 
 fn main() {
     println!("hello world");
-    let join_handle = thread::spawn(|| {
+    let path = format!("{}/ompas-gobot-sim/gobot-sim/simu", ompas_path());
+    let join_handle = thread::spawn(move || {
         let output = Command::new("godot3")
             .arg("--path")
-            .arg("/home/jeremy/godot/Simulation-Factory-Godot/simu")
+            .arg(path.as_str())
             .output()
             .expect("failed to execute process");
         output

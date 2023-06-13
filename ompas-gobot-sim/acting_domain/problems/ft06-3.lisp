@@ -1,9 +1,12 @@
-(configure-platform
-    --path /home/jeremy/godot/simulation-factory-godot/simu
-    --scenario /home/jeremy/godot/simulation-factory-godot/simu/scenarios/new_scenario_multirobots.json
-    --environment /home/jeremy/godot/simulation-factory-godot/simu/environments/env_6_machines.json
-    --jobshop /home/jeremy/godot/simulation-factory-godot/simu/jobshop/instances/ft06-3_la17.txt
-    ;--robot_controller teleport
-    --robot_controller pf
-    --time_scale 4
+(begin
+    (define path (get-env-var "OMPAS_PATH"))
+    (define gobot-sim-path (concatenate path "ompas-gobot-sim/gobot-sim/simu/"))
+    (set-config-platform
+        --path gobot-sim-path
+        --scenario (concatenate gobot-sim-path "scenarios/new_scenario_multirobots.json")
+        --environment (concatenate gobot-sim-path "environments/env_6_machines.json")
+        --jobshop (concatenate gobot-sim-path "jobshop/instances/ft06-3_la17.txt")
+        ;--robot_controller teleport
+        --robot_controller pf
+        --time_scale 4)
 )

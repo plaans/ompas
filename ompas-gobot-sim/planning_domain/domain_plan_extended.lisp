@@ -1,5 +1,5 @@
 (begin
-    (set-current-dir "/home/jeremy/CLionProjects/ompas/ompas-gobot-sim")
+    (set-current-dir (concatenate (get-env-var "OMPAS_PATH") "ompas-gobot-sim/"))
     (read planning_domain/base.lisp)
     (read planning_domain/lambdas.lisp)
     (read planning_domain/plan_model_extended.lisp)

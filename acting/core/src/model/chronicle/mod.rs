@@ -236,8 +236,9 @@ impl Chronicle {
     ADDERS
      */
     pub fn add_var(&mut self, var_id: VarId) {
-        let domain = self.st.get_domain_of_var(&var_id);
-        if !domain.is_constant() {
+        let is_variable = !self.st.get_domain_of_var(&var_id).is_constant();
+        let is_param = self.st.get_variable(&var_id).is_parameter();
+        if is_variable || is_param {
             self.variables.insert(var_id);
         }
     }

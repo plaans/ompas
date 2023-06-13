@@ -30,7 +30,7 @@ use aries::model::lang::{
 use aries::model::symbols::SymbolTable;
 use aries::model::types::TypeHierarchy;
 use aries::utils::input::Sym;
-use aries_planning::chronicles::constraints::{Constraint as aConstraint, ConstraintType, Sum};
+use aries_planning::chronicles::constraints::{Constraint as aConstraint, ConstraintType};
 use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleKind as aChronicleKind,
@@ -405,7 +405,7 @@ fn convert_constraint(
                     cst += factor * shift;
                     match var {
                         IVar::ZERO => {}
-                        _ => terms.push(LinearTerm::new(factor, var, true)),
+                        _ => terms.push(LinearTerm::new(factor, var, false)),
                     }
                 }
 
@@ -418,13 +418,13 @@ fn convert_constraint(
                         let b = terms[1];
 
                         let (a, b): (aAtom, aAtom) = if factor == 1 {
-                            let a = a.var.into();
-                            let b = b.var + cst;
+                            let a = a.var().into();
+                            let b = b.var() + cst;
                             let b = b.var.into();
                             (a, b)
                         } else {
-                            let a = FAtom::new(a.var.into(), factor).into();
-                            let b = FAtom::new(b.var + cst, factor).into();
+                            let a = FAtom::new(a.var().into(), factor).into();
+                            let b = FAtom::new(b.var() + cst, factor).into();
                             (a, b)
                         };
 
@@ -436,7 +436,7 @@ fn convert_constraint(
                             lsum += term;
                         }
                         lsum += cst;
-                        aConstraint::sum(Sum { sum: lsum })
+                        aConstraint::linear_eq_zero(lsum)
                     }
                 }
             }

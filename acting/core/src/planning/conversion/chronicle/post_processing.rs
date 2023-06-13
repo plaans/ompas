@@ -219,12 +219,12 @@ pub fn simplify_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     let mut vec = vec![];
     let st = c.st.clone();
     let instance_id = st.get_sym_id(INSTANCE).unwrap();
-    println!("instance: {}", instance_id);
+    //println!("instance: {}", instance_id);
     for (i, condition) in c.conditions.iter().enumerate() {
         let parent = st.get_var_parent(&condition.sv[0]);
-        println!("condition: {}, {}", condition.format(&st, true), parent,);
+        //println!("condition: {}, {}", condition.format(&st, true), parent,);
         if instance_id == parent && !TEST_CONVERSION.get() {
-            println!("condition is instance");
+            //println!("condition is instance");
             assert_eq!(condition.sv.len(), 2);
             let target_domain: String = condition.value.format(&st, true);
             let domain_id = st.get_domain_id(&condition.sv[1]);

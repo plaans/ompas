@@ -9,10 +9,10 @@
                 (face_belt ?r ?b 5))))
 
     (def-task t_carry_to_machine (:params (?r robot) (?p package) (?m machine)))
-    ; (def-task-om-model t_carry_to_machine
-    ;     (:params (?r robot) (?p package) (?m machine))
-    ;     (:body (sleep 1))
-    ; )
+    (def-task-om-model t_carry_to_machine
+        (:params (?r robot) (?p package) (?m machine))
+        (:body (sleep 1))
+    )
     (def-method m_carry_to_machine
             (:task t_carry_to_machine)
             (:params (?r robot) (?p package) (?m machine))
@@ -22,35 +22,6 @@
                 (do
                     (t_take_package ?r ?p)
                     (t_deliver_package ?r ?m))))
-
-
-    (def-task-om-model t_carry_to_machine
-        (:params (?r robot) (?p package) (?m machine))
-        (:body
-            ;(robot_move ?r (package.location ?p))
-            ;(robot_move ?r (machine.input_belt ?m))
-            (begin
-                (define d1 (package.location ?p))
-                (robot_move ?r d1)
-                (assert 'package.location ?p ?r)
-                (define d2 (machine.input_belt ?m))
-                (robot_move ?r d2)
-                (assert 'package.location ?p d2)
-            )
-            ))
-
-    (def-command robot_move (:params (?r robot) (?dest location)))
-    (def-command-om-model robot_move
-        (:params (?r robot) (?dest location))
-        (:body
-            (begin
-                (define t_r (robot.location ?r))
-                (define time (travel-time t_r ?dest))
-                (transitive-assert 'robot.location ?r ?dest time)
-                ;(transitive-assert 'robot.location ?r ?dest 1)
-            ))
-    )
-
 
     (def-task t_take_package (:params (?r robot) (?p package)))
     (def-method m_take_package (:task t_take_package)
@@ -118,25 +89,30 @@
        (:score 0)
        (:body
            (do
-               (define f2 (async (t_check_rob_bat)))
-               (define tasks 
-                   (mapf (lambda (?p) 
-                       (do
-                           (define tasks (mapf (lambda (process)
-                               `(t_process_on_machine ,?p 
-                                   (arbitrary ',(find_machines_for_process (car process)))
-                                   ,(cadr process)
-                                   ))
-                               (package.all_processes ?p)))
-                            (define last_task
-                                 `(begin
-                                     (define ?r (arbitrary (instances robot)))
-                                     (define h_r (acquire ?r))
-                                     (t_carry_to_machine ?r ,?p ,(find_output_machine))))
-                            (define tasks (append tasks (list last_task)))
-                            `(apply seq ',tasks)))
-                        (instances package)))
-               (define h (apply par tasks)))))
+               (define rh (acquire (arbitrary (instances robot))))
+               (release rh)
+               )))
+;               ;(define f2 (async (t_check_rob_bat)))
+;               (define tasks
+;                   (mapf (lambda (?p)
+;                       (do
+;                           ;(define tasks (mapf (lambda (process)
+;                           ;    `(t_process_on_machine ,?p
+;                           ;        (arbitrary ',(find_machines_for_process (car process)))
+;                           ;        ,(cadr process)
+;                           ;        ))
+;                           ;    (package.all_processes ?p)))
+;                            (define last_task
+;                                 `(begin
+;                                     (define ?r (arbitrary (instances robot)))
+;                                     (define h_r (acquire ?r))))
+;                                     ;(t_carry_to_machine ?r ,?p ,(find_output_machine))))
+;                            ;(define tasks (append tasks (list last_task)))
+;                            (define tasks (list last_task))
+;
+;                            `(apply seq ',tasks)))
+;                        (instances package)))
+;               (define h (apply par tasks)))))
 
     (def-task t_process_on_machine (:params (?p package) (?m machine) (?d int)))
     (def-method m_process_on_machine
@@ -146,28 +122,24 @@
         (:score 0)
         (:body 
             (begin
-                (define ?r (arbitrary (instances robot) rand-element))
+                ;(define ?r (arbitrary (instances robot) rand-element))
                 (define h1 (acquire ?m))
-                (define h2 (acquire ?r))
-                (t_carry_to_machine ?r ?p ?m)
-                (release h2)
-                (t_process ?m ?p ?d)
+                ;(define h2 (acquire ?r))
+                ;(t_carry_to_machine ?r ?p ?m)
+                ;(release h2)
+                ;(t_process ?m ?p ?d)
                 )))
 
     (def-task t_process (:params (?m machine) (?p package) (?d int)))
     (def-task-om-model t_process
         (:params (?m machine) (?p package) (?d int))
-        (:body
-            (transitive-assert 
-                'package.location ?p 
-                (machine.output_belt ?m)
-                ?d)))
-
+        (:body (sleep ?d)))
     (def-method m_process
         (:task t_process)
         (:params (?m machine) (?p package) (?d int))
         (:body
             (do
                 (process ?m ?p)
-                (wait-for `(!= (package.location ,?p) ,?m)))))
+                (wait-for `(!= (package.location ,?p) ,?m))
+                )))
 )

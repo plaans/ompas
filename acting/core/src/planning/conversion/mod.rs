@@ -105,7 +105,7 @@ pub async fn _convert(
     let mut graph = FlowGraph::new(st);
 
     if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
-        println!("conversion n{n_conversion}:\n{}", lv.format(0));
+        println!("conversion n°{n_conversion}:\n{}", lv.format(0));
     }
     let flow = convert_lv(lv, &mut graph, &mut Default::default())?;
     let time = SystemTime::now();

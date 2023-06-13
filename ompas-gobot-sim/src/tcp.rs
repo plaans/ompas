@@ -465,7 +465,6 @@ fn post_process_state_2(
     if let Some(velocity) = global.def_velocity {
         if !global.exported {
             global.exported = true;
-            let mut n = 0;
             //Post processing to return travel-time between two positions
             for (l1, t1) in &global.locations {
                 for (l2, t2) in &global.locations {
@@ -487,11 +486,9 @@ fn post_process_state_2(
                             parameters: vec![l2.to_string().into(), l1.to_string().into()],
                             value: Some(Atom::from(time).into()),
                         });
-                        n += 2;
                     }
                 }
             }
-            println!("Exported : {} new state variables.", n);
         }
     }
 

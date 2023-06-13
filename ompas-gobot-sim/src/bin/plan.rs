@@ -11,9 +11,8 @@ use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
-use sompas_repl::lisp_interpreter::{ChannelToLispInterpreter, LispInterpreter};
+use sompas_repl::lisp_interpreter::LispInterpreter;
 use sompas_structs::lruntimeerror;
-use sompas_structs::lvalue::LValue;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -26,7 +25,7 @@ struct Opt {
     domain: Option<PathBuf>,
 
     #[structopt(short = "o", long = "optimal")]
-    opt: bool,
+    _opt: bool,
 }
 
 #[tokio::main]
@@ -68,22 +67,7 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
     .await;
     li.import_namespace(ctx_rae);
 
-    let mut channel: ChannelToLispInterpreter = li.subscribe();
-
-    //li.set_config(LispInterpreterConfig::new(true));
-
     tokio::spawn(li.run(None));
-
-    let command = match opt.opt {
-        false => "(plan-task t_jobshop)".to_string(),
-        true => "(plan-task-opt t_jobshop)".to_string(),
-    };
-
-    channel.send(command).await.unwrap();
-    let result: LValue = channel.recv().await.unwrap()?;
-    println!("finished: {}", result);
-
-    Master::end().await;
     Master::wait_end().await;
 
     Ok(())

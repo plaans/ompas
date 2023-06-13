@@ -7,7 +7,12 @@ use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use std::time::Instant;
 
-const STRATEGIES: [Strat; 2] = [ActivityNonTemporalFirst, Strat::Forward];
+const STRATEGIES: [Strat; 4] = [
+    ActivityNonTemporalFirst,
+    Strat::Forward,
+    Strat::Causal,
+    Strat::Activity,
+];
 const MIN_DEPTH: u32 = 0;
 const MAX_DEPTH: u32 = u32::MAX;
 

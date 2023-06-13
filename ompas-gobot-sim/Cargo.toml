@@ -50,6 +50,10 @@ name = "ompas-gobot-sim-plan"
 path = "src/bin/plan.rs"
 
 [[bin]]
+name = "ompas-gobot-sim-plan-e"
+path = "src/bin/plan_e.rs"
+
+[[bin]]
 name = "ompas-gobot-sim-plan-exec"
 path = "src/bin/plan_exec.rs"
 

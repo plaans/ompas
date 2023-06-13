@@ -1,5 +1,7 @@
 # Environment variables of the OMPAS project
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 # print the generates chronicles
 export OMPAS_CHRONICLE_DEBUG=full
 
@@ -10,7 +12,7 @@ export OMPAS_PLAN_OUTPUT=false
 export OMPAS_DEBUG=false
 
 # path to the ompas project
-export OMPAS_PATH=$HOME/CLionProjects/ompas/
+export OMPAS_PATH=${SCRIPT_DIR}
 
 # activate the logs of OMPAS
 export OMPAS_LOG=false

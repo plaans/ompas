@@ -18,6 +18,7 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
+use std::process::exit;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::Receiver;
@@ -36,7 +37,13 @@ pub async fn task_tcp_connection(
     command_response_sender: broadcast::Sender<CommandResponse>,
     state_update_sender: broadcast::Sender<PlatformUpdate>,
 ) {
-    let stream = TcpStream::connect(socket_addr).await.unwrap();
+    let stream = match TcpStream::connect(socket_addr).await {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error opening tcp connection with gobot-sim : {e:?}");
+            exit(0);
+        }
+    };
 
     // splits the tcp connection into a read and write stream.
     let (rd, wr) = io::split(stream);

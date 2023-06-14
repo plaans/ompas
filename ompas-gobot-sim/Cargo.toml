@@ -39,6 +39,7 @@ macro_rules_attribute = "0.0.2"
 tonic = "0.8"
 tokio-stream = { default-features = false, version = "0.1" }
 map-macro = "0.2.4"
+xshell = "0.2.3"
 
 
 [[bin]]

@@ -1,13 +1,14 @@
 use crate::platform_server::PlatformGobotSimService;
 use crate::tcp::task_tcp_connection;
+use crate::TOKIO_CHANNEL_SIZE;
 use crate::{default_gobot_sim_path, PROCESS_TOPIC_GOBOT_SIM};
-use crate::{GODOT_HEADLESS_PATH, GODOT_PATH, TOKIO_CHANNEL_SIZE};
 use async_trait::async_trait;
 use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
 use ompas_core::ompas::scheme::exec::platform::platform_config::{
     InnerPlatformConfig, PlatformConfig,
 };
 use ompas_core::ompas::scheme::exec::platform::PlatformDescriptor;
+use ompas_core::ompas_path;
 use ompas_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
 use ompas_language::interface::{
     DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT, LOG_TOPIC_PLATFORM,
@@ -18,20 +19,27 @@ use ompas_middleware::ProcessInterface;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
-use std::env;
 use std::fs::File;
 use std::net::SocketAddr;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tonic::transport::Server;
+use xshell::{cmd, Shell};
 
 const DEFAULT_GOBOT_IP: &str = "127.0.0.1";
 const DEFAULT_GOBOT_PORT: &str = "10000";
 const PROCESS_GOBOT_SIM: &str = "__PROCESS_GOBOT_SIM__";
 const PROCESS_SERVER_GRPC: &str = "__PROCESS_SERVER_GRPC__";
+const GODOT_DOWNLOAD_URL: &str =
+    "https://downloads.tuxfamily.org/godotengine/3.5/Godot_v3.5-stable_x11.64.zip";
+const GODOT_ZIP_NAME: &str = "Godot_v3.5-stable_x11.64.zip";
+const GODOT_HEADLESS_DOWNLOAD_URL: &str =
+    "https://downloads.tuxfamily.org/godotengine/3.5/Godot_v3.5-stable_linux_headless.64.zip";
+const GODOT_HEADLESS_ZIP_NAME: &str = "Godot_v3.5-stable_linux_headless.64.zip";
 
 /// Struct used to bind RAE and Godot.
 #[derive(Clone)]
@@ -83,42 +91,44 @@ impl PlatformGobotSim {
     }
 
     pub async fn start_platform(&self, config: Option<String>) -> LResult {
-        let godot = match self.headless {
-            true => {
-                if let Ok(s) = env::var(GODOT_HEADLESS_PATH) {
-                    s
-                } else {
-                    "godot3-headless".to_string()
+        let bin_name = match self.headless {
+            true => match self.godot3_headless_path() {
+                None => {
+                    self.install_godot3_headless();
+                    self.godot3_headless_path().unwrap()
                 }
-            }
-            false => {
-                if let Ok(s) = env::var(GODOT_PATH) {
-                    s
-                } else {
-                    "godot3".to_string()
+                Some(s) => s,
+            },
+            false => match self.godot3_path() {
+                None => {
+                    self.install_godot3();
+                    self.godot3_path().unwrap()
                 }
-            }
+                Some(s) => s,
+            },
         };
+
+        self.init_godot_project();
 
         let f1 = File::create("gobotsim.log").expect("couldn't create file");
         let f2 = File::create("gobotsim.log").expect("couldn't create file");
 
         let mut child = match config {
-            Some(config) => Command::new(godot)
+            Some(config) => Command::new(bin_name)
                 .args(config.split_whitespace())
                 .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
                 .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
                 .spawn()
                 .expect("failed to execute process"),
             None => match self.config.is_empty() {
-                true => Command::new(godot)
+                true => Command::new(bin_name)
                     .arg("--path")
                     .arg(default_gobot_sim_path())
                     .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
                     .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
                     .spawn()
                     .expect("failed to execute process"),
-                false => Command::new(godot)
+                false => Command::new(bin_name)
                     .args(self.config.split_whitespace())
                     .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
                     .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
@@ -189,6 +199,121 @@ impl PlatformGobotSim {
         });
         //println!("com opened with godot");
         Ok(LValue::Nil)
+    }
+
+    pub fn godot3_path(&self) -> Option<PathBuf> {
+        let sh = Shell::new().unwrap();
+        match cmd!(sh, "which godot3.5").quiet().read() {
+            Ok(s) => Some(s.into()),
+            Err(_) => {
+                let ompas_path = ompas_path();
+                let path =
+                    PathBuf::from(format!("{}/ompas-gobot-sim/gobot-bin/godot3.5", ompas_path));
+                if path.is_file() {
+                    Some(path)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn godot3_headless_path(&self) -> Option<PathBuf> {
+        let sh = Shell::new().unwrap();
+        match cmd!(sh, "which godot3-headless").quiet().read() {
+            Ok(s) => Some(s.into()),
+            Err(_) => {
+                let ompas_path = ompas_path();
+                let path = PathBuf::from(format!(
+                    "{}/ompas-gobot-sim/gobot-bin/godot3.5-headless",
+                    ompas_path
+                ));
+                if path.is_file() {
+                    Some(path)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn check_dependencies(&self) {
+        let sh = Shell::new().unwrap();
+        print!("Checking dependencies wget unzip...");
+        if cmd!(sh, "which wget").quiet().read().is_err() {
+            panic!("Cannot install godot3.5 : missing wget, please install with command \n sudo apt install wget")
+        }
+        if cmd!(sh, "which unzip").quiet().read().is_err() {
+            panic!("Cannot install godot3.5 : missing unzip, please install with command \n sudo apt install unzip")
+        }
+        println!("Ok!")
+    }
+
+    /// Install the executable for godot3 if not yet available on the system.
+    fn install_godot3_headless(&self) {
+        println!("Installing godot3.5-headless on your computer to run the platform");
+        let sh = Shell::new().unwrap();
+
+        self.check_dependencies();
+        sh.change_dir(format!("{}/ompas-gobot-sim", ompas_path()));
+        sh.create_dir("gobot-bin")
+            .expect("Could not create dir gobot-bin");
+        sh.change_dir("gobot-bin");
+
+        //Install the headless version
+        cmd!(sh, "wget {GODOT_HEADLESS_DOWNLOAD_URL}")
+            .run()
+            .unwrap();
+        cmd!(sh, "unzip {GODOT_HEADLESS_ZIP_NAME}").run().unwrap();
+        cmd!(
+            sh,
+            "mv Godot_v3.5-stable_linux_headless.64 godot3.5-headless"
+        )
+        .quiet()
+        .run()
+        .unwrap();
+        println!(
+            "godot3.5-headless has been installed in {}",
+            sh.current_dir().to_str().unwrap()
+        )
+    }
+
+    fn install_godot3(&self) {
+        println!("Installing godot3.5 on your computer to run the platform...");
+        let sh = Shell::new().unwrap();
+
+        self.check_dependencies();
+        sh.change_dir(format!("{}/ompas-gobot-sim", ompas_path()));
+        sh.create_dir("gobot-bin")
+            .expect("Could not create dir gobot-bin");
+        sh.change_dir("gobot-bin");
+
+        //Install the standard version
+        cmd!(sh, "wget {GODOT_DOWNLOAD_URL}").run().unwrap();
+        cmd!(sh, "unzip {GODOT_ZIP_NAME}").run().unwrap();
+        cmd!(sh, "mv Godot_v3.5-stable_x11.64 godot3.5")
+            .run()
+            .unwrap();
+        println!(
+            "godot3.5 has been installed in {}",
+            sh.current_dir().to_str().unwrap()
+        )
+    }
+
+    /// Setup the gobot-sim project in godot3 to launch it
+    pub fn init_godot_project(&self) {
+        // if .import directory does not exist
+        // godot3 -e --quit (imports the project and quits).
+        // Needed to generate the .import directory
+        let sh = Shell::new().unwrap();
+        sh.change_dir(format!("{}/ompas-gobot-sim/gobot-sim/simu", ompas_path()));
+
+        if !sh.path_exists(format!("{}/.import", sh.current_dir().to_str().unwrap())) {
+            print!("Init gobot-sim project in godot...");
+            let gd_path = self.godot3_path().unwrap();
+            cmd!(sh, "{gd_path} -e --quit").quiet().run().unwrap();
+            println!("Ok!");
+        }
     }
 
     pub fn set_server_info(&mut self, socket_info: SocketAddr) {

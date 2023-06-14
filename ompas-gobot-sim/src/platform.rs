@@ -311,7 +311,7 @@ impl PlatformGobotSim {
         if !sh.path_exists(format!("{}/.import", sh.current_dir().to_str().unwrap())) {
             print!("Init gobot-sim project in godot...");
             let gd_path = self.godot3_path().unwrap();
-            cmd!(sh, "{gd_path} -e --quit").quiet().run().unwrap();
+            cmd!(sh, "{gd_path} -e").quiet().run().unwrap();
             println!("Ok!");
         }
     }

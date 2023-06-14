@@ -9,3 +9,4 @@ rae_logs/
 Cargo.lock
 *.log
 *.yml
+gobot-bin

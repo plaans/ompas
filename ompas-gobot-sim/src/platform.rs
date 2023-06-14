@@ -220,7 +220,7 @@ impl PlatformGobotSim {
 
     pub fn godot3_headless_path(&self) -> Option<PathBuf> {
         let sh = Shell::new().unwrap();
-        match cmd!(sh, "which godot3-headless").quiet().read() {
+        match cmd!(sh, "which godot3.5-headless").quiet().read() {
             Ok(s) => Some(s.into()),
             Err(_) => {
                 let ompas_path = ompas_path();

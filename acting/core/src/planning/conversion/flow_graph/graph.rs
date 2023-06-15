@@ -1,6 +1,7 @@
 use crate::model::chronicle::acting_binding::ActingBindingCollection;
+use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::interval::Interval;
-use crate::model::chronicle::lit::Lit;
+use crate::model::chronicle::lit::{Lit, LitSet};
 use crate::model::process_ref::Label;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
@@ -185,17 +186,29 @@ impl FlowGraph {
 
     pub fn new_instantaneous_assignment(&mut self, value: impl Into<Lit>) -> FlowId {
         let interval = Interval::new_instantaneous(self.st.new_timepoint());
+        let vertice = value.into();
         let result = self.st.new_result();
 
-        let vertice = value.into();
         let id = self.new_flow(vertice, interval, result);
         self.new_seq(vec![id])
+    }
+
+    pub fn new_arbitrary(&mut self, set: impl Into<LitSet>) {
+        let interval = Interval::new_instantaneous(self.st.new_timepoint());
+        let vertice: Lit = Lit::Constraint(Box::new(Constraint::arbitrary(set)));
+        let result = self.st.new_arbitrary();
+        self.new_flow(vertice, interval, result);
     }
 
     pub fn new_assignment(&mut self, value: impl Into<Lit>) -> FlowId {
         let vertice = value.into();
         let result = self.st.new_result();
-        let interval = Interval::new(self.st.new_timepoint(), self.st.new_timepoint());
+        let (start, end) = if vertice.is_exec() {
+            (self.st.new_start_task(), self.st.new_end_task())
+        } else {
+            (self.st.new_timepoint(), self.st.new_timepoint())
+        };
+        let interval = Interval::new(start, end);
         self.new_flow(vertice, interval, result)
     }
 

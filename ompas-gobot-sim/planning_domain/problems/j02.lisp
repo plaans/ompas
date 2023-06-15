@@ -12,13 +12,4 @@
         --time_scale 4
     )
     ;(export-type-lattice)
-    (start)
-    (sleep 0.5)
-    ;(plan-task t_jobshop)
-    ;(plan-task t_process machine0 package0 3)
-
-    (plan-task-opt t_jobshop)
-    ;(plan-task t_carry_to_machine robot0 package0 machine0)
-    ;(plan-task robot_move robot0 belt0)
-    ;(plan-task robot_move robot0 belt12)
 )

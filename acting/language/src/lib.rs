@@ -950,15 +950,18 @@ pub mod interface {
 
 pub mod sym_table {
 
-    pub const RESULT_PREFIX: char = 'r';
-    pub const HANDLE_PREFIX: char = 'h';
+    pub const RESULT_PREFIX: &str = "_r_";
+    pub const HANDLE_PREFIX: &str = "_h_";
     pub const IF_PREFIX: &str = "if";
-    pub const TIMEPOINT_PREFIX: char = 't';
-    pub const START_PREFIX: char = 's';
-    pub const END_PREFIX: char = 'e';
-    pub const PRESENCE_PREFIX: char = 'p';
-    pub const COND_PREFIX: char = 'c';
-    pub const CHRONICLE_RESULT_PREFIX: &str = "cr";
+    pub const TIMEPOINT_PREFIX: &str = "_t_";
+    pub const START_PREFIX: &str = "_s_";
+    pub const END_PREFIX: &str = "_e_";
+    pub const START_TASK_PREFIX: &str = "_st_";
+    pub const END_TASK_PREFIX: &str = "_et_";
+    pub const PRESENCE_PREFIX: &str = "_p_";
+    pub const COND_PREFIX: &str = "_c_";
+    pub const CHRONICLE_RESULT_PREFIX: &str = "_cr_";
+    pub const ARBITRARY_PREFIX: &str = "_a_";
 
     pub const START: &str = "start";
     pub const END: &str = "end";

@@ -10,9 +10,4 @@
         --robot_controller pf
         --time_scale 4
     )
-    (start)
-    (sleep 0.5)
-    (plan-task t_jobshop)
-    ;(plan-task t_process machine0 package0 3)
-    ;(plan-task-opt t_jobshop)
 )

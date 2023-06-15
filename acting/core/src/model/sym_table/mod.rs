@@ -219,7 +219,7 @@ impl SymTable {
     //The name of the return value will be format!("r_{}", last_return_index)
     pub fn new_result(&mut self) -> VarId {
         let index = self.meta_data.new_result_index();
-        let sym = format!("_{RESULT_PREFIX}{index}_");
+        let sym = format!("{RESULT_PREFIX}{index}");
         let id = self.new_variable(&sym, Domain::any());
         self.ids.insert(&sym, &id);
         id
@@ -231,16 +231,48 @@ impl SymTable {
 
     pub fn new_timepoint(&mut self) -> VarId {
         let index = self.meta_data.new_timepoint_index();
-        let sym = format!("_{TIMEPOINT_PREFIX}{index}_");
+        let sym = format!("{TIMEPOINT_PREFIX}{index}");
         let id = self.new_variable(&sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
         self.ids.insert(&sym, &id);
+        id
+    }
+
+    pub fn new_start(&mut self) -> VarId {
+        let index = self.meta_data.new_start_index();
+        let sym = &format!("{START_PREFIX}{index}");
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        self.ids.insert(sym, &id);
+        id
+    }
+
+    pub fn new_end(&mut self) -> VarId {
+        let index = self.meta_data.new_end_index();
+        let sym = &format!("{END_PREFIX}{index}");
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        self.ids.insert(sym, &id);
+        id
+    }
+
+    pub fn new_start_task(&mut self) -> VarId {
+        let index = self.meta_data.new_start_task_index();
+        let sym = &format!("{START_TASK_PREFIX}{index}");
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        self.ids.insert(sym, &id);
+        id
+    }
+
+    pub fn new_end_task(&mut self) -> VarId {
+        let index = self.meta_data.new_end_task_index();
+        let sym = &format!("{END_TASK_PREFIX}{index}");
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        self.ids.insert(sym, &id);
         id
     }
 
     pub fn new_if(&mut self) -> (VarId, VarId, VarId) {
         let index = self.meta_data.new_if_index();
 
-        let sym_if = &format!("_{IF_PREFIX}{index}_");
+        let sym_if = &format!("{IF_PREFIX}{index}");
         let id_if = self.new_variable(sym_if, self.get_type_as_domain(TYPE_TASK).unwrap());
         self.ids.insert(sym_if, &id_if);
 
@@ -259,31 +291,15 @@ impl SymTable {
 
     pub fn new_handle(&mut self) -> VarId {
         let index = self.meta_data.new_handle_index();
-        let sym = &format!("_{HANDLE_PREFIX}{index}_");
+        let sym = &format!("{HANDLE_PREFIX}{index}");
         let id = self.new_variable(sym, Domain::composed(Handle as usize, vec![Any]));
-        self.ids.insert(sym, &id);
-        id
-    }
-
-    pub fn new_start(&mut self) -> VarId {
-        let index = self.meta_data.new_start_index();
-        let sym = &format!("_{START_PREFIX}{index}_");
-        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
-        self.ids.insert(sym, &id);
-        id
-    }
-
-    pub fn new_end(&mut self) -> VarId {
-        let index = self.meta_data.new_end_index();
-        let sym = &format!("_{END_PREFIX}{index}_");
-        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
         self.ids.insert(sym, &id);
         id
     }
 
     pub fn new_presence(&mut self) -> VarId {
         let index = self.meta_data.new_presence_index();
-        let sym = &format!("_{PRESENCE_PREFIX}{index}_");
+        let sym = &format!("{PRESENCE_PREFIX}{index}");
         let id = self.new_parameter(sym, Boolean);
         self.ids.insert(sym, &id);
         id
@@ -291,8 +307,16 @@ impl SymTable {
 
     pub fn new_chronicle_result(&mut self) -> VarId {
         let index = self.meta_data.new_chronicle_result_index();
-        let sym = &format!("_{CHRONICLE_RESULT_PREFIX}{index}_");
+        let sym = &format!("{CHRONICLE_RESULT_PREFIX}{index}");
         let id = self.new_parameter(sym, Domain::any());
+        self.ids.insert(sym, &id);
+        id
+    }
+
+    pub fn new_arbitrary(&mut self) -> VarId {
+        let index = self.meta_data.new_arbitrary_index();
+        let sym = &format!("{ARBITRARY_PREFIX}{index}");
+        let id = self.new_variable(sym, Domain::any());
         self.ids.insert(sym, &id);
         id
     }

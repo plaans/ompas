@@ -70,6 +70,9 @@ impl Lit {
     pub fn is_exp(&self) -> bool {
         matches!(self, Self::Exp(_))
     }
+    pub fn is_exec(&self) -> bool {
+        matches!(self, Self::Exec(_))
+    }
 }
 
 impl TryFrom<Lit> for VarId {

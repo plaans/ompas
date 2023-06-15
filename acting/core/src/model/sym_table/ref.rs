@@ -165,6 +165,18 @@ impl RefSymTable {
         self.0.write().unwrap().new_end()
     }
 
+    pub fn new_start_task(&self) -> VarId {
+        self.0.write().unwrap().new_start_task()
+    }
+
+    pub fn new_end_task(&self) -> VarId {
+        self.0.write().unwrap().new_end_task()
+    }
+
+    pub fn new_arbitrary(&self) -> VarId {
+        self.0.write().unwrap().new_arbitrary()
+    }
+
     pub fn new_presence(&self) -> VarId {
         self.0.write().unwrap().new_presence()
     }

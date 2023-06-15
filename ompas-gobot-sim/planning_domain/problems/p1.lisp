@@ -83,5 +83,3 @@
         ((machine.processes_list machine0) (1))
                 )
 )
-
-

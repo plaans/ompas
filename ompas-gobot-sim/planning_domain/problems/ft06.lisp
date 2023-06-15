@@ -11,8 +11,4 @@
         --robot_controller pf
         --time_scale 4
     )
-    (start)
-    (sleep 0.5)
-    (plan-task t_jobshop)
-    ;(plan-task-opt t_jobshop)
 )

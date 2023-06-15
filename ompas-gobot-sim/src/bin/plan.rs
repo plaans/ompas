@@ -26,6 +26,9 @@ struct Opt {
 
     #[structopt(short = "o", long = "optimal")]
     _opt: bool,
+
+    #[structopt(short = "v", long = "view-simulator")]
+    view: bool,
 }
 
 #[tokio::main]
@@ -59,7 +62,7 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(
             LispDomain::File(opt.domain.unwrap_or(default_gobot_sim_plan_domain().into())),
-            false,
+            !opt.view,
             LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,
         ),
         None,

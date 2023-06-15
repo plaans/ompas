@@ -42,14 +42,13 @@ use function_name::named;
 use num_integer::Integer;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
-use ompas_language::sym_table::{
-    TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_METHOD, TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_PREDICATE,
-    TYPE_PRESENCE, TYPE_STATE_FUNCTION, TYPE_TASK, TYPE_TIMEPOINT,
-};
+use ompas_language::sym_table::*;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::ops::Deref;
 use std::sync::Arc;
+
+const TIMEPOINT_UB: IntCst = 1000 * 1000; //INT_CST_MAX;
 
 #[named]
 pub fn encode_ctx(
@@ -604,6 +603,24 @@ pub fn read_chronicle(
         let var_domain = st.get_var_domain(var);
         let domain = &var_domain.domain;
         let label = st.get_label(var, false);
+        let var_type = if label.starts_with(TIMEPOINT_PREFIX)
+            || label.starts_with(START_TASK_PREFIX)
+            || label.starts_with(END_TASK_PREFIX)
+        {
+            VarType::InternalTimepoint
+        } else if label.starts_with(START_PREFIX) {
+            VarType::ChronicleStart
+        } else if label.starts_with(END_PREFIX) {
+            VarType::ChronicleEnd
+        } else if label.starts_with(PRESENCE_PREFIX) {
+            VarType::Presence
+        } else if label.starts_with(ARBITRARY_PREFIX) {
+            VarType::Arbitrary
+        } else if label.starts_with(RESULT_PREFIX) {
+            VarType::Reification
+        } else {
+            VarType::Parameter(label)
+        };
 
         let (t, var_val) = &match domain {
             Simple(TYPE_ID_NIL | TYPE_ID_FALSE) => {
@@ -636,10 +653,10 @@ pub fn read_chronicle(
         } else if t == lattice.get_type_id(TYPE_TIMEPOINT).unwrap() {
             let fvar = ctx.model.new_optional_fvar(
                 0,
-                INT_CST_MAX,
+                TIMEPOINT_UB,
                 TIME_SCALE.get(),
                 prez,
-                container / VarType::Parameter(label),
+                container / var_type,
             );
 
             table.add_binding(*var, fvar.into());
@@ -661,9 +678,9 @@ pub fn read_chronicle(
                 (INT_CST_MIN, INT_CST_MAX)
             };
 
-            let ivar =
-                ctx.model
-                    .new_optional_ivar(lb, ub, prez, container / VarType::Parameter(label));
+            let ivar = ctx
+                .model
+                .new_optional_ivar(lb, ub, prez, container / var_type);
             table.add_binding(*var, ivar.into());
             ivar.into()
         } else if *t == TYPE_ID_FLOAT || *t == TYPE_ID_NUMBER {
@@ -672,14 +689,12 @@ pub fn read_chronicle(
                 INT_CST_MAX,
                 TIME_SCALE.get(), //Not sure of that
                 prez,
-                container / VarType::Parameter(label),
+                container / var_type,
             );
             table.add_binding(var, fvar.into());
             fvar.into()
         } else if *t == TYPE_ID_BOOLEAN {
-            let bvar = ctx
-                .model
-                .new_optional_bvar(prez, container / VarType::Parameter(label));
+            let bvar = ctx.model.new_optional_bvar(prez, container / var_type);
             //context.model.
             table.add_binding(*var, bvar.into());
             bvar.into()
@@ -699,9 +714,9 @@ pub fn read_chronicle(
                 .id_of(&str)
                 .unwrap_or_else(|| panic!("{str} should be defined in type hierarchy"));
             //let s = ch.sym_table.get_atom(var, true).unwrap();
-            let svar =
-                ctx.model
-                    .new_optional_sym_var(t, prez, container / VarType::Parameter(label));
+            let svar = ctx
+                .model
+                .new_optional_sym_var(t, prez, container / var_type);
             table.add_binding(*var, svar.into());
             svar.into()
         };

@@ -1,4 +1,4 @@
-use crate::model::acting_domain::model::{ActingModel, ROOT};
+use crate::model::acting_domain::model::{ActingModel, NewTask, ROOT};
 use crate::model::chronicle::acting_binding::ActingBinding;
 use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation};
 use crate::model::process_ref::{Label, ProcessRef};
@@ -113,7 +113,7 @@ impl InnerActingManager {
         time_reference: Instant,
         st: RefSymTable,
     ) -> Self {
-        let model = ActingModel::root(st.clone());
+        let model = ActingModel::root(&st);
         let chronicle = model.chronicle.as_ref().unwrap();
         let mut acting_vars = ActingVarCollection::default();
 
@@ -382,7 +382,10 @@ impl InnerActingManager {
     //New processes
     pub async fn new_high_level_task(&mut self, debug: String, mut args: Vec<Cst>) -> ProcessRef {
         let id = self.processes.len();
-        let task_ref = self.models[0].add_subtask(args.clone());
+        let task_ref = self.models[0].add_new_task(NewTask {
+            start: None,
+            args: args.clone(),
+        });
 
         let start = self.new_execution_var(&task_ref.start, &0);
         let end = self.new_execution_var(&task_ref.end, &0);

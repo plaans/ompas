@@ -13,6 +13,7 @@ pub mod control;
 pub mod debug_conversion;
 pub mod log;
 pub mod model;
+pub mod planning;
 use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::rae_options::OMPASOptions;
@@ -22,6 +23,7 @@ use crate::ompas::scheme::exec::platform::platform_declaration::PlatformDeclarat
 use crate::ompas::scheme::exec::platform::Platform;
 use crate::ompas::scheme::exec::ModExec;
 use crate::ompas::scheme::monitor::log::ModLog;
+use crate::ompas::scheme::monitor::planning::ModPlanning;
 use ompas_language::monitor::*;
 use ompas_language::process::{LOG_TOPIC_OMPAS, OMPAS};
 use sompas_modules::advanced_math::ModAdvancedMath;
@@ -48,11 +50,13 @@ impl From<ModMonitor> for LModule {
     fn from(m: ModMonitor) -> Self {
         let mod_domain = ModModel::new(&m);
         let mod_control = ModControl::new(&m);
+        let mod_planning = ModPlanning::new(&m);
         let mut module = LModule::new(m, MOD_MONITOR, DOC_MOD_MONITOR);
         module.add_submodule(mod_domain);
         module.add_submodule(ModLog::default());
         module.add_submodule(ModDebugConversion::default());
         module.add_submodule(mod_control);
+        module.add_submodule(mod_planning);
 
         module
     }

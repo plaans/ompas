@@ -7,18 +7,20 @@ use aries_planning::chronicles;
 use aries_planning::chronicles::analysis::hierarchical_is_non_recursive;
 use std::time::Instant;
 
-const STRATEGIES: [Strat; 4] = [
-    ActivityNonTemporalFirst,
-    Strat::Forward,
-    Strat::Causal,
-    Strat::Activity,
-];
 const MIN_DEPTH: u32 = 0;
 const MAX_DEPTH: u32 = u32::MAX;
+const STRATEGIES: [Strat; 4] = [
+    ActivityNonTemporalFirst,
+    ActivityNonTemporalFirst,
+    //Strat::Forward,
+    Strat::Causal,
+    Strat::Causal,
+    //Strat::Activity,
+];
 
 pub type PMetric = Metric;
 
-pub fn run_solver(
+pub fn run_planner(
     problem: chronicles::Problem,
     optimize: Option<PMetric>,
 ) -> Result<Option<PlanResult>> {

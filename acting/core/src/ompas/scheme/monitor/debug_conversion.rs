@@ -1,6 +1,4 @@
-use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::scheme::exec::state::ModState;
-use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::planning::conversion::context::ConversionContext;
 use crate::planning::conversion::convert_acting_domain;
@@ -8,10 +6,8 @@ use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, PLEnv};
 use crate::planning::conversion::flow_graph::algo::p_eval::{p_eval, P_EVAL};
 use crate::planning::planner::problem::PlanningDomain;
-use crate::planning::planner::solver::PMetric;
 use chrono::{DateTime, Utc};
 use ompas_language::exec::refinement::EXEC_TASK;
-use ompas_language::monitor::control::MOD_CONTROL;
 use ompas_language::monitor::debug_conversion::*;
 use ompas_language::monitor::model::MOD_MODEL;
 use ompas_middleware::logger::LogClient;
@@ -21,7 +17,7 @@ use sompas_macros::async_scheme_fn;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::LLambda;
 use sompas_structs::lmodule::LModule;
-use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::env::set_current_dir;
 use std::fs;
@@ -30,7 +26,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::SystemTime;
-use tokio::sync::broadcast;
 
 #[derive(Default)]
 pub struct ModDebugConversion {}
@@ -45,8 +40,6 @@ impl From<ModDebugConversion> for LModule {
             DOC_EXPORT_TYPE_LATTICE,
             false,
         );
-        m.add_async_fn(PLAN_TASK, plan_task, DOC_PLAN_TASK, false);
-        m.add_async_fn(PLAN_TASK_OPT, plan_task_opt, DOC_PLAN_TASK_OPT, false);
         m.add_async_fn(PRE_EVAL_TASK, pre_eval_task, DOC_PRE_EVAL_TASK, false);
         m.add_async_fn(PRE_EVAL_EXPR, pre_eval_expr, DOC_PRE_EVAL_EXPR, false);
         m.add_async_fn(ANNOTATE_TASK, annotate_task, DOC_ANNOTATE_TASK, false);
@@ -107,46 +100,6 @@ pub async fn export_type_lattice(env: &LEnv) -> Result<(), LRuntimeError> {
         .unwrap();
 
     Ok(())
-}
-
-async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
-    let task: LValue = args.into();
-    println!("task to plan: {}", task);
-    let acting_manager = env
-        .get_context::<ModControl>(MOD_CONTROL)?
-        .acting_manager
-        .clone();
-    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
-    //let mut context: ConversionContext = ctx.get_conversion_context().await;
-    let mut env: LEnv = ctx.get_plan_env().await;
-    let state = ctx.get_plan_state().await;
-
-    env.update_context(ModState::new_from_snapshot(state));
-
-    acting_manager
-        .start_continuous_planning(env, if opt { Some(PMetric::Makespan) } else { None })
-        .await;
-
-    let debug = LValue::from(args).to_string();
-    let args = args.iter().map(|lv| lv.as_cst().unwrap()).collect();
-
-    let _pr = acting_manager.new_high_level_task(debug, args).await;
-    let mut recv: broadcast::Receiver<bool> =
-        acting_manager.subscribe_on_plan_update().await.unwrap();
-    recv.recv()
-        .await
-        .expect("Error while waiting on plan update.");
-    Ok(LValue::Nil)
-}
-
-#[async_scheme_fn]
-pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
-    _plan_task(env, args, false).await
-}
-
-#[async_scheme_fn]
-pub async fn plan_task_opt(env: &LEnv, args: &[LValue]) -> LResult {
-    _plan_task(env, args, true).await
 }
 
 #[async_scheme_fn]

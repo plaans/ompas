@@ -5,7 +5,6 @@
     ;(def-objects (unk location))
 
 
-
     ;globals
     (def-static-state-function globals.robot_default_battery_capacity (:result float))
     (def-static-state-function globals.robot_battery_charge_rate (:result float))

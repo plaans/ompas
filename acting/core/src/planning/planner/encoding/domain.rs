@@ -17,7 +17,7 @@ use crate::ompas::manager::acting::planning::ActingVarRefTable;
 use crate::model::acting_domain::model::ActingModel;
 use crate::ompas::manager::state::instance::InstanceCollection;
 use crate::planning::planner::encoding::{
-    atom_from_cst, get_type, try_variable_into_fvar, var_id_into_atom, PlannerDomain,
+    atom_from_cst, get_type, var_id_into_atom, PlannerDomain,
 };
 use crate::OMPAS_PLAN_ENCODING_OPTIMIZATION_ON;
 use anyhow::anyhow;
@@ -25,7 +25,7 @@ use aries::core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
 use aries::model::lang::linear::{LinearSum, LinearTerm};
 use aries::model::lang::{
-    Atom as aAtom, Atom, ConversionError, FAtom, FVar, IAtom, IVar, Type as aType, Variable,
+    Atom as aAtom, Atom, ConversionError, FAtom, IAtom, IVar, Type as aType, Variable,
 };
 use aries::model::symbols::SymbolTable;
 use aries::model::types::TypeHierarchy;
@@ -759,10 +759,8 @@ pub fn read_chronicle(
                 })
                 .collect();
         let value = get_atom(&c.value, ctx);
-        let start: FVar = try_variable_into_fvar(table.get_var(c.get_start()).cloned().unwrap())?;
-        let start = FAtom::from(start);
-        let end: FVar = try_variable_into_fvar(table.get_var(c.get_end()).cloned().unwrap())?;
-        let end = FAtom::from(end);
+        let start: FAtom = get_atom(&c.get_start(), ctx).try_into()?;
+        let end: FAtom = get_atom(&c.get_start(), ctx).try_into()?;
         let condition = Condition {
             start,
             state_var: sv,
@@ -784,10 +782,8 @@ pub fn read_chronicle(
                 })
                 .collect();
         let value = get_atom(&e.value, ctx);
-        let start: FVar = try_variable_into_fvar(*table.get_var(e.get_start()).unwrap())?;
-        let start = FAtom::from(start);
-        let end: FVar = try_variable_into_fvar(*table.get_var(e.get_end()).unwrap())?;
-        let end = FAtom::from(end);
+        let start: FAtom = get_atom(&e.get_start(), ctx).try_into()?;
+        let end: FAtom = get_atom(&e.get_start(), ctx).try_into()?;
         let effect = Effect {
             transition_start: start, // + FAtom::EPSILON,
             persistence_start: end,  // + FAtom::EPSILON,
@@ -819,10 +815,8 @@ pub fn read_chronicle(
     }
     //println!("ok!");
 
-    let start = try_variable_into_fvar(*table.get_var(ch.get_interval().get_start()).unwrap())?;
-    let start = FAtom::from(start);
-    let end = try_variable_into_fvar(*table.get_var(ch.get_interval().get_end()).unwrap())?;
-    let end = FAtom::from(end);
+    let start: FAtom = get_atom(&ch.get_interval().get_start(), ctx).try_into()?;
+    let end: FAtom = get_atom(&ch.get_interval().get_start(), ctx).try_into()?;
 
     //print!("init name...");
     let name: Vec<aAtom> = ch.get_name().iter().map(|a| get_atom(a, ctx)).collect();

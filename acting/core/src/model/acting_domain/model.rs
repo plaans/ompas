@@ -1,12 +1,15 @@
 use crate::model::chronicle;
 use crate::model::chronicle::acting_binding::ActionBinding;
+use crate::model::chronicle::condition::Condition;
 use crate::model::chronicle::constraint::Constraint;
+use crate::model::chronicle::effect::Effect;
 use crate::model::chronicle::subtask::SubTask;
 use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation};
 use crate::model::process_ref::Label;
 use crate::model::sym_domain::{cst, Domain};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
+use crate::ompas::manager::acting::interval::{Interval, Timepoint};
 use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
@@ -61,6 +64,7 @@ impl ActingModel {
             .map(|c| c.instantiate(self.instantiations.clone()))
     }
 }
+#[derive(Clone)]
 
 pub struct TaskRef {
     pub start: VarId,
@@ -68,8 +72,65 @@ pub struct TaskRef {
     pub name: Vec<VarId>,
 }
 
+#[derive(Clone)]
+pub struct NewTask {
+    pub start: Option<Timepoint>,
+    pub args: Vec<cst::Cst>,
+}
+
+fn format_vec(f: &mut Formatter<'_>, vec: &[cst::Cst]) -> std::fmt::Result {
+    for e in vec {
+        write!(f, "{e} ")?;
+    }
+    Ok(())
+}
+
+impl Display for NewTask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(start) = &self.start {
+            write!(f, "{}", start)?;
+        }
+        format_vec(f, &self.args)?;
+
+        Ok(())
+    }
+}
+#[derive(Clone)]
+
+pub struct Event {
+    pub interval: Interval,
+    pub sv: Vec<cst::Cst>,
+    pub value: cst::Cst,
+}
+
+impl Display for Event {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.interval)?;
+
+        format_vec(f, &self.sv)?;
+        write!(f, "<- {}", self.value)
+    }
+}
+
+#[derive(Clone)]
+pub struct Goal {
+    pub interval: Option<Interval>,
+    pub sv: Vec<cst::Cst>,
+    pub value: cst::Cst,
+}
+
+impl Display for Goal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(interval) = &self.interval {
+            write!(f, "{}", interval)?;
+        }
+        format_vec(f, &self.sv)?;
+        write!(f, "<- {}", self.value)
+    }
+}
+
 impl ActingModel {
-    pub fn root(st: RefSymTable) -> Self {
+    pub fn root(st: &RefSymTable) -> Self {
         let chronicle = Chronicle::new(ROOT, ChronicleKind::Root, st.clone());
         st.set_domain(&st.get_domain_id(chronicle.get_result()), Domain::nil());
         st.set_domain(
@@ -86,12 +147,80 @@ impl ActingModel {
         }
     }
 
-    pub fn add_subtask(&mut self, mut task: Vec<cst::Cst>) -> TaskRef {
+    pub fn add_event(&mut self, mut event: Event) {
+        let chronicle = self.chronicle.as_mut().unwrap();
+        let st = chronicle.st.clone();
+
+        let mut interval = chronicle::interval::Interval::new_instantaneous(
+            st.new_float(event.interval.start.as_secs()),
+        );
+        if let Some(end) = event.interval.end {
+            interval.set_end(st.new_float(end.as_secs()))
+        }
+
+        let effect = Effect {
+            interval,
+            sv: event.sv.drain(..).map(|cst| st.new_cst(cst)).collect(),
+            value: st.new_cst(event.value),
+        };
+
+        chronicle.add_constraint(Constraint::leq(
+            chronicle.interval.get_start(),
+            interval.get_start(),
+        ));
+        chronicle.add_constraint(Constraint::leq(
+            interval.get_end(),
+            chronicle.interval.get_end(),
+        ));
+
+        chronicle.add_effect(effect)
+    }
+
+    pub fn add_goal(&mut self, mut goal: Goal) {
+        let chronicle = self.chronicle.as_mut().unwrap();
+        let st = chronicle.st.clone();
+
+        let interval = match goal.interval {
+            Some(t) => {
+                let mut interval = chronicle::interval::Interval::new_instantaneous(
+                    st.new_float(t.start.as_secs()),
+                );
+                if let Some(end) = t.end {
+                    interval.set_end(st.new_float(end.as_secs()))
+                }
+                interval
+            }
+            None => chronicle::interval::Interval::new_instantaneous(st.new_timepoint()),
+        };
+
+        let condition = Condition {
+            interval,
+            sv: goal.sv.drain(..).map(|cst| st.new_cst(cst)).collect(),
+            value: st.new_cst(goal.value),
+        };
+
+        chronicle.add_constraint(Constraint::leq(
+            chronicle.interval.get_start(),
+            interval.get_start(),
+        ));
+        chronicle.add_constraint(Constraint::leq(
+            interval.get_end(),
+            chronicle.interval.get_end(),
+        ));
+
+        chronicle.add_condition(condition)
+    }
+
+    pub fn add_new_task(&mut self, mut task: NewTask) -> TaskRef {
         let chronicle = self.chronicle.as_mut().unwrap();
 
         let st = chronicle.st.clone();
 
-        let interval = chronicle::interval::Interval::new(st.new_timepoint(), st.new_timepoint());
+        let start = match task.start {
+            Some(start) => st.new_float(start.as_secs()),
+            None => st.new_timepoint(),
+        };
+        let interval = chronicle::interval::Interval::new(start, st.new_timepoint());
 
         let start = interval.get_start();
         let end = interval.get_end();
@@ -99,7 +228,7 @@ impl ActingModel {
         let result = st.new_result();
         st.set_domain(&st.get_domain_id(&result), Domain::nil());
 
-        let name: Vec<VarId> = task.drain(..).map(|cst| st.new_cst(cst)).collect();
+        let name: Vec<VarId> = task.args.drain(..).map(|cst| st.new_cst(cst)).collect();
 
         let n_subtask = chronicle.get_subtasks().len();
         let label = Label::Action(n_subtask);

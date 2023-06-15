@@ -214,6 +214,9 @@ pub mod env {
     pub const GET_PROCESS_HIERARCHY: &str = "get_process_hierarchy";
     pub const DOC_GET_PROCESS_HIERARCHY: &str =
         "Return the list of processes and process topics along their dependencies.";
+
+    pub const EXIT: &str = "exit";
+    pub const DOC_EXIT: &str = "Exit the program.";
 }
 
 pub mod utils {

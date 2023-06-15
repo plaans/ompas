@@ -23,7 +23,7 @@ use crate::planning::planner::encoding::problem_generation::{
 use crate::planning::planner::encoding::{PlannerDomain, PlannerProblem};
 use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
-use crate::planning::planner::solver::run_solver;
+use crate::planning::planner::solver::run_planner;
 use crate::planning::planner::solver::PMetric;
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON};
 use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
@@ -148,7 +148,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                                 }
                             }
 
-                            let result = run_solver(
+                            let result = run_planner(
                                 aries_problem,
                                 opt,
                             );

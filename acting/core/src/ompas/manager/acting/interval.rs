@@ -91,6 +91,15 @@ impl From<Instant> for Timepoint {
     }
 }
 
+impl From<f64> for Timepoint {
+    fn from(value: f64) -> Self {
+        Self {
+            factor: Self::MILLIS_FACTOR,
+            instant: (value as u64 * Self::MILLIS_FACTOR) as u128,
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Interval {
     pub start: Timepoint,

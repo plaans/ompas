@@ -439,12 +439,6 @@ pub mod monitor {
         pub const DOC_EXPORT_TYPE_LATTICE: &str =
             "Exports in a google-chrome page the lattice in a dot form";
 
-        pub const PLAN_TASK: &str = "plan-task";
-        pub const DOC_PLAN_TASK: &str= "Plan a task using the defined planner with the acting domain defined in the environment";
-
-        pub const PLAN_TASK_OPT: &str = "plan-task-opt";
-        pub const DOC_PLAN_TASK_OPT: &str= "Plan a task using the defined planner with the acting domain defined in the environment, and returns the optimal solution in terms of makespan";
-
         pub const PRE_EVAL_TASK: &str = "pre-eval-task";
         pub const DOC_PRE_EVAL_TASK: &str = "Pre evaluate a task";
 
@@ -454,6 +448,51 @@ pub mod monitor {
         pub const ANNOTATE_TASK: &str = "annotate-task";
         pub const DOC_ANNOTATE_TASK: &str =
             "Pre eval a task and annotate each acting process with a unique id";
+    }
+
+    pub mod planning {
+        pub const MOD_PLANNING: &str = "planning";
+        pub const DOC_MOD_PLANNING: &str =
+            "mod used to plan a task regarding the current state of the system.";
+
+        pub const PLAN: &str = "plan";
+        pub const DOC_PLAN: &str= "Plan with an optional task using the defined planner with the acting domain defined in the environment";
+
+        pub const PLAN_OPT: &str = "plan-task-opt";
+        pub const DOC_PLAN_OPT: &str= "Plan with an optional task using the defined planner with the acting domain defined in the environment, and returns the optimal solution in terms of makespan";
+
+        pub const NEW_EVENT: &str = "new-event";
+        pub const DOC_NEW_EVENT: &str = "Add an event in the planning problem.";
+        pub const DOC_NEW_EVENT_VERBOSE: &str = "Example: (new-event alarm true 10.5)";
+
+        pub const NEW_GOAL: &str = "new-goal";
+        pub const DOC_NEW_GOAL: &str =
+            "Add a goal in the planning problem. The interval is optional";
+        pub const DOC_NEW_GOAL_VERBOSE: &str= "Examples: (new-goal '(battery truck) 100)\n(add-goal '(position truck) warehouse '(100 120))";
+
+        pub const NEW_GOAL_TASK: &str = "new-goal-task";
+        pub const DOC_NEW_GOAL_TASK: &str = "Add a task in the planning problem.";
+        pub const DOC_NEW_GOAL_TASK_VERBOSE: &str =
+            "Example: (new-goal-task move r1 bedroom kitchen)";
+
+        pub const NEW_TIMED_GOAL_TASK: &str = "new-timed-goal-task";
+        pub const DOC_NEW_TIMED_GOAL_TASK: &str =
+            "Add a task in the planning problem. The last arg is the moment the task should start.";
+        pub const DOC_NEW_TIMED_GOAL_TASK_VERBOSE: &str =
+            "Example: (new-timed-goal-task move r1 bedroom kitchen 10)";
+
+        pub const GET_GOALS_EVENTS: &str = "get-goals-events";
+        pub const DOC_GET_GOALS_EVENTS: &str =
+            "Return the list of tasks, goals, and objectives defined in the planning problem.";
+
+        pub const REMOVE_GOAL: &str = "remove-goal";
+        pub const DOC_REMOVE_GOAL: &str= "Remove the goal with the given id. Use `get-planning-problem` to get the list of goals and theirs ids.";
+
+        pub const REMOVE_TASK: &str = "remove-task";
+        pub const DOC_REMOVE_TASK: &str= "Remove the task with the given id. Use `get-planning-problem` to get the list of tasks and theirs ids.";
+
+        pub const REMOVE_EVENT: &str = "remove-event";
+        pub const DOC_REMOVE_EVENT: &str= "Remove the event with the given id. Use `get-planning-problem` to get the list of events and theirs ids.";
     }
 
     pub mod model {

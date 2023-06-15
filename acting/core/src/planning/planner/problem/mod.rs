@@ -1,5 +1,5 @@
 use crate::model::acting_domain::command::Command;
-use crate::model::acting_domain::model::ActingModel;
+use crate::model::acting_domain::model::{ActingModel, Event, Goal, NewTask};
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
 use crate::model::process_ref::ProcessRef;
@@ -28,6 +28,31 @@ pub struct ChronicleInstance {
     pub origin: ChronicleOrigin,
     pub am: ActingModel,
     pub pr: ProcessRef,
+}
+
+pub fn new_problem_chronicle_instance(
+    st: &RefSymTable,
+    tasks: Vec<NewTask>,
+    goals: Vec<Goal>,
+    events: Vec<Event>,
+) -> ChronicleInstance {
+    let mut am = ActingModel::root(st);
+    for task in tasks {
+        am.add_new_task(task);
+    }
+    for goal in goals {
+        am.add_goal(goal);
+    }
+    for event in events {
+        am.add_event(event);
+    }
+
+    ChronicleInstance {
+        generated: false,
+        origin: ChronicleOrigin::Original,
+        am,
+        pr: ProcessRef::Id(0),
+    }
 }
 
 #[derive(Clone)]

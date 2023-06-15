@@ -7,6 +7,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
+use std::process::exit;
 
 #[derive(Default)]
 pub struct ModEnv {}
@@ -25,6 +26,8 @@ impl From<ModEnv> for LModule {
             DOC_GET_PROCESS_HIERARCHY,
             false,
         );
+        module.add_fn(EXIT, fn_exit, DOC_EXIT, false);
+
         module
     }
 }
@@ -98,4 +101,9 @@ fn get_contexts(env: &LEnv) -> String {
 #[async_scheme_fn]
 pub async fn get_process_hierarchy() -> String {
     Master::format_process_hierarchy().await
+}
+
+#[scheme_fn]
+pub fn fn_exit(code: i64) {
+    exit(code as i32)
 }

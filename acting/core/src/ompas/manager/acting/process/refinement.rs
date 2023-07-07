@@ -21,6 +21,10 @@ impl RefinementProcess {
     }
 
     pub fn get_name_as_lvalue(&self) -> LValue {
+        /*for arg in &self.args {
+            println!("{}", arg.get_val().as_ref().unwrap());
+        }*/
+
         let vec: Vec<LValue> = self
             .args
             .iter()

@@ -12,7 +12,7 @@ export OMPAS_PLAN_OUTPUT=false
 export OMPAS_DEBUG=false
 
 # path to the ompas project
-export OMPAS_PATH=${SCRIPT_DIR}
+export OMPAS_PATH=/home/jeremy/CLionProjects/ompas/
 
 # activate the logs of OMPAS
 export OMPAS_LOG=false

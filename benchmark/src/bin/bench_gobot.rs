@@ -4,7 +4,7 @@ use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use ompas_middleware::logger::{FileDescriptor, LogClient};
-use ompas_middleware::Master;
+use ompas_middleware::{LogLevel, Master};
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
@@ -63,6 +63,8 @@ async fn main() {
 }
 
 pub async fn lisp_interpreter(opt: Opt) {
+    Master::set_log_level(LogLevel::Trace).await;
+
     let path = fs::canonicalize(opt.domain.clone()).expect("path to domain is unvalid");
 
     println!("domain: {:?}", path);
@@ -246,6 +248,6 @@ pub fn domain(opt: &Opt) -> LispDomain {
         om.to_str().unwrap(),
     );
 
-    //println!("{domain}");
+    println!("{domain}");
     domain.into()
 }

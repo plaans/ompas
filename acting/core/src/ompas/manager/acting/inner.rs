@@ -507,6 +507,14 @@ impl InnerActingManager {
 
         let (start, end, args) = if let Some(chronicle) = &model.chronicle {
             let name = chronicle.get_name().clone();
+
+            if name.len() != args.len() {
+                panic!(
+                    "no matching between chronicle_name:{:?} and args:{:?}",
+                    name, args
+                )
+            }
+
             let interval = chronicle.interval;
             let start = self.new_execution_var(&interval.get_start(), &am_id);
             let end = self.new_execution_var(&interval.get_end(), &am_id);

@@ -28,6 +28,7 @@ use inner::InnerActingManager;
 use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
+use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
@@ -431,11 +432,10 @@ impl ActingManager {
         let model: &ActingModel = &locked.models[am_id];
         let lv: LValue = locked.get_refinement_lv(id);
         let lv_om: LValue = model.lv_om.clone();
-
         let (label, params_values) = if let LValue::List(list) = lv {
             (list[0].to_string(), list[1..].to_vec())
         } else {
-            panic!()
+            panic!("action_id: {action_id}, lv: {}, lv_om: {}", lv, lv_om)
         };
 
         let mut body = vec![
@@ -467,7 +467,6 @@ impl ActingManager {
         mut p_env: PLEnv,
     ) -> Result<ActingModel, LRuntimeError> {
         let debug = lv.to_string();
-
         let p_eval_lv = p_eval(lv, &mut p_env).await?;
         //debug_println!("{}\np_eval =>\n{}", lv.format(0), p_eval_lv.format(0));
         let lv_om = annotate(p_eval_lv);
@@ -477,14 +476,35 @@ impl ActingManager {
 
         if self.planning.load(Ordering::Relaxed) {
             let st = self.st.clone();
-            let ch = Some(Chronicle::new(debug, ChronicleKind::Method, st.clone()));
+            let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
+            let mut name = vec![];
+            if let LValue::List(list) = &lv {
+                for arg in list.as_slice() {
+                    let id = match arg {
+                        LValue::Symbol(s) => st.new_symbol(s),
+                        LValue::Number(LNumber::Int(i)) => st.new_int(*i),
+                        LValue::Number(LNumber::Float(f)) => st.new_float(*f),
+                        LValue::True => st.new_bool(true),
+                        LValue::Nil => st.new_bool(false),
+                        _ => unreachable!(),
+                    };
+                    ch.add_var(id);
+                    name.push(id);
+                }
+            } else {
+                panic!()
+            };
+            ch.set_name(name);
+            //ch.set_task();
+
+            let ch = Some(ch);
             let pp_lv = pre_processing(&lv_om, &p_env).await?;
             //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
 
             chronicle = match _convert(ch, &pp_lv, &mut p_env, st).await {
                 Ok(ch) => Some(ch),
                 Err(e) => {
-                    println!("{}", e);
+                    println!("convert error: {}", e);
                     None
                 }
             };

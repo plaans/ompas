@@ -8,5 +8,5 @@
         --jobshop (concatenate gobot-sim-path "jobshop/instances/j02.txt")
         --robot_controller teleport
         --robot_controller pf
-        ;--time_scale 4)
+        --time_scale 4)
 )

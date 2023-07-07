@@ -45,9 +45,11 @@ const COLOR_PLANNING: &str = "red";
 const COLOR_EXECUTION: &str = "blue";
 const COLOR_DEFAULT: &str = "black";
 
-const TASK_NAME: &str = "task_name";
-const TASK_STATUS: &str = "task_status";
-const TASK_EXECUTION_TIME: &str = "task_exec_time";
+const PROCESS_NAME: &str = "process_name";
+const PROCESS_STATUS: &str = "process_status";
+const PROCESS_START: &str = "process_start";
+const PROCESS_END: &str = "process_end";
+//const PROCESS_DELIBERATION_TIME: &str = "process_deliberation_time";
 const OMPAS_STATS: &str = "ompas_stats";
 
 struct Reservation {
@@ -1289,8 +1291,11 @@ impl InnerActingManager {
             .open(&file_path)
             .expect("error creating stat file");
         let header = format!(
-            "\"{}\";\"{}\";\"{}\"\n",
-            TASK_NAME, TASK_STATUS, TASK_EXECUTION_TIME,
+            "\"{}\";\"{}\";\"{}\";\"{}\"\n",
+            PROCESS_NAME,
+            PROCESS_STATUS,
+            PROCESS_START,
+            PROCESS_END, // PROCESS_DELIBERATION_TIME
         );
         if file.metadata().unwrap().len() == 0 {
             file.write_all(header.as_bytes())
@@ -1301,20 +1306,24 @@ impl InnerActingManager {
             let process = &self.processes[*p];
             file.write_all(
                 format!(
-                    "\"{}\";\"{}\";\"{}\"\n", //";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
+                    "\"{}\";\"{}\";\"{}\";\"{}\"\n", //";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
                     process.debug().clone().unwrap(),
                     process.status,
-                    {
-                        let start = process.start.get_val().unwrap();
-                        let end = *process.end.get_val();
-                        let interval = Interval::new(start, end);
-                        let duration = interval.duration();
-                        if duration.is_finite() {
-                            duration.as_secs().to_string()
-                        } else {
-                            duration.to_string()
-                        }
-                    },
+                    process.start.get_val().unwrap(),
+                    match process.end.get_val().as_ref() {
+                        Some(end) => end.to_string(),
+                        None => "none".to_string(),
+                    } /*{
+                          let start = process.start.get_val().unwrap();
+                          let end = *process.end.get_val();
+                          let interval = Interval::new(start, end);
+                          let duration = interval.duration();
+                          if duration.is_finite() {
+                              duration.as_secs().to_string()
+                          } else {
+                              duration.to_string()
+                          }
+                      },*/
                 )
                 .as_bytes(),
             )

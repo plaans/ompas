@@ -114,12 +114,15 @@ impl PlatformGobotSim {
         let f2 = File::create("gobotsim.log").expect("couldn't create file");
 
         let mut child = match config {
-            Some(config) => Command::new(bin_name)
-                .args(config.split_whitespace())
-                .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
-                .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
-                .spawn()
-                .expect("failed to execute process"),
+            Some(config) => {
+                println!("godot config: {}", config);
+                Command::new(bin_name)
+                    .args(config.split_whitespace())
+                    .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                    .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) })
+                    .spawn()
+                    .expect("failed to execute process")
+            }
             None => match self.config.is_empty() {
                 true => Command::new(bin_name)
                     .arg("--path")
@@ -307,7 +310,7 @@ impl PlatformGobotSim {
         // Needed to generate the .import directory
         let sh = Shell::new().unwrap();
         sh.change_dir(format!("{}/ompas-gobot-sim/gobot-sim/simu", ompas_path()));
-
+        println!("check .import");
         if !sh.path_exists(format!("{}/.import", sh.current_dir().to_str().unwrap())) {
             print!("Init gobot-sim project in godot...");
             let gd_path = self.godot3_path().unwrap();

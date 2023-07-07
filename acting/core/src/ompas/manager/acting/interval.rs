@@ -152,6 +152,12 @@ pub enum Duration {
     Inf,
 }
 
+impl Default for Duration {
+    fn default() -> Self {
+        Self::Finite(Timepoint::MICROS_FACTOR, 0)
+    }
+}
+
 impl Duration {
     pub fn as_millis(&self) -> f64 {
         match self {

@@ -1,6 +1,6 @@
 use crate::ompas::manager::acting::acting_var::ExecutionVar;
 use crate::ompas::manager::acting::inner::ProcessKind;
-use crate::ompas::manager::acting::interval::Timepoint;
+use crate::ompas::manager::acting::interval::{Duration, Timepoint};
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
 use crate::ompas::manager::acting::process::action::ActionProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
@@ -43,6 +43,7 @@ pub struct ActingProcess {
     pub status: ProcessStatus,
     pub start: ExecutionVar<Timepoint>,
     pub end: ExecutionVar<Timepoint>,
+    pub deliberation_time: Duration,
     pub inner: ActingProcessInner,
     pub status_update: Option<watch::Sender<ProcessStatus>>,
 }
@@ -100,6 +101,7 @@ impl ActingProcess {
             status: Pending,
             start,
             end,
+            deliberation_time: Duration::default(),
             inner: inner.into(),
             status_update: None,
         }
@@ -148,6 +150,10 @@ impl ActingProcess {
 
     pub fn get_mut_inner(&mut self) -> &mut ActingProcessInner {
         &mut self.inner
+    }
+
+    pub fn add_deliberation_time(&mut self, duration: Duration) {
+        self.deliberation_time += duration;
     }
 }
 

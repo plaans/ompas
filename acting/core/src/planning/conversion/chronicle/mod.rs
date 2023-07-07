@@ -343,12 +343,12 @@ pub fn convert_into_chronicle(
                         ch.add_constraint(Constraint::leq(new_q_prime, max_q_result));
 
                         ch.add_effect(Effect {
-                            interval: Interval::new(t_prime, interval.get_end()),
+                            interval: Interval::new_instantaneous(interval.get_end()),
                             sv: vec![quantity_symbol, resource],
                             value: new_q,
                         });
                         ch.add_effect(Effect {
-                            interval: Interval::new(t_release, t_release_prime),
+                            interval: Interval::new_instantaneous(t_release_prime),
                             sv: vec![quantity_symbol, resource],
                             value: new_q_prime,
                         });
@@ -443,8 +443,9 @@ pub fn convert_into_chronicle(
                     Lit::Write(write) => {
                         let sv = write[0..write.len() - 1].to_vec();
                         let value = *write.last().unwrap();
+
                         let effect = Effect {
-                            interval,
+                            interval: Interval::new_instantaneous(interval.get_end()),
                             sv,
                             value,
                         };

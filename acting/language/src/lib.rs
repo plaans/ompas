@@ -455,6 +455,9 @@ pub mod monitor {
         pub const DOC_MOD_PLANNING: &str =
             "mod used to plan a task regarding the current state of the system.";
 
+        pub const PLAN_IN_OMPAS: &str = "plan-in-ompas";
+        pub const DOC_PLAN_IN_OMPAS: &str = "Plans in the acting engine.";
+
         pub const PLAN: &str = "plan";
         pub const DOC_PLAN: &str= "Plan with an optional task using the defined planner with the acting domain defined in the environment";
 

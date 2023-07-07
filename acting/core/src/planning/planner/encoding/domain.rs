@@ -668,7 +668,8 @@ pub fn read_chronicle(
                 panic!()
             }
         } else if *t == TYPE_ID_INT {
-            let (lb, ub): (IntCst, IntCst) = if OMPAS_PLAN_ENCODING_OPTIMIZATION_ON.get() {
+            let (lb, ub): (IntCst, IntCst) = //(INT_CST_MIN, INT_CST_MAX);
+            if OMPAS_PLAN_ENCODING_OPTIMIZATION_ON.get() {
                 if let Some(VarVal::Range(l, u)) = var_val {
                     (*l as IntCst, *u as IntCst)
                 } else {

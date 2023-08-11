@@ -760,7 +760,7 @@ pub fn read_chronicle(
                 .collect();
         let value = get_atom(&c.value, ctx);
         let start: FAtom = get_atom(&c.get_start(), ctx).try_into()?;
-        let end: FAtom = get_atom(&c.get_start(), ctx).try_into()?;
+        let end: FAtom = get_atom(&c.get_end(), ctx).try_into()?;
         let condition = Condition {
             start,
             state_var: sv,
@@ -783,7 +783,7 @@ pub fn read_chronicle(
                 .collect();
         let value = get_atom(&e.value, ctx);
         let start: FAtom = get_atom(&e.get_start(), ctx).try_into()?;
-        let end: FAtom = get_atom(&e.get_start(), ctx).try_into()?;
+        let end: FAtom = get_atom(&e.get_end(), ctx).try_into()?;
         let effect = Effect {
             transition_start: start, // + FAtom::EPSILON,
             persistence_start: end,  // + FAtom::EPSILON,
@@ -816,7 +816,7 @@ pub fn read_chronicle(
     //println!("ok!");
 
     let start: FAtom = get_atom(&ch.get_interval().get_start(), ctx).try_into()?;
-    let end: FAtom = get_atom(&ch.get_interval().get_start(), ctx).try_into()?;
+    let end: FAtom = get_atom(&ch.get_interval().get_end(), ctx).try_into()?;
 
     //print!("init name...");
     let name: Vec<aAtom> = ch.get_name().iter().map(|a| get_atom(a, ctx)).collect();

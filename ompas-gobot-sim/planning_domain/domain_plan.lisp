@@ -14,14 +14,14 @@
 
     ;for test purpose
 
-    (def-state-function test (:result boolean))
+    ;(def-state-function test (:result boolean))
 
     (new-goal-task t_jobshop)
-    (new-event test true '(10 12))
-    (new-event test false '(20 22))
-    (new-goal test true)
-    (print (get-goals-events))
-    (remove-task 0)
+    ;(new-event test true '(10 12))
+    ;(new-event test false '(20 22))
+    ;(new-goal test true)
+    ;(print (get-goals-events))
+    ;(remove-task 0)
     ;(print (get-goals-events))
     (plan)
     (exit 0)

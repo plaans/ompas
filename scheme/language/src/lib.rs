@@ -752,11 +752,11 @@ pub mod map {
     pub const SET_MAP: &str = "set-map";
     pub const DOC_SET_MAP: &str = "Takes a map and and a list of pairs (key . value) to set in the map. Return a new map with the new bindings";
     pub const DOC_SET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n\
-                                 \t>> (define m (map (quote ((ten . 10) (twenty . 20)))))\n\
+                                 \t>> (define m (map '(ten 10) '(twenty 20)))\n\
                                  \t>> (get m)\n\
                                  \tLI>> ten: 10 \n\
                                  \ttwenty: 20 \n\
-                                 \t>> (define m (set-map m (three . 3 )))\n\
+                                 \t>> (define m (set-map m (three 3 )))\n\
                                  \tLI>> (get m)\n\
                                  \tLI>> ten: 10 \n\
                                  \tthree: 3\n\

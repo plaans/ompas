@@ -42,8 +42,8 @@ impl Default for TypeLattice {
         dc.add_type(Handle, vec![]);
         dc.add_type(Number, vec![]);
         dc.add_type(Nil, vec![]);
-        dc.add_type(Int, vec![Number as usize]);
         dc.add_type(Float, vec![Number as usize]);
+        dc.add_type(Int, vec![Number as usize, Float as usize]);
         dc.add_decomposition(Number as usize, vec![Int as usize, Float as usize]);
         dc.add_type(Symbol, vec![]);
         dc.add_type(EmptyList, vec![List as usize, Nil as usize]);

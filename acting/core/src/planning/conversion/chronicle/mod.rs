@@ -498,8 +498,14 @@ pub fn convert_into_chronicle(
                                 types.push(*r.clone());
                                 for (f, t) in args.iter().zip(types) {
                                     let r = fl.st.get_domain_id(f);
+                                    let t_debug = t.clone();
                                     if !fl.st.meet_to_domain(&r, t).is_none() {
-                                        panic!("brrruuuuuh")
+                                        panic!(
+                                            "{}: incompatible variable domains: {} not {}",
+                                            exec.format(&st, true),
+                                            (*f).format(&st, true),
+                                            st.format_domain(&t_debug),
+                                        )
                                     };
                                 }
                             }

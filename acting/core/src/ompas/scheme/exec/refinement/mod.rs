@@ -203,9 +203,12 @@ async fn check_select_response(
                     unpure_bindings: Default::default(),
                 };
 
+                //println!("generating refinement for {}", method);
                 let model: ActingModel = acting_manager
                     .generate_acting_model_for_method(&method, p_env)
                     .await?;
+
+                //println!("refinement args: {}", &method);
 
                 let args = if let LValue::List(list) = method {
                     list.iter().map(|lv| lv.as_cst()).collect()
@@ -213,9 +216,15 @@ async fn check_select_response(
                     panic!()
                 };
 
-                acting_manager
+                let id = acting_manager
                     .new_refinement(task_id, debug, args, model, ProcessOrigin::Execution)
-                    .await
+                    .await;
+
+                /*println!(
+                    "args after adding: {}",
+                    acting_manager.get_refinement_lv(&id).await
+                );*/
+                id
             }
         }
     };

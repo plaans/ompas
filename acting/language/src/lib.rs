@@ -766,7 +766,7 @@ pub mod monitor {
         pub const DEF_RESOURCES: &str = "def-resources";
         pub const DOC_DEF_RESOURCES: &str =
             "Wrapper to ease the definition of new objects. Objects are defined with their types.";
-        pub const DOC_DEF_RESOURCES_VERBOSE: &str = "Example: (def-objects (b1 4) (b2 5) b3)";
+        pub const DOC_DEF_RESOURCES_VERBOSE: &str = "Example: (def-resources (b1 4) (b2 5) b3)";
         pub const MACRO_DEF_RESOURCES: &str = "(lambda args
     (cons 'add-resources (quote-list args)))";
 

@@ -278,7 +278,7 @@ impl TypeLattice {
         }
     }
 
-    pub(crate) fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
         match (t1, t2) {
             (Simple(t1), Simple(t2)) => {
                 if t1 == t2 {
@@ -405,7 +405,7 @@ impl TypeLattice {
         }
     }
 
-    pub(crate) fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
         if t1.is_any() || t2.is_any() {
             Domain::any()
         } else if t1.is_empty() {
@@ -566,7 +566,7 @@ impl TypeLattice {
         }
     }
 
-    pub(crate) fn __substract(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub fn __substract(&self, t1: &Domain, t2: &Domain) -> Domain {
         let meet = self.__meet(t1, t2);
         if meet == Simple(Empty as usize) {
             t1.clone()
@@ -657,7 +657,7 @@ impl TypeLattice {
         }
     }
 
-    pub(crate) fn simplify_union(&self, set: HashSet<Domain>) -> Domain {
+    pub fn simplify_union(&self, set: HashSet<Domain>) -> Domain {
         let mut tested: HashSet<TypeId> = Default::default();
         let mut simples: HashSet<TypeId> = Default::default();
         let mut others: HashSet<Domain> = Default::default();

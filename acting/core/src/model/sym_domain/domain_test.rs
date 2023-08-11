@@ -211,7 +211,16 @@ impl DomainTest {
             }
             Cst(d1, c1) => Domain::Cst(Box::new(d1.into_domain(dc)), c1.clone()),
             New(s) => Domain::Simple(*dc.get_type_id(s.as_str()).unwrap()),
+            False => BasicType::False.into(),
             _ => todo!(),
+            /*Vector(_) => {}
+            Tuple(_) => {}
+            Alias(_, _) => {}
+            Proc => {}
+            Primitive => {}
+            Fn => {}
+            Lambda => {}
+            Application(_, _, _) => {}*/
         }
     }
 

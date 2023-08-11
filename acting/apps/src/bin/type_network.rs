@@ -1,4 +1,6 @@
 use chrono::{DateTime, Utc};
+use ompas_core::model::sym_domain::domain_test::DomainTest;
+use ompas_core::model::sym_domain::domain_test::DomainTest::*;
 use ompas_core::model::sym_domain::type_lattice::TypeLattice;
 use std::env::set_current_dir;
 use std::fs;
@@ -11,51 +13,53 @@ fn main() {
     println!("Hello, world!");
     let tn = TypeLattice::new();
     output_markdown("/tmp".into(), &tn, true);
-    //let tn = &TypeNetwork::default();
+    let tn = &TypeLattice::default();
 
-    /*test_meet(tn, List, Map);
+    test_meet(tn, List(None), Map);
     test_meet(tn, Map, Any);
     test_meet(tn, Any, Map);
     test_meet(tn, Any, Any);
     test_meet(tn, Int, Number);
-    test_meet(tn, Any, Err(Box::new(Any)));
-    test_meet(tn, Err(Box::new(Int)), Err(Box::new(Any)));
-    test_meet(tn, Handle(Box::new(Number)), Handle(Box::new(Any)));
-    test_meet(tn, Boolean, Handle(Box::new(Any)));*/
-    //test_meet(tn, Boolean, Union(vec![True, Symbol]));
-    //test_meet(tn, Union(vec![True, Number]), Union(vec![Boolean, Int]));
+    test_meet(tn, Any, Err(None));
+    test_meet(tn, Err(Some(Box::new(Int))), Err(None));
+    test_meet(tn, Handle(Some(Box::new(Number))), Handle(None));
+    test_meet(tn, Boolean, Handle(None));
+    test_meet(tn, Boolean, Union(vec![True, Symbol]));
+    test_meet(tn, Union(vec![True, Number]), Union(vec![Boolean, Int]));
     //test_meet(tn, "Timepoint".into(), Number);
     //test_meet(tn, Int, "Timepoint".into());
-    //test_union(tn, True, Boolean);
-    //test_union(tn, Boolean, False);
-    //test_union(tn, False, List);
-    //test_union(tn, EmptyList, List);
-    //test_union(tn, Union(vec![False, Map]), Union(vec![Boolean, List]));
-    //test_union(tn, Union(vec![Map, Boolean]), False);
-    /*test_union(tn, False, True);
+    test_union(tn, True, Boolean);
+    test_union(tn, Boolean, False);
+    test_union(tn, False, List(None));
+    //test_union(tn, EmptyList, List(None));
+    test_union(
+        tn,
+        Union(vec![False, Map]),
+        Union(vec![Boolean, List(None)]),
+    );
+    test_union(tn, Union(vec![Map, Boolean]), False);
+    test_union(tn, False, True);
     test_union(tn, Union(vec![Symbol, Float, Int]), Boolean);
     test_union(
         tn,
         Union(vec![Symbol, Float, Int, Map]),
-        Union(vec![
-            Boolean,
-            List,
-            Handle(Box::new(Any)),
-            Err(Box::new(Any)),
-            Map,
-        ]),
-    );*/
+        Union(vec![Boolean, List(None), Handle(None), Err(None), Map]),
+    );
 
     //output_domain_collection("/temp".into(), dc, true);
 }
 
-/*fn test_meet(tn: &TypeNetwork, ta: Type, tb: Type) {
-    println!("{} ^ {} = {}", ta, tb, tn.meet(&ta, &tb))
+fn test_meet(tn: &TypeLattice, ta: DomainTest, tb: DomainTest) {
+    let r = tn.__meet(&ta.into_domain(&tn), &tb.into_domain(&tn));
+    let r = DomainTest::from_domain(tn, &r);
+    println!("{} ^ {} = {}", ta, tb, r)
 }
 
-fn test_union(tn: &TypeNetwork, ta: Type, tb: Type) {
-    println!("{} | {} = {}", ta, tb, tn.union(&ta, &tb))
-}*/
+fn test_union(tn: &TypeLattice, ta: DomainTest, tb: DomainTest) {
+    let r = tn.__union(&ta.into_domain(&tn), &tb.into_domain(&tn));
+    let r = DomainTest::from_domain(tn, &r);
+    println!("{} | {} = {}", ta, tb, r)
+}
 
 /*fn output_domain_collection(path: PathBuf, dc: &DomainCollection, view: bool) {
     let mut path = path;

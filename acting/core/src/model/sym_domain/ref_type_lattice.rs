@@ -50,15 +50,15 @@ impl RefTypeLattice {
         self.0.read().await.contained_in(d1, d2)
     }
 
-    pub(crate) async fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub async fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
         self.0.read().await.__meet(t1, t2)
     }
 
-    pub(crate) async fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub async fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
         self.0.read().await.__union(t1, t2)
     }
 
-    pub(crate) async fn __substract(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub async fn __substract(&self, t1: &Domain, t2: &Domain) -> Domain {
         self.0.read().await.__substract(t1, t2)
     }
 

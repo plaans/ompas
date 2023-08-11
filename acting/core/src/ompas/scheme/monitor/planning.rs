@@ -29,7 +29,7 @@ use sompas_macros::async_scheme_fn;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
-use sompas_structs::lruntimeerror::LRuntimeError;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use std::fmt::Write;
 use std::sync::Arc;
@@ -59,6 +59,13 @@ impl ModPlanning {
 impl From<ModPlanning> for LModule {
     fn from(m: ModPlanning) -> Self {
         let mut m = LModule::new(m, MOD_PLANNING, DOC_MOD_PLANNING);
+        m.add_async_fn(PLAN_IN_OMPAS, plan_in_ompas, DOC_PLAN_IN_OMPAS, false);
+        m.add_async_fn(
+            PLAN_OPT_IN_OMPAS,
+            plan_opt_in_ompas,
+            DOC_PLAN_OPT_IN_OMPAS,
+            false,
+        );
         m.add_async_fn(PLAN, plan, DOC_PLAN, false);
         m.add_async_fn(PLAN_OPT, plan_opt, DOC_PLAN_OPT, false);
         m.add_async_fn(
@@ -98,8 +105,7 @@ impl From<ModPlanning> for LModule {
     }
 }
 
-#[async_scheme_fn]
-async fn plan_in_ompas(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+async fn _plan_in_ompas(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
     let task: LValue = args.into();
     println!("task to plan: {}", task);
     let acting_manager = env
@@ -113,7 +119,9 @@ async fn plan_in_ompas(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
 
     env.update_context(ModState::new_from_snapshot(state));
 
-    acting_manager.start_continuous_planning(env, None).await;
+    acting_manager
+        .start_continuous_planning(env, if opt { Some(PMetric::Makespan) } else { None })
+        .await;
 
     let debug = LValue::from(args).to_string();
     let args = args.iter().map(|lv| lv.as_cst().unwrap()).collect();
@@ -124,8 +132,17 @@ async fn plan_in_ompas(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
     recv.recv()
         .await
         .expect("Error while waiting on plan update.");
+    Ok(LValue::Nil)
+}
 
-    Ok(())
+#[async_scheme_fn]
+pub async fn plan_in_ompas(env: &LEnv, args: &[LValue]) -> LResult {
+    _plan_in_ompas(env, args, false).await
+}
+
+#[async_scheme_fn]
+pub async fn plan_opt_in_ompas(env: &LEnv, args: &[LValue]) -> LResult {
+    _plan_in_ompas(env, args, true).await
 }
 
 async fn _plan(env: &LEnv, task: &[LValue], opt: bool) -> Result<(), LRuntimeError> {

@@ -24,7 +24,6 @@ use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror};
-use std::ops::Deref;
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct ModUtils {}
@@ -142,7 +141,7 @@ pub fn enumerate(element: &[LValue]) -> Vec<LValue> {
     while let Some(val) = iter_params.next() {
         let mut enumeration = vec![];
         for val in val {
-            enumeration.push(val.deref().clone())
+            enumeration.push((*val).clone())
         }
         vec_result.push(enumeration.into())
     }

@@ -619,7 +619,7 @@ pub fn read_chronicle(
         } else if label.starts_with(RESULT_PREFIX) {
             VarType::Reification
         } else {
-            VarType::Parameter(label)
+            VarType::Parameter(label.clone())
         };
 
         let (t, var_val) = &match domain {
@@ -695,7 +695,6 @@ pub fn read_chronicle(
             fvar.into()
         } else if *t == TYPE_ID_BOOLEAN {
             let bvar = ctx.model.new_optional_bvar(prez, container / var_type);
-            //context.model.
             table.add_binding(*var, bvar.into());
             bvar.into()
         } else if *t == TYPE_ID_NIL {
@@ -713,7 +712,6 @@ pub fn read_chronicle(
                 .types
                 .id_of(&str)
                 .unwrap_or_else(|| panic!("{str} should be defined in type hierarchy"));
-            //let s = ch.sym_table.get_atom(var, true).unwrap();
             let svar = ctx
                 .model
                 .new_optional_sym_var(t, prez, container / var_type);

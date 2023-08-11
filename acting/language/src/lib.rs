@@ -455,10 +455,16 @@ pub mod monitor {
         pub const DOC_MOD_PLANNING: &str =
             "mod used to plan a task regarding the current state of the system.";
 
+        pub const PLAN_IN_OMPAS: &str = "plan-in-ompas";
+        pub const DOC_PLAN_IN_OMPAS: &str = "Simulates planning in ompas";
+
+        pub const PLAN_OPT_IN_OMPAS: &str = "plan-opt-in-ompas";
+        pub const DOC_PLAN_OPT_IN_OMPAS: &str = "Simulates planning optimally in ompas";
+
         pub const PLAN: &str = "plan";
         pub const DOC_PLAN: &str= "Plan with an optional task using the defined planner with the acting domain defined in the environment";
 
-        pub const PLAN_OPT: &str = "plan-task-opt";
+        pub const PLAN_OPT: &str = "plan-opt";
         pub const DOC_PLAN_OPT: &str= "Plan with an optional task using the defined planner with the acting domain defined in the environment, and returns the optimal solution in terms of makespan";
 
         pub const NEW_EVENT: &str = "new-event";
@@ -560,7 +566,7 @@ pub mod monitor {
         pub const DOC_ADD_RESOURCE: &str = "Declare a new resource";
 
         pub const ADD_RESOURCES: &str = "add-resources";
-        pub const DOC_ADD_RESOUCES: &str = "Declare a list of new resources";
+        pub const DOC_ADD_RESOURCES: &str = "Declare a list of new resources";
 
         //Macros
 
@@ -1019,7 +1025,7 @@ pub mod sym_table {
     pub const TYPE_STATE_FUNCTION: &str = "*StateFunctionType*";
     pub const TYPE_OBJECT_TYPE: &str = "*ObjectType*";
     pub const TYPE_OBJECT: &str = "*Object*";
-    pub const TYPE_RESSOURCE_HANDLE: &str = "*ResourceHandle*";
+    pub const TYPE_RESOURCE_HANDLE: &str = "*ResourceHandle*";
 
     pub const EPSILON: &str = "*eps*";
 }

@@ -50,13 +50,13 @@ fn main() {
 }
 
 fn test_meet(tn: &TypeLattice, ta: DomainTest, tb: DomainTest) {
-    let r = tn.__meet(&ta.into_domain(&tn), &tb.into_domain(&tn));
+    let r = tn.__meet(&ta.into_domain(tn), &tb.into_domain(tn));
     let r = DomainTest::from_domain(tn, &r);
     println!("{} ^ {} = {}", ta, tb, r)
 }
 
 fn test_union(tn: &TypeLattice, ta: DomainTest, tb: DomainTest) {
-    let r = tn.__union(&ta.into_domain(&tn), &tb.into_domain(&tn));
+    let r = tn.__union(&ta.into_domain(tn), &tb.into_domain(tn));
     let r = DomainTest::from_domain(tn, &r);
     println!("{} | {} = {}", ta, tb, r)
 }

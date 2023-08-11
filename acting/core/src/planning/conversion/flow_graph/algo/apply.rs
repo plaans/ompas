@@ -25,7 +25,7 @@ use ompas_language::exec::state::{
 };
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
-use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE};
+use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESOURCE_HANDLE};
 use sompas_language::basic_math::{ADD, DIV, EQ, GEQ, GT, LEQ, LT, MUL, NEQ, NOT, NOT_SHORT, SUB};
 use sompas_language::error::IS_ERR;
 use sompas_language::io::PRINT;
@@ -483,7 +483,7 @@ fn convert_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, L
     let acquire_domain = fl.st.get_domain_id(&acquire_result);
     fl.st.set_domain(
         &acquire_domain,
-        fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
+        fl.st.get_type_as_domain(TYPE_RESOURCE_HANDLE).unwrap(),
     );
     fl.resource_handles
         .insert(fl.get_flow_result(&acquire), release_time);
@@ -498,7 +498,7 @@ fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRunt
     let result_domain = fl.st.get_domain_id(&result);
     fl.st.set_domain(
         &result_domain,
-        fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
+        fl.st.get_type_as_domain(TYPE_RESOURCE_HANDLE).unwrap(),
     );
 
     let flow_release = fl.new_instantaneous_assignment(Lit::Release(result));

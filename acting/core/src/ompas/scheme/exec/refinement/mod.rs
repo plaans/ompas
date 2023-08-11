@@ -216,15 +216,9 @@ async fn check_select_response(
                     panic!()
                 };
 
-                let id = acting_manager
+                acting_manager
                     .new_refinement(task_id, debug, args, model, ProcessOrigin::Execution)
-                    .await;
-
-                /*println!(
-                    "args after adding: {}",
-                    acting_manager.get_refinement_lv(&id).await
-                );*/
-                id
+                    .await
             }
         }
     };

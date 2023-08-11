@@ -5,7 +5,7 @@ use crate::model::sym_domain::Domain::*;
 use crate::model::sym_domain::{Domain, TypeId};
 use ompas_language::sym_table::{
     TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_METHOD, TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_PREDICATE,
-    TYPE_PRESENCE, TYPE_RESSOURCE_HANDLE, TYPE_STATE_FUNCTION, TYPE_TASK, TYPE_TIMEPOINT,
+    TYPE_PRESENCE, TYPE_RESOURCE_HANDLE, TYPE_STATE_FUNCTION, TYPE_TASK, TYPE_TIMEPOINT,
 };
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Display, Write};
@@ -83,7 +83,7 @@ impl TypeLattice {
     pub fn new() -> Self {
         let mut lt = Self::default();
         //Type linked to the resource representation
-        lt.add_type(TYPE_RESSOURCE_HANDLE, vec![]);
+        lt.add_type(TYPE_RESOURCE_HANDLE, vec![]);
 
         //Type linked to the planning objects
         lt.add_alias(Number, TYPE_TIMEPOINT);

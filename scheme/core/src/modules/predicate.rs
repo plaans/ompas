@@ -111,25 +111,25 @@ pub fn is_handle(lv: &LValue) -> bool {
 /// Returns true if LValue is a function
 #[scheme_fn]
 pub fn is_fn(lv: &LValue) -> bool {
-    matches!(lv, &LValue::Fn(_)) || matches!(lv, &LValue::Fn(_))
+    matches!(lv, &LValue::Fn(_))
 }
 
 /// Returns true if LValue is a function
 #[scheme_fn]
 pub fn is_mut_fn(lv: &LValue) -> bool {
-    matches!(lv, &LValue::Fn(_)) || matches!(lv, &LValue::MutFn(_))
+    matches!(lv, &LValue::MutFn(_))
 }
 
 /// Returns true if LValue is a function
 #[scheme_fn]
 pub fn is_async_fn(lv: &LValue) -> bool {
-    matches!(lv, &LValue::Fn(_)) || matches!(lv, &LValue::AsyncFn(_))
+    matches!(lv, &LValue::AsyncFn(_))
 }
 
 /// Returns true if LValue is a function
 #[scheme_fn]
 pub fn is_async_mut_fn(lv: &LValue) -> bool {
-    matches!(lv, &LValue::Fn(_)) || matches!(lv, &LValue::AsyncMutFn(_))
+    matches!(lv, &LValue::AsyncMutFn(_))
 }
 
 /// Returns true if two LValues are equals.

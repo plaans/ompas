@@ -124,7 +124,7 @@ impl From<ModModel> for LModule {
         module.add_async_fn(ADD_OBJECT, add_object, DOC_ADD_OBJECT, false);
         module.add_async_fn(ADD_OBJECTS, add_objects, DOC_ADD_OBJECTS, false);
         module.add_async_fn(ADD_RESOURCE, add_resource, DOC_ADD_RESOURCE, false);
-        module.add_async_fn(ADD_RESOURCES, add_resources, DOC_ADD_RESOUCES, false);
+        module.add_async_fn(ADD_RESOURCES, add_resources, DOC_ADD_RESOURCES, false);
 
         //Macros
         module.add_macro(

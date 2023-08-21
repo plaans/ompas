@@ -281,7 +281,6 @@ pub async fn populate_problem(
 
     while let Some(action) = p_actions.pop() {
         let tps = &action.args;
-        let instance_id = instances.len();
         if let Some(task) = domain.tasks.get(tps[0].lvalues().to_string().as_str()) {
             tasks.insert(task.get_label().to_string());
 
@@ -303,7 +302,7 @@ pub async fn populate_problem(
                     )
                     .await?;
                     //instance.pr.push(Label::Refinement(None));
-                    update_problem(&mut p_actions, &vec![], &instance, instance_id);
+                    update_problem(&mut p_actions, &vec![], &instance, instances.len());
 
                     instances.push(instance)
                 }
@@ -333,7 +332,7 @@ pub async fn populate_problem(
                         )
                         .await?;
                         instance.pr.push(Label::Refinement(None));
-                        update_problem(&mut p_actions, &vec![], &instance, instance_id);
+                        update_problem(&mut p_actions, &vec![], &instance, instances.len());
 
                         instances.push(instance);
                     }
@@ -360,7 +359,7 @@ pub async fn populate_problem(
                 ChronicleKind::Command,
             )
             .await?;
-            update_problem(&mut p_actions, &vec![], &instance, instance_id);
+            update_problem(&mut p_actions, &vec![], &instance, instances.len());
 
             instances.push(instance)
         } else {

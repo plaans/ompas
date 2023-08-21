@@ -11,13 +11,13 @@
     (def-state-function carry (:params (?g gripper)) (:result ball))
 
     ;actions
-    (def-command move (:params (?from room)))
-    (def-command-ppdl-model move
+    (def-command move (:params (?from room) (?to room)))
+    (def-command-pddl-model move
       (:params (?from room) (?to room))
       (:pre-conditions (= (at-robby) ?from) (!= ?from ?to))
       (:effects
         (begin
-            (assert 'at-robby ?to))))
+            (transitive-assert 'at-robby ?to))))
 
     (def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))
     (def-command-pddl-model pick
@@ -37,10 +37,10 @@
       (:pre-conditions
         (= (carry ?gripper) ?obj)
         (= (at-robby) ?room))
-      (:effects
+     (:effects
         (begin
             (assert 'carry ?gripper no_ball)
-            (assert 'at ?obj ?room ))))
+           (assert 'at ?obj ?room ))))
 
     ;task with their methods
     (def-task pick-and-drop (:params (?ball ball) (?room room)))

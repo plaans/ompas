@@ -2,7 +2,7 @@
   (def-objects
     (bedroom kitchen living_room room)
     (b1 b2 b3 b4 ball))
-  (def-initial-state
+  (def-facts
     (at-robby living_room)
     ((at b1) bedroom)
     ((at b2) bedroom)
@@ -11,5 +11,6 @@
     ((carry left) no_ball)
     ((carry right) no_ball))
       
-  (trigger-task pick-and-drop b1 kitchen)
+  (new-goal-task pick-and-drop b1 kitchen)
+  (plan)
 )

@@ -3,7 +3,6 @@ use crate::model::acting_domain::parameters::Parameters;
 use crate::model::acting_domain::task::Task;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::conversion::chronicle::convert_graph;
@@ -17,7 +16,7 @@ use crate::planning::conversion::flow_graph::algo::post_processing::flow_graph_p
 use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processing;
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::planner::problem::{
-    ChronicleInstance, PlanningDomain, PlanningInstance, PlanningProblem, TaskChronicle,
+    ChronicleInstance, PlanningDomain, PlanningInstance, PlanningProblem,
 };
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON};
 use aries_planning::chronicles::{ChronicleOrigin, TaskId};
@@ -25,13 +24,11 @@ use chrono::{DateTime, Utc};
 #[allow(unused)]
 use debug_print::debug_println;
 use env_param::EnvParam;
-use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::MOD_EXEC;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
-use std::collections::HashSet;
 use std::env::set_current_dir;
 use std::fmt::Display;
 use std::fs;
@@ -246,190 +243,6 @@ const CONVERT_LVALUE_TO_CHRONICLE: &str = "convert_lvalue_to_chronicle";
 #[allow(unused)]
 const CONVERT_DOMAIN_TO_CHRONICLE_HIERARCHY: &str = "convert_domain_to_chronicle_hierarchy";
 
-pub async fn p_convert(
-    pp: &mut PlanningProblem,
-    cc: &ConversionContext,
-) -> lruntimeerror::Result<()> {
-    //for each action: translate to chronicle
-    let st = cc.st.clone();
-
-    let mut pc = PConfig::default();
-    pc.avoid.insert(EXEC_TASK.to_string());
-
-    let mut tasks_to_convert: HashSet<String> = Default::default();
-    let mut label_sf: HashSet<String> = Default::default();
-    let mut converted: HashSet<String> = Default::default();
-
-    for instance in &pp.instance.instances {
-        let chronicle = instance.am.chronicle.as_ref().unwrap();
-        for subtask in chronicle.get_subtasks() {
-            let label = subtask.name[0].format(&st, true);
-            if !converted.contains(&label) {
-                tasks_to_convert.insert(label);
-            }
-        }
-
-        for effect in chronicle.get_effects() {
-            label_sf.insert(effect.sv[0].format(&st, true));
-        }
-
-        for condition in chronicle.get_conditions() {
-            label_sf.insert(condition.sv[0].format(&st, true));
-        }
-    }
-
-    //add new types to list of types.
-    //panic!("for no fucking reason");
-    //Add actions, tasks and methods symbols to ch.sym_table:
-
-    //Add tasks to domain
-
-    while !tasks_to_convert.is_empty() {
-        //println!("Start task declaration.");
-
-        let mut new_tasks: HashSet<String> = Default::default();
-
-        for t_label in tasks_to_convert.drain() {
-            converted.insert(t_label.to_string());
-
-            if let Some(task) = cc.domain.get_tasks().get(&t_label) {
-                //let mut task_chronicle = declare_task(&task, st.clone());
-
-                pp.domain.tasks.push(task.get_label().to_string());
-                //println!("Declaring task: {}", task.get_label());
-                if let Some(model) = task.get_model(&ModelKind::PlanModel) {
-                    let task_lambda = model.try_into()?;
-
-                    for param in &task.get_parameters().get_labels() {
-                        pc.p_table.add_param(param.to_string());
-                    }
-
-                    let om: ActingModel = convert_abstract_task_to_chronicle(
-                        &task_lambda,
-                        task.get_label(),
-                        None,
-                        task.get_parameters(),
-                        cc,
-                        ChronicleKind::Task,
-                        pc.clone(),
-                    )
-                    .await?;
-
-                    let chronicle = om.chronicle.as_ref().unwrap();
-                    for subtask in chronicle.get_subtasks() {
-                        let label = subtask.name[0].format(&st, true);
-                        if !converted.contains(&label) {
-                            new_tasks.insert(label);
-                        }
-                    }
-
-                    for effect in chronicle.get_effects() {
-                        label_sf.insert(effect.sv[0].format(&st, true));
-                    }
-
-                    for condition in chronicle.get_conditions() {
-                        label_sf.insert(condition.sv[0].format(&st, true));
-                    }
-                    pp.domain.templates.push(om)
-                } else {
-                    for method in task.get_methods() {
-                        let mut pc = pc.clone();
-
-                        let method = cc.domain.get_methods().get(method).unwrap();
-                        let method_lambda: LLambda = method.get_body().try_into().expect("");
-
-                        for param in &method.parameters.get_labels() {
-                            pc.p_table.add_param(param.to_string());
-                        }
-
-                        let om: ActingModel = convert_abstract_task_to_chronicle(
-                            &method_lambda,
-                            &method.label,
-                            Some(task),
-                            method.get_parameters(),
-                            cc,
-                            ChronicleKind::Method,
-                            pc.clone(),
-                        )
-                        .await?;
-
-                        let chronicle = om.chronicle.as_ref().unwrap();
-
-                        for subtask in chronicle.get_subtasks() {
-                            let label = subtask.name[0].format(&st, true);
-                            if !converted.contains(&label) {
-                                new_tasks.insert(label);
-                            }
-                        }
-
-                        for effect in chronicle.get_effects() {
-                            label_sf.insert(effect.sv[0].format(&st, true));
-                        }
-
-                        for condition in chronicle.get_conditions() {
-                            label_sf.insert(condition.sv[0].format(&st, true));
-                        }
-
-                        pp.domain.templates.push(om);
-                    }
-                }
-            } else if let Some(command) = cc.domain.get_commands().get(&t_label) {
-                let mut pc = pc.clone();
-
-                for param in &command.get_parameters().get_labels() {
-                    pc.p_table.add_param(param.to_string());
-                }
-                //evaluate the lambda sim.
-                //println!("Converting command {}", command.get_label());
-                let om: ActingModel = convert_abstract_task_to_chronicle(
-                    &command
-                        .get_model(&ModelKind::PlanModel)
-                        .unwrap()
-                        .try_into()?,
-                    command.get_label(),
-                    None,
-                    command.get_parameters(),
-                    cc,
-                    ChronicleKind::Command,
-                    pc,
-                )
-                .await?;
-
-                let chronicle = om.chronicle.as_ref().unwrap();
-
-                for effect in chronicle.get_effects() {
-                    label_sf.insert(effect.sv[0].format(&st, true));
-                }
-
-                for condition in chronicle.get_conditions() {
-                    label_sf.insert(condition.sv[0].format(&st, true));
-                }
-
-                pp.domain.templates.push(om);
-            }
-        }
-
-        tasks_to_convert = new_tasks;
-    }
-
-    let mut sfs = cc
-        .domain
-        .get_state_functions()
-        .iter()
-        .filter_map(|(k, v)| {
-            if label_sf.contains(k) {
-                Some(v.clone())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    pp.domain.sf.append(&mut sfs);
-
-    Ok(())
-}
-
 pub async fn convert_acting_domain(
     cc: &ConversionContext,
 ) -> lruntimeerror::Result<PlanningDomain> {
@@ -615,23 +428,6 @@ pub async fn convert_abstract_task_to_chronicle(
     Ok(om)
 }
 
-pub fn declare_task(task: &Task, st: RefSymTable) -> TaskChronicle {
-    let task_label_id = st
-        .get_sym_id(task.get_label())
-        .expect("symbol of task should be defined");
-
-    let mut task_lit: Vec<VarId> = vec![task_label_id];
-
-    for (param, t) in task.get_parameters().inner() {
-        task_lit.push(st.new_parameter(param, t.get_domain().clone()))
-    }
-    TaskChronicle {
-        task: task.clone(),
-        convert: task_lit,
-        template: None,
-    }
-}
-
 pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: bool) {
     let ch = om.chronicle.as_ref().unwrap();
     let label = label.replace('/', "_");
@@ -730,34 +526,3 @@ pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: b
             .unwrap();
     }
 }
-
-/*
-pub fn build_chronicle(
-    mut chronicle: ChronicleTemplate,
-    exp: &LValue,
-    conversion_context: &ConversionContext,
-    ch: &mut ConversionCollection,
-) -> lruntimeerror::Result<ChronicleTemplate> {
-    let lvalue: &LValue = if let LValue::Lambda(lambda) = exp {
-        lambda.get_body()
-    } else {
-        exp
-    };
-
-    let pre_processed = pre_processing(lvalue, conversion_context, ch)?;
-
-    chronicle.set_debug(Some(pre_processed.clone()));
-
-    let ec = convert_lvalue_to_expression_chronicle(
-        &pre_processed,
-        conversion_context,
-        ch,
-        MetaData::new(true, false),
-    )?;
-
-    chronicle.absorb_expression_chronicle(ec);
-
-    post_processing(&mut chronicle, conversion_context, ch)?;
-
-    Ok(chronicle)
-}*/

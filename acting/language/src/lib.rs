@@ -455,12 +455,6 @@ pub mod monitor {
         pub const DOC_MOD_PLANNING: &str =
             "mod used to plan a task regarding the current state of the system.";
 
-        pub const PLAN_IN_OMPAS: &str = "plan-in-ompas";
-        pub const DOC_PLAN_IN_OMPAS: &str = "Simulates planning in ompas";
-
-        pub const PLAN_OPT_IN_OMPAS: &str = "plan-opt-in-ompas";
-        pub const DOC_PLAN_OPT_IN_OMPAS: &str = "Simulates planning optimally in ompas";
-
         pub const PLAN: &str = "plan";
         pub const DOC_PLAN: &str= "Plan with an optional task using the defined planner with the acting domain defined in the environment";
 
@@ -499,6 +493,27 @@ pub mod monitor {
 
         pub const REMOVE_EVENT: &str = "remove-event";
         pub const DOC_REMOVE_EVENT: &str= "Remove the event with the given id. Use `get-planning-problem` to get the list of events and theirs ids.";
+    }
+
+    pub mod continuous_planning {
+        pub const MOD_CONTINUOUS_PLANNING: &str = "continuous-planning";
+        pub const DOC_MOD_CONTINUOUS_PLANNING: &str =
+            "Mod to test the continuous planning capabilities of ompas";
+
+        pub const START: &str = "cp.start";
+        pub const DOC_START: &str = "Start the continuous planning processes.";
+
+        pub const PLAN: &str = "cp.plan";
+        pub const DOC_PLAN: &str = "Plan with the current Acting Tree.";
+
+        pub const NEW_TASK: &str = "cp.new-task";
+        pub const DOC_NEW_TASK: &str = "Simulates a new task to face.";
+
+        pub const NEW_INSTANTIATION: &str = "cp.new-instantiation";
+        pub const DOC_NEW_INSTANTIATION: &str = "Simulates the instantiation of a variable.";
+
+        pub const NEW_EVENT: &str = "cp.new-event";
+        pub const DOC_NEW_EVENT: &str = "Simulates the occurrence of a new event.";
     }
 
     pub mod model {

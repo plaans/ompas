@@ -26,6 +26,7 @@ use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::run_planner;
 use crate::planning::planner::solver::PMetric;
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON};
+use aries::collections::seq::Seq;
 use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries::model::lang::{Atom, Variable};
 use aries::model::Model;
@@ -111,7 +112,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
     let mut process =
         ProcessInterface::new(CONTINUOUS_PLANNING, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
 
-    let mut table = ActingVarRefTable::default();
+    let mut table;
     let ContinuousPlanningConfig {
         mut problem_receiver,
         plan_sender,
@@ -137,11 +138,12 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                             let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
                             if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
                                 for (origin, chronicle) in pp.instances.iter().map(|i| (i.origin.clone(), i.am.chronicle.as_ref().unwrap())) {
-                                    println!("{:?}:{}", origin, chronicle)
+                                    println!("{:?}:\n{}", origin, chronicle)
                                 }
                             }
 
-                            let aries_problem: chronicles::Problem = encode(&mut table, &st, &pp).await.unwrap();
+                            let (aries_problem, t_table): (chronicles::Problem, ActingVarRefTable) = encode(&st, &pp).await.unwrap();
+                            table = t_table;
                             if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
                                 for instance in &aries_problem.chronicles {
                                     Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);
@@ -213,16 +215,19 @@ pub async fn populate_problem(
 ) -> Result<PlannerProblem, LRuntimeError> {
     let ExecutionProblem { state, chronicles } = ep;
 
+    let mut names: HashSet<String> = Default::default();
     let mut tasks: HashSet<String> = Default::default();
-    let mut methods: HashSet<String> = Default::default();
-    let mut commands: HashSet<String> = Default::default();
     let mut sf_labels: HashSet<String> = Default::default();
 
     let mut update_problem = |p_actions: &mut Vec<PAction>,
-                              em: &Vec<ChronicleInstance>,
-                              chronicles: &ChronicleInstance,
+                              cis: &Vec<ChronicleInstance>,
+                              ci: &ChronicleInstance,
                               instance_id: usize| {
-        let chronicle = chronicles.am.chronicle.as_ref().unwrap();
+        let chronicle = ci.am.chronicle.as_ref().unwrap();
+        if ci.origin != ChronicleOrigin::Original {
+            names.insert(chronicle.get_name()[0].format(st, true));
+            tasks.insert(chronicle.get_task()[0].format(st, true));
+        }
         for (task_id, subtask) in chronicle.get_subtasks().iter().enumerate() {
             // If we do not find at least one chronicle to refine the subtask,
             // then we add a new chronicle
@@ -235,7 +240,7 @@ pub async fn populate_problem(
                 template_id: 0,
             };
 
-            if !em.iter().any(|ci| ci.origin == origin) {
+            if !cis.iter().any(|ci| ci.origin == origin) {
                 let mut value: Vec<ActionParam> = vec![];
                 for e in &subtask.name {
                     let domain = st.get_domain_of_var(e);
@@ -247,7 +252,7 @@ pub async fn populate_problem(
                     value.push(val)
                 }
 
-                let mut pr = chronicles.pr.clone();
+                let mut pr = ci.pr.clone();
                 pr.push(subtask.label.unwrap());
 
                 p_actions.insert(
@@ -282,7 +287,7 @@ pub async fn populate_problem(
     while let Some(action) = p_actions.pop() {
         let tps = &action.args;
         if let Some(task) = domain.tasks.get(tps[0].lvalues().to_string().as_str()) {
-            tasks.insert(task.get_label().to_string());
+            //tasks.insert(task.get_label().to_string());
 
             let params = task.get_parameters().get_labels();
             assert_eq!(params.len(), tps.len() - 1);
@@ -308,7 +313,7 @@ pub async fn populate_problem(
                 }
                 None => {
                     for (_, m_label) in task.get_methods().iter().enumerate() {
-                        methods.insert(m_label.to_string());
+                        //methods.insert(m_label.to_string());
                         let method = domain.get_methods().get(m_label).unwrap();
                         let method_lambda: LLambda = method.get_body().try_into().expect("");
 
@@ -342,7 +347,7 @@ pub async fn populate_problem(
             .commands
             .get(action.args[0].lvalues().to_string().as_str())
         {
-            commands.insert(command.get_label().to_string());
+            //commands.insert(command.get_label().to_string());
             let model_lambda: LLambda = command
                 .get_model(&ModelKind::PlanModel)
                 .unwrap()
@@ -378,6 +383,21 @@ pub async fn populate_problem(
         })
         .collect();
 
+    let methods: Vec<_> = names
+        .intersection(&domain.get_methods().keys().cloned().to_set())
+        .cloned()
+        .collect();
+
+    let commands: Vec<_> = tasks
+        .intersection(&domain.get_commands().keys().cloned().to_set())
+        .cloned()
+        .collect();
+
+    let tasks: Vec<_> = tasks
+        .intersection(&domain.get_tasks().keys().cloned().to_set())
+        .cloned()
+        .collect();
+
     /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
         println!("sf_labels: {:?}\nstate functions {:?}", sf_labels, sf)
     }*/
@@ -387,9 +407,9 @@ pub async fn populate_problem(
         templates: vec![],
         domain: PlannerDomain {
             sf,
-            methods: methods.drain().collect(),
-            tasks: tasks.drain().collect(),
-            commands: commands.drain().collect(),
+            methods,
+            tasks,
+            commands,
         },
         state,
     })
@@ -397,13 +417,13 @@ pub async fn populate_problem(
 
 /// Encode the chronicles in the aries format in order to then call the planner lcp.
 pub async fn encode(
-    table: &mut ActingVarRefTable,
     st: &RefSymTable,
     pp: &PlannerProblem,
-) -> anyhow::Result<chronicles::Problem> {
+) -> anyhow::Result<(chronicles::Problem, ActingVarRefTable)> {
+    let mut table = ActingVarRefTable::default();
     let domain = &pp.domain;
     let mut context = encode_ctx(st, domain, &pp.state.instance)?;
-    let mut chronicles = generate_instances(&mut context, table, &pp.instances)?;
+    let mut chronicles = generate_instances(&mut context, &mut table, &pp.instances)?;
     let mut present_sf: Vec<String> = pp
         .domain
         .sf
@@ -415,11 +435,14 @@ pub async fn encode(
 
     encode_init(&context, &pp.state, &present_sf, &mut chronicles[0]);
 
-    Ok(chronicles::Problem {
-        context,
-        templates: vec![],
-        chronicles,
-    })
+    Ok((
+        chronicles::Problem {
+            context,
+            templates: vec![],
+            chronicles,
+        },
+        table,
+    ))
 }
 
 pub fn extract_new_acting_models(

@@ -11,6 +11,7 @@ use ompas_core::OMPAS_LOG_ON;
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::FileDescriptor;
 use ompas_middleware::Master;
+use sompas_modules::time::ModTime;
 use structopt::StructOpt;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 65_384;
@@ -45,6 +46,7 @@ async fn lisp_interpreter(opt: &Opt) {
     let ctx_math = ModAdvancedMath::default();
     let ctx_utils = ModUtils::default();
     let ctx_string = ModString::default();
+    let ctx_time = ModTime::new(2);
 
     //Insert the doc for the different contexts.
 
@@ -57,6 +59,7 @@ async fn lisp_interpreter(opt: &Opt) {
     li.import_namespace(ctx_io);
     li.import_namespace(ctx_math);
     li.import_namespace(ctx_string);
+    li.import_namespace(ctx_time);
 
     let mut com = li.subscribe();
     let str = fs::read_to_string(&opt.domain).expect("Something went wrong reading the file");

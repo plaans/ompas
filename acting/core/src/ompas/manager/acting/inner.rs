@@ -168,6 +168,16 @@ impl InnerActingManager {
             .map(|pm| pm.watcher.0.subscribe())
     }
 
+    pub async fn plan(&mut self) {
+        if let Some(notifier) = &self.planner_manager {
+            notifier
+                .update_notifier
+                .send(ActingUpdateNotification::Plan)
+                .await
+                .unwrap_or_else(|_| panic!());
+        }
+    }
+
     pub async fn clear(&mut self) {
         self.processes.clear();
         self.models.clear();
@@ -214,8 +224,14 @@ impl InnerActingManager {
                             if id == 0 {
                                 id = obj.inner.as_root().unwrap().nth_task(*s)?;
                             } else {
-                                id = if let Some(id) =
-                                    obj.inner.as_method().unwrap().childs.get(&label)
+                                id = if let Some(id) = obj
+                                    .inner
+                                    .as_method()
+                                    .unwrap_or_else(|| {
+                                        panic!("{id} is not a method but a {}.", obj.inner.kind())
+                                    })
+                                    .childs
+                                    .get(&label)
                                 {
                                     *id
                                 } else {
@@ -928,7 +944,7 @@ impl InnerActingManager {
         }];
 
         let mut chronicles = vec![];
-        'main: while let Some(ExecChronicle { id, origin }) = exec_chronicles.pop() {
+        'main: while let Some(ExecChronicle { mut id, origin }) = exec_chronicles.pop() {
             let instance_id = chronicles.len();
             let process = &self.processes[id];
             let chronicle: Chronicle = match &process.inner {
@@ -953,7 +969,7 @@ impl InnerActingManager {
                         .unwrap()
                 }
                 ActingProcessInner::Action(a) => {
-                    //Verify if we take the model of the action of the refinement
+                    //Verify if we take the model of the action or the refinement
                     if let Some(am_id) = &a.abstract_am_id {
                         //An abstract model is used, meaning that no subtask is present.
                         self.models[*am_id].chronicle.clone().unwrap()
@@ -988,6 +1004,7 @@ impl InnerActingManager {
                                 );
                             }
                         }
+                        id = refinement;
                         model
                     } else {
                         continue 'main;

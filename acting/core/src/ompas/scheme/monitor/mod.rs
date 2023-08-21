@@ -10,10 +10,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 pub mod control;
+pub mod debug_continuous_planning;
 pub mod debug_conversion;
 pub mod log;
 pub mod model;
 pub mod planning;
+
 use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::rae_options::OMPASOptions;
@@ -22,6 +24,7 @@ use crate::ompas::scheme::exec::platform::exec_platform::ExecPlatform;
 use crate::ompas::scheme::exec::platform::platform_declaration::PlatformDeclaration;
 use crate::ompas::scheme::exec::platform::Platform;
 use crate::ompas::scheme::exec::ModExec;
+use crate::ompas::scheme::monitor::debug_continuous_planning::ModContinuousPlanning;
 use crate::ompas::scheme::monitor::log::ModLog;
 use crate::ompas::scheme::monitor::planning::ModPlanning;
 use ompas_language::monitor::*;
@@ -31,7 +34,7 @@ use sompas_modules::string::ModString;
 use sompas_modules::time::ModTime;
 use sompas_modules::utils::ModUtils;
 use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
-use sompas_structs::lenv::LEnv;
+use sompas_structs::lenv::{ImportType, LEnv};
 
 //LANGUAGE
 
@@ -51,12 +54,14 @@ impl From<ModMonitor> for LModule {
         let mod_domain = ModModel::new(&m);
         let mod_control = ModControl::new(&m);
         let mod_planning = ModPlanning::new(&m);
+        let mod_continuous_planning = ModContinuousPlanning::new(&m);
         let mut module = LModule::new(m, MOD_MONITOR, DOC_MOD_MONITOR);
-        module.add_submodule(mod_domain);
-        module.add_submodule(ModLog::default());
-        module.add_submodule(ModDebugConversion::default());
-        module.add_submodule(mod_control);
-        module.add_submodule(mod_planning);
+        module.add_submodule(mod_domain, ImportType::WithoutPrefix);
+        module.add_submodule(ModLog::default(), ImportType::WithoutPrefix);
+        module.add_submodule(ModDebugConversion::default(), ImportType::WithoutPrefix);
+        module.add_submodule(mod_control, ImportType::WithoutPrefix);
+        module.add_submodule(mod_planning, ImportType::WithoutPrefix);
+        module.add_submodule(mod_continuous_planning, ImportType::WithoutPrefix);
 
         module
     }

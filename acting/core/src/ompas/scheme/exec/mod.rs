@@ -21,7 +21,7 @@ use platform::Platform;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
 use sompas_macros::async_scheme_fn;
-use sompas_structs::lenv::LEnv;
+use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
@@ -74,11 +74,11 @@ impl From<ModExec> for LModule {
 
         let mut module = LModule::new(m, MOD_EXEC, DOC_MOD_EXEC);
         module.add_subcontext(CtxMode::new(RAEMode::Exec), DOC_CTX_MODE);
-        module.add_submodule(mod_platform);
-        module.add_submodule(mod_resource);
-        module.add_submodule(mod_state);
-        module.add_submodule(ModActingContext::default());
-        module.add_submodule(mod_refinement);
+        module.add_submodule(mod_platform, ImportType::WithoutPrefix);
+        module.add_submodule(mod_resource, ImportType::WithoutPrefix);
+        module.add_submodule(mod_state, ImportType::WithoutPrefix);
+        module.add_submodule(ModActingContext::default(), ImportType::WithoutPrefix);
+        module.add_submodule(mod_refinement, ImportType::WithoutPrefix);
         module.add_async_fn(ARBITRARY, arbitrary, DOC_ARBITRARY, false);
         module
     }

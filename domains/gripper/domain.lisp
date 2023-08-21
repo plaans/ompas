@@ -17,7 +17,7 @@
       (:pre-conditions (= (at-robby) ?from) (!= ?from ?to))
       (:effects
         (begin
-            (transitive-assert 'at-robby ?to))))
+            (assert 'at-robby ?to))))
 
     (def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))
     (def-command-pddl-model pick

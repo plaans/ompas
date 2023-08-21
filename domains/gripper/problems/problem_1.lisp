@@ -11,6 +11,6 @@
     ((carry left) no_ball)
     ((carry right) no_ball))
       
-  (new-goal-task pick-and-drop b1 kitchen)
-  (plan)
+  ;(new-goal-task pick-and-drop b1 kitchen)
+
 )

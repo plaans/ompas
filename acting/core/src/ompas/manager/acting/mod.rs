@@ -377,12 +377,14 @@ impl ActingManager {
     }
 
     pub async fn start_continuous_planning(&self, env: LEnv, opt: Option<PMetric>) {
-        self.planning
-            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .unwrap_or_else(|_| {
-                eprintln!("error compare exchange in start_continuous_planning");
-                false
-            });
+        if !self.planning.load(Ordering::Acquire) {
+            self.planning
+                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+                .unwrap_or_else(|_| {
+                    eprintln!("error compare exchange in start_continuous_planning");
+                    false
+                });
+        }
         let mut locked = self.inner.write().await;
         let st = self.st.clone();
         let domain = self.domain.read().await.clone();
@@ -422,6 +424,10 @@ impl ActingManager {
 
     pub async fn subscribe_on_plan_update(&self) -> Option<broadcast::Receiver<bool>> {
         self.inner.read().await.subscribe_on_plan_update().await
+    }
+
+    pub async fn plan(&self) {
+        self.inner.write().await.plan().await;
     }
 
     pub async fn get_om_lvalue(&self, id: &ActingProcessId) -> LValue {

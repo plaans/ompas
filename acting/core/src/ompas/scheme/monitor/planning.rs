@@ -59,13 +59,6 @@ impl ModPlanning {
 impl From<ModPlanning> for LModule {
     fn from(m: ModPlanning) -> Self {
         let mut m = LModule::new(m, MOD_PLANNING, DOC_MOD_PLANNING);
-        m.add_async_fn(PLAN_IN_OMPAS, plan_in_ompas, DOC_PLAN_IN_OMPAS, false);
-        m.add_async_fn(
-            PLAN_OPT_IN_OMPAS,
-            plan_opt_in_ompas,
-            DOC_PLAN_OPT_IN_OMPAS,
-            false,
-        );
         m.add_async_fn(PLAN, plan, DOC_PLAN, false);
         m.add_async_fn(PLAN_OPT, plan_opt, DOC_PLAN_OPT, false);
         m.add_async_fn(
@@ -190,7 +183,6 @@ pub async fn __plan(
 
     env.update_context(ModState::new_from_snapshot(state));
     let opt = if opt { Some(PMetric::Makespan) } else { None };
-    let mut table = ActingVarRefTable::default();
     let st = acting_manager.st.clone();
     let domain: OMPASDomain = acting_manager.domain.read().await.clone();
     add_domain_symbols(&st, &domain);
@@ -214,7 +206,8 @@ pub async fn __plan(
         }
     }
 
-    let aries_problem: chronicles::Problem = encode(&mut table, &st, &pp).await.unwrap();
+    let (aries_problem, table): (chronicles::Problem, ActingVarRefTable) =
+        encode(&st, &pp).await.unwrap();
     if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
         for instance in &aries_problem.chronicles {
             Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);

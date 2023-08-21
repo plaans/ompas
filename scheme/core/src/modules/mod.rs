@@ -17,6 +17,7 @@ use crate::modules::primitive::ModPrimitive;
 use crate::modules::set::ModSet;
 use sompas_language::{DOC_MOD_STD, MOD_STD};
 use sompas_macros::scheme_fn;
+use sompas_structs::lenv::ImportType;
 use sompas_structs::lmodule::LModule;
 
 #[derive(Default)]
@@ -27,14 +28,14 @@ impl From<ModStd> for LModule {
     ///
     fn from(m: ModStd) -> LModule {
         let mut module = LModule::new(m, MOD_STD, DOC_MOD_STD);
-        module.add_submodule(ModBasicMath::default());
-        module.add_submodule(ModError::default());
-        module.add_submodule(ModEnv::default());
-        module.add_submodule(ModList::default());
-        module.add_submodule(ModMap::default());
-        module.add_submodule(ModPredicate::default());
-        module.add_submodule(ModSet::default());
-        module.add_submodule(ModPrimitive::default());
+        module.add_submodule(ModBasicMath::default(), ImportType::WithoutPrefix);
+        module.add_submodule(ModError::default(), ImportType::WithoutPrefix);
+        module.add_submodule(ModEnv::default(), ImportType::WithoutPrefix);
+        module.add_submodule(ModList::default(), ImportType::WithoutPrefix);
+        module.add_submodule(ModMap::default(), ImportType::WithoutPrefix);
+        module.add_submodule(ModPredicate::default(), ImportType::WithoutPrefix);
+        module.add_submodule(ModSet::default(), ImportType::WithoutPrefix);
+        module.add_submodule(ModPrimitive::default(), ImportType::WithoutPrefix);
 
         module
     }

@@ -26,6 +26,7 @@ pub struct Instanciation {}
 pub struct UpdateState {}
 
 pub enum ActingUpdateNotification {
+    Plan,
     VarUpdate(ActingVarId),
     NewProcess(ActingProcessId),
 }
@@ -76,7 +77,7 @@ impl ProblemUpdateManager {
                     let notification: ActingUpdateNotification = notification;
                     match notification {
                         ActingUpdateNotification::VarUpdate(_) => {}
-                        ActingUpdateNotification::NewProcess(_) => {
+                        ActingUpdateNotification::NewProcess(_) | ActingUpdateNotification::Plan => {
                              let em: ExecutionProblem = acting_manager.get_execution_problem().await;
                             /*for i in &em.chronicles {
                                 println!("{}", i.am.chronicle.as_ref().unwrap())

@@ -163,9 +163,9 @@ impl LEnv {
     pub fn import_module(&mut self, ctx: impl Into<LModule>, import_type: ImportType) {
         let module: LModule = ctx.into();
 
-        let mut queue = vec![module];
+        let mut queue = vec![(module, import_type)];
 
-        while let Some(mut module) = queue.pop() {
+        while let Some((mut module, import_type)) = queue.pop() {
             self.add_documentation(module.documentation);
             self.add_pure_functions(module.pure_fonctions);
             self.add_context(module.ctx);

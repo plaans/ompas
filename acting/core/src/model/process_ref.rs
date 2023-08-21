@@ -71,6 +71,7 @@ impl From<ActingProcessId> for ProcessRef {
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Label {
+    AbstractModel,
     Refinement(Option<usize>),
     Action(usize),
     Acquire(usize),
@@ -98,6 +99,9 @@ impl Display for Label {
             }
             Label::Arbitrary(arb) => {
                 write!(f, "arbitrary({arb})")
+            }
+            Label::AbstractModel => {
+                write!(f, "abstract_model")
             }
         }
     }

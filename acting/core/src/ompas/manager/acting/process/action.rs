@@ -1,12 +1,12 @@
 use crate::model::sym_domain::cst::Cst;
 use crate::ompas::manager::acting::acting_var::{ActingValUpdate, ExecutionVar};
 use crate::ompas::manager::acting::process::ActingProcessInner;
-use crate::ompas::manager::acting::{AMId, ActingProcessId};
+use crate::ompas::manager::acting::ActingProcessId;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug)]
 pub struct ActionProcess {
-    pub abstract_am_id: Option<AMId>,
+    pub abstract_model: Option<ActingProcessId>,
     pub args: Vec<ExecutionVar<Cst>>,
     pub refinements: Vec<ActingProcessId>,
 }
@@ -14,7 +14,7 @@ pub struct ActionProcess {
 impl ActionProcess {
     pub fn new(args: Vec<ExecutionVar<Cst>>) -> Self {
         Self {
-            abstract_am_id: None,
+            abstract_model: None,
             args,
             refinements: vec![],
         }
@@ -42,12 +42,12 @@ impl ActionProcess {
         updates
     }
 
-    pub fn add_abstract_am_id(&mut self, am_id: &AMId) {
-        self.abstract_am_id = Some(*am_id)
+    pub fn add_abstract_model(&mut self, id: &ActingProcessId) {
+        self.abstract_model = Some(*id)
     }
 
-    pub fn get_abstract_am_id(&self) -> Option<&AMId> {
-        self.abstract_am_id.as_ref()
+    pub fn get_abstract_model(&self) -> Option<&ActingProcessId> {
+        self.abstract_model.as_ref()
     }
 
     pub fn add_refinement(&mut self, refinement: ActingProcessId) {

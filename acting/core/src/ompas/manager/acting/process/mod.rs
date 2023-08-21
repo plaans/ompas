@@ -63,10 +63,9 @@ impl Display for ActingProcess {
             ActingProcessInner::RootTask(_) => {
                 write!(f, "root")
             }
-            ActingProcessInner::Action(_) => {
-                write!(f, "{}", debug)
-            }
-            ActingProcessInner::Method(_) => {
+            ActingProcessInner::Method(_)
+            | ActingProcessInner::AbstractModel(_)
+            | ActingProcessInner::Action(_) => {
                 write!(f, "{}", debug)
             }
             ActingProcessInner::Arbitrary(arb) => {
@@ -154,6 +153,7 @@ impl ActingProcess {
 pub enum ActingProcessInner {
     RootTask(RootProcess),
     Action(ActionProcess),
+    AbstractModel(RefinementProcess),
     Method(RefinementProcess),
     Arbitrary(ArbitraryProcess),
     Acquire(AcquireProcess),
@@ -167,6 +167,9 @@ impl Display for ActingProcessInner {
             ActingProcessInner::Method(r) => write!(f, "{r}"),
             ActingProcessInner::Arbitrary(r) => write!(f, "{r}"),
             ActingProcessInner::Acquire(r) => write!(f, "{r}"),
+            ActingProcessInner::AbstractModel(r) => {
+                write!(f, "{r}")
+            }
         }
     }
 }
@@ -179,6 +182,7 @@ impl ActingProcessInner {
             ActingProcessInner::Method(_) => ProcessKind::Method,
             ActingProcessInner::Arbitrary(_) => ProcessKind::Arbitrary,
             ActingProcessInner::Acquire(_) => ProcessKind::Acquire,
+            ActingProcessInner::AbstractModel(_) => ProcessKind::AbstractModel,
         }
     }
 

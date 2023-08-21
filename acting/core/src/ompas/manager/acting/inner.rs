@@ -64,6 +64,7 @@ pub enum ProcessKind {
     Arbitrary,
     Action,
     RootTask,
+    AbstractModel,
 }
 
 impl Display for ProcessKind {
@@ -77,6 +78,7 @@ impl Display for ProcessKind {
                 ProcessKind::Acquire => ACQUIRE,
                 ProcessKind::Arbitrary => ARBITRARY,
                 ProcessKind::RootTask => ROOT_TASK,
+                ProcessKind::AbstractModel => ABSTRACT_MODEL,
             }
         )
     }
@@ -265,6 +267,9 @@ impl InnerActingManager {
                             } else {
                                 return None;
                             }
+                        }
+                        Label::AbstractModel => {
+                            id = obj.inner.as_action().unwrap().abstract_model?;
                         }
                     }
                 }
@@ -509,6 +514,72 @@ impl InnerActingManager {
             /*self.notify_planner(ActingUpdateNotification::NewProcess(id))
             .await;*/
         }
+        id
+    }
+
+    pub async fn new_abstract_model(
+        &mut self,
+        parent: &ActingProcessId,
+        debug: String,
+        mut args: Vec<Option<Cst>>,
+        model: ActingModel,
+    ) -> ActingProcessId {
+        let id = self.processes.len();
+        let am_id = self.new_model(model);
+        let model = &self.models[am_id];
+
+        let (start, end, args) = if let Some(chronicle) = &model.chronicle {
+            let name = chronicle.get_name().clone();
+
+            if name.len() != args.len() {
+                panic!(
+                    "no matching between chronicle_name:{:?} and args:{:?}",
+                    name, args
+                )
+            }
+
+            let interval = chronicle.interval;
+            let start = self.new_execution_var(&interval.get_start(), &am_id);
+            let end = self.new_execution_var(&interval.get_end(), &am_id);
+            let mut new_name = vec![];
+
+            for (cst, var_id) in args.drain(..).zip(name) {
+                let mut exec = self.new_execution_var(&var_id, &am_id);
+                if let Some(val) = cst {
+                    let update = exec.set_val(val).unwrap();
+                    self.set_planner_val(update)
+                }
+                new_name.push(exec)
+            }
+            (start, end, new_name)
+        } else {
+            let start = ExecutionVar::new();
+            let end = ExecutionVar::new();
+            let name = args
+                .drain(..)
+                .map(|cst| {
+                    let mut exec = ExecutionVar::new();
+                    if let Some(val) = cst {
+                        exec.set_val(val);
+                    }
+                    exec
+                })
+                .collect();
+            (start, end, name)
+        };
+        self.processes.push(ActingProcess::new(
+            id,
+            *parent,
+            ProcessOrigin::Planner,
+            am_id,
+            Some(debug),
+            start,
+            end,
+            ActingProcessInner::AbstractModel(RefinementProcess::new(args)),
+        ));
+
+        let action: &mut ActionProcess = self.processes[*parent].inner.as_mut_action().unwrap();
+        action.add_abstract_model(&id);
         id
     }
 
@@ -970,9 +1041,14 @@ impl InnerActingManager {
                 }
                 ActingProcessInner::Action(a) => {
                     //Verify if we take the model of the action or the refinement
-                    if let Some(am_id) = &a.abstract_am_id {
+                    if let Some(abstract_model) = &a.abstract_model {
                         //An abstract model is used, meaning that no subtask is present.
-                        self.models[*am_id].chronicle.clone().unwrap()
+                        id = *abstract_model;
+
+                        let abstract_process = &self.processes[*abstract_model];
+                        self.models[abstract_process.get_am_id()]
+                            .get_instantiated_chronicle()
+                            .unwrap()
                     }
                     //Otherwise we check if there is a refinement
                     else if let Some(&refinement) = a.refinements.last() {
@@ -1057,7 +1133,7 @@ impl InnerActingManager {
                         queue.push(*r)
                     }
                 }
-                ActingProcessInner::Method(m) => {
+                ActingProcessInner::Method(m) | ActingProcessInner::AbstractModel(m) => {
                     for sub in m.childs.values() {
                         writeln!(dot, "P{id} -> P{sub};").unwrap();
                         queue.push(*sub)
@@ -1128,9 +1204,7 @@ impl InnerActingManager {
                 let bindings = chronicle.bindings.clone();
                 let st = chronicle.st.clone();
                 let mut pr = instance.pr.clone();
-                if chronicle.meta_data.kind == ChronicleKind::Method {
-                    let _ = pr.pop().unwrap();
-                }
+                let _ = pr.pop().unwrap();
                 let parent = match self.get_id(pr.clone()) {
                     Some(id) => id,
                     None =>
@@ -1169,12 +1243,20 @@ impl InnerActingManager {
 
                 match chronicle.meta_data.kind {
                     ChronicleKind::Command | ChronicleKind::Task => {
-                        let am_id = self.new_model(instance.am);
+                        let args: Vec<Option<Cst>> = chronicle
+                            .get_name()
+                            .iter()
+                            .map(|var_id| st.var_as_cst(var_id))
+                            .collect();
+                        self.new_abstract_model(&parent, debug, args, instance.am)
+                            .await;
+
+                        /*let am_id = self.new_model(instance.am);
                         self.processes[parent]
                             .inner
                             .as_mut_action()
                             .unwrap()
-                            .abstract_am_id = Some(am_id);
+                            .abstract_am_id = Some(am_id);*/
                     }
                     ChronicleKind::Method => {
                         let args: Vec<Option<Cst>> = chronicle
@@ -1389,6 +1471,9 @@ fn format_acting_process(
                 planner_manager.format_execution_var(&acq.quantity)
             )
             .unwrap();
+        }
+        ActingProcessInner::AbstractModel(_) => {
+            write!(f, "{}", debug).unwrap();
         }
     }
     f

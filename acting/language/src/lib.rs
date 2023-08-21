@@ -963,6 +963,8 @@ pub mod supervisor {
     pub const METHOD: &str = "method";
     pub const ARBITRARY: &str = "arbitrary";
     pub const ACQUIRE: &str = "acquire";
+
+    pub const ABSTRACT_MODEL: &str = "abstract_model";
 }
 
 pub const ACTION_TYPE: &str = "action_type";

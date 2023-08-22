@@ -279,12 +279,12 @@ fn read_moment(moment: &LValue) -> Result<Interval, LRuntimeError> {
 pub async fn new_timed_goal_task(env: &LEnv, task_args: &[LValue]) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModPlanning>(MOD_PLANNING)?;
 
-    let start: f64 = task_args.last().unwrap().try_into()?;
+    let start: f64 = task_args.first().unwrap().try_into()?;
     let start = start.into();
 
     let mut args = vec![];
 
-    for arg in &task_args[0..args.len() - 1] {
+    for arg in &task_args[1..args.len()] {
         if let Some(cst) = arg.as_cst() {
             args.push(cst);
         } else {

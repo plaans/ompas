@@ -17,12 +17,11 @@
     (def-state-function door (?r room) (?d door) (?r new_bool))
 
     (def-action open '(?r robot) '(?d door) '(?g gripper))
-    (def-action-operational-model open
-    '((:params (?r robot) (?d door) (?g gripper))
+    (def-command-pddl-model open
+      (:params (?r robot) (?d door) (?g gripper))
       (:pre-conditions (and-cond (= (door (at-robot ?r) ?d) yes) (= (door-opened ?d) no) (= (carry ?r ?g) no_ball)))
       (:effects
-        (begin
-            (assert (carry)))
+            ('carry)))
     
     )
 

@@ -21,8 +21,7 @@
       (!= ?from ?to)
       (= (connected ?from ?to) yes))
     (:effects
-      (begin
-          (assert 'at-robby ?to))))
+          ('at-robby ?to)))
 
 
   (def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))
@@ -33,9 +32,8 @@
       (= (at-robby) ?room)
       (= (carry ?gripper) no_ball))
     (:effects
-      (begin
-          (assert `(carry ,?gripper) ?obj)
-          (assert `(at ,?obj) no_place))))
+          ('carry ?gripper ?obj)
+          ('at ?obj no_place)))
 
   (def-command drop (:params (?obj ball) (?room room) (?gripper gripper)))
   (def-command-pddl-model drop
@@ -44,9 +42,8 @@
       (= (carry ?gripper) ?obj)
       (= (at-robby) ?room))
     (:effects
-      (begin
-          (assert `(carry ,?gripper) no_ball)
-          (assert `(at ,?obj) ?room ))))
+          ('carry ?gripper no_ball)
+          ('at ?obj ?room)))
 
   (def-task pick-and-drop (:params (?ball ball) (?room room)))
 

@@ -402,7 +402,16 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
             let effects = model
                 .get(&EFFECTS.into())
                 .ok_or_else(|| LRuntimeError::new("create_model", "missing :effects"))?;
-            let effects = cons(env, &[LPrimitive::Do.into(), effects.clone()])?;
+            let mut str_effects = "(do".to_string();
+            if let LValue::List(effects) = effects {
+                for effect in effects.iter() {
+                    let cons = cons(env, &["assert".into(), effect.into()])?;
+                    str_effects.push_str(cons.to_string().as_str());
+                }
+                str_effects.push(')');
+            } else {
+                return Err(LRuntimeError::default());
+            }
             let test =
                 generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
                     .await?;
@@ -411,7 +420,7 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
                 params.get_params_as_lvalue(),
                 test,
                 str_conds,
-                effects
+                str_effects
             )
         }
         ModelType::OM => {
@@ -786,21 +795,6 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
     };
 
     for (k, v) in &map {
-        /*let mut is_instance: bool = false;
-        if let LValue::List(key) = k {
-            if key[0] == LValue::from(INSTANCE) {
-                let instances: Vec<LValue> = v.try_into()?;
-                for e in instances {
-                    state
-                        .add_instance(&key[1].to_string(), &e.to_string())
-                        .await
-                }
-                is_instance = true;
-            }
-        }
-        if !is_instance {
-            inner_dynamic.insert(k.try_into()?, v.try_into()?);
-        }*/
         inner_dynamic.insert(k.try_into()?, v.try_into()?);
     }
 
@@ -1065,7 +1059,7 @@ mod test {
         Ok(())
     }
 
-    #[ignore]
+    //#[ignore]
     #[tokio::test]
     async fn test_macro_def_command_pddl_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1078,16 +1072,15 @@ mod test {
                             (= (at-robby) ?room)
                             (= (carry ?gripper) no_ball))
                           (:effects
-                            (begin
-                                (assert `(carry ,?gripper) ?obj)
-                                (assert `(at ,?obj) no_place))))",
+                                ('carry ?gripper ?obj)
+                                ('at ?obj no_place)))",
             expected: "(add-command-model\
                 (map '(\
                     (:name pick)\
                     (:model-type pddl)\
                     (:params ((?obj ball) (?room room) (?gripper gripper)))\
                     (:pre-conditions ((= (at ?obj) ?room) (= (at-robby) ?room) (= (carry ?gripper) no_ball)))\
-                    (:effects ((begin (assert `(carry ,?gripper) ?obj) (assert `(at ,?obj) no_place)))))))",
+                    (:effects (('carry ?gripper ?obj) ('at ?obj no_place))))))",
             result: "nil",
         };
 
@@ -1164,16 +1157,15 @@ mod test {
                             (= (at-robby) ?room)
                             (= (carry ?gripper) no_ball))
                           (:effects
-                            (begin
-                                (assert 'carry ?gripper ?obj)
-                                (assert 'at ?obj no_place))))",
+                                ('carry ?gripper ?obj)
+                                ('at ?obj no_place)))",
             expected: "(add-task-model\
                 (map '(\
                     (:name pick)\
                     (:model-type pddl)\
                     (:params ((?obj ball) (?room room) (?gripper gripper)))\
                     (:pre-conditions ((= (at ?obj) ?room) (= (at-robby) ?room) (= (carry ?gripper) no_ball)))\
-                    (:effects ((begin (assert 'carry ?gripper ?obj) (assert 'at ?obj no_place)))))))",
+                    (:effects (('carry ?gripper ?obj) ('at ?obj no_place))))))",
             result: "nil",
         };
 

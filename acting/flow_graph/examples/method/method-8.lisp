@@ -55,7 +55,7 @@
                                             (begin
                                                (define ?r ?r)
                                                (read-static-state (quote robot.default_velocity) ?r))))
-                                   (transitive-assert (quote robot.coordinates_tile) ?r ?dest time)))))
+                                   (transitive-assert time (quote robot.coordinates_tile) ?r ?dest)))))
              (assert (quote (package.location package0)) ?r)
              nil
              nil
@@ -86,5 +86,5 @@
                                             (begin
                                                (define ?r ?r)
                                                (read-static-state (quote robot.default_velocity) ?r))))
-                                   (transitive-assert (quote robot.coordinates_tile) ?r (quote tile_25_17) time)))))
+                                   (transitive-assert time (quote robot.coordinates_tile) ?r (quote tile_25_17))))))
              (assert (quote (package.location package0)) (quote belt13)))))

@@ -64,9 +64,8 @@ A model can be provided and defined with the macro `def-command-pddl-model`. Her
         (= (at-robby) ?room)
         (= (carry ?gripper) no_ball))
     (:effects
-        (begin
-            (assert `(carry ,?gripper) ?obj)
-            (assert `(at ,?obj) no_place))))
+        ('carry ?gripper) ?obj)
+        ('at ?obj no_place)))
 ```
 
 

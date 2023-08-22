@@ -1,1 +1,1 @@
-(transitive-assert '(r p1) b 2)
+(transitive-assert 2 '(r p1) b)

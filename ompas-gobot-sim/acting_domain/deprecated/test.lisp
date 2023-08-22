@@ -50,9 +50,9 @@
           (:pre-conditions (and
             (isavailable ?r)
             (isready ?m)))
-          (:effects (begin
-            (assert (isavailbale ?r) false)
-            (retract (isready ?m) true)))
+          (:effects
+            (isavailbale ?r) false)
+            (isready ?m) true)))
           (:parameters-generator (robots machines) (and (isinrange ?r) ( = (process-machine ?m) process_test)))
           (:score-generator 10)
           (:body (rae-await (pick ?r ?m)))))

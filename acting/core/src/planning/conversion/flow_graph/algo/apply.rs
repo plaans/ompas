@@ -203,7 +203,7 @@ fn convert_transitive_assert(
     mut seq: Vec<FlowId>,
 ) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
-    let duration = seq.pop().unwrap();
+    let duration = seq.remove(0);
 
     let flow_apply = fl.new_assignment(Lit::Write(
         seq.iter().map(|f| fl.get_flow_result(f)).collect(),

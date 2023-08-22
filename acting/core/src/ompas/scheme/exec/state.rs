@@ -86,9 +86,9 @@ impl From<ModState> for LModule {
 ///Add a fact to fact state
 #[async_scheme_fn]
 async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    if args.len() < 3 {
+    if args.len() < 2 {
         Err(LRuntimeError::wrong_number_of_args(
-            TRANSITIVE_ASSERT,
+            ASSERT,
             args,
             2..usize::MAX,
         ))?
@@ -117,15 +117,15 @@ async fn transitive_assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
         ));
     }
     let state = env.get_context::<ModState>(MOD_STATE)?;
+    let duration: f64 = args.first().unwrap().try_into()?;
     let key: LValueS = if args.len() > 3 {
-        LValue::from(&args[0..args.len() - 2])
+        LValue::from(&args[1..args.len() - 1])
     } else {
-        args[0].clone()
+        args[1].clone()
     }
     .try_into()?;
 
-    let duration: f64 = args.last().unwrap().try_into()?;
-    let value: LValueS = args.get(args.len() - 2).unwrap().try_into()?;
+    let value: LValueS = args.last().unwrap().try_into()?;
     state.state.add_fact(key.clone(), UNKNOWN.into()).await;
     tokio::time::sleep(Duration::from_micros((duration * 1_000_000.0) as u64)).await;
     state.state.add_fact(key, value).await;

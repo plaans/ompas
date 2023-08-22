@@ -5,7 +5,7 @@ use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{lruntimeerror, wrong_n_args, wrong_type};
+use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 
 #[derive(Default)]
 pub struct ModMap {}
@@ -24,6 +24,12 @@ impl From<ModMap> for LModule {
             true,
         );
         module.add_fn(UNION_MAP, union_map, DOC_UNION_MAP, true);
+        module.add_fn(
+            MAP_AS_LIST,
+            map_as_list,
+            (DOC_MAP_AS_LIST, DOC_MAP_AS_LIST_VERBOSE),
+            true,
+        );
 
         module
     }
@@ -115,4 +121,11 @@ pub fn union_map(
     map2: im::HashMap<LValue, LValue>,
 ) -> HashMap<LValue, LValue> {
     map1.union(map2)
+}
+
+#[scheme_fn]
+pub fn map_as_list(map: im::HashMap<LValue, LValue>) -> Vec<LValue> {
+    map.iter()
+        .map(|(k, v)| list!(k.clone(), v.clone()))
+        .collect()
 }

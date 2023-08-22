@@ -770,6 +770,11 @@ pub mod map {
 
     pub const UNION_MAP: &str = "union-map";
     pub const DOC_UNION_MAP: &str = "Return the union of two maps.";
+
+    pub const MAP_AS_LIST: &str = "map-as-list";
+    pub const DOC_MAP_AS_LIST: &str = "Takes a map and return a list of key value pairs";
+    pub const DOC_MAP_AS_LIST_VERBOSE: &str = "(map-as-list (map '((one 1) (two 2))))\
+    \n=> ((one 1)(two 2))";
 }
 /// Set of keywords and documentations for predicated on the kind of LValues.
 pub mod predicate {

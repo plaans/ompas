@@ -5,7 +5,6 @@ use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::error::RaeExecError;
-use crate::ompas::interface::rae_options::OMPASOptions;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::inner::ProcessKind;
@@ -13,8 +12,11 @@ use crate::ompas::manager::acting::interval::Interval;
 use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
+use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
 use crate::ompas::scheme::exec::refinement::aries::aries_select;
 use crate::ompas::scheme::exec::refinement::c_choice::c_choice_select;
@@ -41,14 +43,12 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror};
 use std::borrow::Borrow;
 use std::convert::TryInto;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 pub struct ModRefinement {
-    //pub env: LEnv,
-    pub domain: Arc<RwLock<OMPASDomain>>,
+    pub domain: DomainManager,
     pub acting_manager: ActingManager,
-    pub options: Arc<RwLock<OMPASOptions>>,
+    pub options: OMPASManager,
+    pub clock_manager: ClockManager,
     pub log: LogClient,
 }
 
@@ -59,6 +59,7 @@ impl ModRefinement {
             log: exec.log.clone(),
             acting_manager: exec.acting_manager.clone(),
             options: exec.options.clone(),
+            clock_manager: exec.acting_manager.clock_manager.clone(),
         }
     }
 }
@@ -311,7 +312,7 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
         .collect();
     let debug: String = supervisor.get_debug(&task_id).await.unwrap();
     let state: WorldStateSnapshot = mod_refinement.acting_manager.state.get_snapshot().await;
-    let select_mode: SelectMode = *mod_refinement.options.read().await.get_select_mode();
+    let select_mode: SelectMode = mod_refinement.options.get_select_mode().await;
 
     let tried: Vec<LValue> = supervisor.get_tried(&task_id).await;
 
@@ -341,7 +342,7 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
             }
         }
         None => {
-            let rt: RefinementInner = match &select_mode {
+            let rt: RefinementInner = match select_mode {
                 SelectMode::Greedy => {
                     /*
                     Returns all applicable methods sorted by their score
@@ -352,19 +353,19 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
                 }
                 SelectMode::Planning(Planner::Aries(bool)) => {
                     log.debug(format!("select with aries for {debug}")).await;
-                    aries_select(&state, greedy_refinement, env, *bool)
+                    aries_select(&state, greedy_refinement, env, bool)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
                 }
                 SelectMode::Planning(Planner::CChoice(config)) => {
                     log.debug(format!("select with c-choice for {debug}")).await;
-                    c_choice_select(&state, greedy_refinement, env, *config)
+                    c_choice_select(&state, greedy_refinement, env, config)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
                 }
                 SelectMode::Planning(Planner::RAEPlan(config)) => {
                     log.debug(format!("select with c-choice for {debug}")).await;
-                    rae_plan_select(&state, greedy_refinement, env, *config)
+                    rae_plan_select(&state, greedy_refinement, env, config)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
                 }
@@ -415,7 +416,7 @@ pub async fn greedy_select(
     env.update_context(ModState::new_from_snapshot(state.clone()));
     let env = &env;
 
-    let domain: OMPASDomain = ctx.domain.read().await.clone();
+    let domain: OMPASDomain = ctx.domain.get_inner().await;
 
     let method_templates: Vec<String> =
         domain.tasks.get(&task_label).unwrap().get_methods().clone();
@@ -486,18 +487,21 @@ pub async fn greedy_select(
     /*
     Sort the list
      */
-    let mut rng = rand::thread_rng();
-    applicable_methods.shuffle(&mut rng);
-    applicable_methods.sort_by_key(|a| a.1);
-    applicable_methods.reverse();
-    let mut methods: Vec<_> = applicable_methods.drain(..).map(|a| a.0).collect();
-    methods.retain(|m| !tried.contains(m));
-    let choosed = methods.get(0).cloned().unwrap_or(LValue::Nil);
-
+    let (methods, chosen) = {
+        let mut rng = rand::thread_rng();
+        applicable_methods.shuffle(&mut rng);
+        applicable_methods.sort_by_key(|a| a.1);
+        applicable_methods.reverse();
+        let mut methods: Vec<_> = applicable_methods.drain(..).map(|a| a.0).collect();
+        methods.retain(|m| !tried.contains(m));
+        let chosen = methods.get(0).cloned().unwrap_or(LValue::Nil);
+        (methods, chosen)
+    };
+    let interval = Interval::new(start, Some(ctx.clock_manager.now().await));
     Ok(RefinementInner {
         task_value: task.into(),
-        method_value: choosed,
-        interval: Interval::new(start, Some(ctx.acting_manager.instant())),
+        method_value: chosen,
+        interval,
         possibilities: methods,
         select: SelectTrace::RealTime(RTSelect {
             refinement_type: SelectMode::Greedy,

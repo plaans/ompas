@@ -1,6 +1,6 @@
 use crate::ompas::manager::acting::planning::ActingVarRefTable;
 use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::world_state::{StateType, WorldStateSnapshot};
+use crate::ompas::manager::state::state_manager::{StateType, WorldStateSnapshot};
 use crate::planning::planner::encoding::domain::read_chronicle;
 use crate::planning::planner::encoding::{atom_from_lvalues, satom_from_lvalues};
 use crate::planning::planner::problem::{ChronicleInstance, PlanningProblem};

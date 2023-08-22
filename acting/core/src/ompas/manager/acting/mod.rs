@@ -1,5 +1,4 @@
 use crate::model::acting_domain::model::ActingModel;
-use crate::model::acting_domain::OMPASDomain;
 use crate::model::add_domain_symbols;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::process_ref::{Label, ProcessRef};
@@ -14,10 +13,12 @@ use crate::ompas::manager::acting::planning::problem_update::{
 };
 use crate::ompas::manager::acting::planning::{run_continuous_planning, ContinuousPlanningConfig};
 use crate::ompas::manager::acting::process::ProcessOrigin;
+use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::monitor::MonitorManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::world_state::WorldState;
+use crate::ompas::manager::state::state_manager::StateManager;
 use crate::planning::conversion::_convert;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::p_eval;
@@ -36,7 +37,6 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, watch, RwLock};
-use tokio::time::Instant;
 
 pub mod acting_var;
 pub mod filter;
@@ -57,29 +57,29 @@ pub struct ActingManager {
     pub st: RefSymTable,
     pub resource_manager: ResourceManager,
     pub monitor_manager: MonitorManager,
-    pub domain: Arc<RwLock<OMPASDomain>>,
-    pub state: WorldState,
+    pub domain: DomainManager,
+    pub state: StateManager,
     pub inner: Arc<RwLock<InnerActingManager>>,
-    instant: Instant,
+    pub clock_manager: ClockManager,
     planning: Arc<AtomicBool>,
 }
 
 impl ActingManager {
     pub fn new(st: RefSymTable) -> Self {
-        let instant = Instant::now();
+        let clock_manager = ClockManager::default();
         let resource_manager = ResourceManager::default();
         Self {
             st: st.clone(),
             resource_manager: resource_manager.clone(),
-            monitor_manager: Default::default(),
-            domain: Arc::new(Default::default()),
-            state: WorldState::new(st.clone()),
+            monitor_manager: MonitorManager::from(clock_manager.clone()),
+            domain: Default::default(),
+            state: StateManager::new(st.clone()),
             inner: Arc::new(RwLock::new(InnerActingManager::new(
                 resource_manager,
-                instant,
+                clock_manager.clone(),
                 st,
             ))),
-            instant,
+            clock_manager,
             planning: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -95,7 +95,6 @@ impl ActingManager {
     pub async fn clear(&self) {
         self.monitor_manager.clear().await;
         self.resource_manager.clear().await;
-        self.state.clear().await;
         self.inner.write().await.clear().await;
     }
 
@@ -146,10 +145,6 @@ impl ActingManager {
 
     pub async fn get_kind(&self, id: &ActingProcessId) -> ProcessKind {
         self.inner.read().await.get_kind(id)
-    }
-
-    pub fn instant(&self) -> Timepoint {
-        self.instant.elapsed().as_millis().into()
     }
 
     pub async fn get_tried(&self, id: &ActingProcessId) -> Vec<LValue> {
@@ -387,7 +382,7 @@ impl ActingManager {
         }
         let mut locked = self.inner.write().await;
         let st = self.st.clone();
-        let domain = self.domain.read().await.clone();
+        let domain = self.domain.get_inner().await;
         add_domain_symbols(&st, &domain);
 
         let (plan_update_manager, tx) = PlanUpdateManager::new(self.clone());
@@ -451,10 +446,8 @@ impl ActingManager {
 
         let labels: Vec<Arc<Sym>> = self
             .domain
-            .read()
+            .get_method(&label)
             .await
-            .get_methods()
-            .get(&label)
             .unwrap()
             .parameters
             .get_labels();

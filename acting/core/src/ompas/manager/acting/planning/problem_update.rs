@@ -1,6 +1,6 @@
 use crate::ompas::manager::acting::acting_var::ActingVarId;
 use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::planning::planner::problem::ChronicleInstance;
 use crate::TOKIO_CHANNEL_SIZE;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};

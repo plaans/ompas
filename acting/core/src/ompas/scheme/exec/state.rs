@@ -1,5 +1,6 @@
+use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::monitor::MonitorManager;
-use crate::ompas::manager::state::world_state::{StateType, WorldState, WorldStateSnapshot};
+use crate::ompas::manager::state::state_manager::{StateManager, StateType, WorldStateSnapshot};
 use crate::ompas::scheme::exec::resource::resources;
 use crate::ompas::scheme::exec::ModExec;
 use futures::FutureExt;
@@ -23,7 +24,7 @@ use sompas_structs::{lruntimeerror, wrong_type};
 use std::time::Duration;
 
 pub struct ModState {
-    pub state: WorldState,
+    pub state: StateManager,
     pub monitors: MonitorManager,
 }
 
@@ -38,7 +39,7 @@ impl ModState {
     pub fn new_from_snapshot(state: WorldStateSnapshot) -> Self {
         Self {
             state: state.into(),
-            monitors: Default::default(),
+            monitors: MonitorManager::from(ClockManager::default()),
         }
     }
 }

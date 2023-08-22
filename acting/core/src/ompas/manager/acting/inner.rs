@@ -19,6 +19,7 @@ use crate::ompas::manager::acting::process::refinement::RefinementProcess;
 use crate::ompas::manager::acting::process::root_task::RootProcess;
 use crate::ompas::manager::acting::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
 use crate::ompas::manager::acting::{AMId, ActingProcessId};
+use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::planning::conversion::flow_graph::graph::Dot;
@@ -39,7 +40,6 @@ use std::path::PathBuf;
 use std::{env, fs};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc, watch};
-use tokio::time::Instant;
 
 const COLOR_PLANNING: &str = "red";
 const COLOR_EXECUTION: &str = "blue";
@@ -105,23 +105,34 @@ pub struct InnerActingManager {
     acting_vars: ActingVarCollection,
     pub(in crate::ompas::manager::acting) st: RefSymTable,
     resource_manager: ResourceManager,
-    time_reference: Instant,
+    clock_manager: ClockManager,
     planner_manager: Option<PlannerManager>,
 }
 
 impl InnerActingManager {
     pub fn new(
         resource_manager: ResourceManager,
-        time_reference: Instant,
+        clock_manager: ClockManager,
         st: RefSymTable,
     ) -> Self {
-        let model = ActingModel::root(&st);
-        let chronicle = model.chronicle.as_ref().unwrap();
-        let mut acting_vars = ActingVarCollection::default();
+        let mut new = Self {
+            processes: vec![],
+            models: vec![],
+            acting_vars: Default::default(),
+            st,
+            resource_manager,
+            clock_manager,
+            planner_manager: None,
+        };
+        new.init();
+        new
+    }
 
-        let start =
-            acting_vars.new_acting_var(ActingVarRef::new(chronicle.interval.get_start(), 0));
-        let end = acting_vars.new_acting_var(ActingVarRef::new(chronicle.interval.get_end(), 0));
+    pub fn init(&mut self) {
+        let model = ActingModel::root(&self.st);
+        let chronicle = model.chronicle.as_ref().unwrap();
+        let start = self.new_acting_var(ActingVarRef::new(chronicle.interval.get_start(), 0));
+        let end = self.new_acting_var(ActingVarRef::new(chronicle.interval.get_end(), 0));
 
         let root = ActingProcess::new(
             0,
@@ -133,15 +144,8 @@ impl InnerActingManager {
             ExecutionVar::new_with_ref(end),
             RootProcess::new(),
         );
-        Self {
-            st,
-            processes: vec![root],
-            models: vec![model],
-            resource_manager,
-            time_reference,
-            acting_vars,
-            planner_manager: None,
-        }
+        self.processes = vec![root];
+        self.models = vec![model];
     }
 
     pub fn set_planner_manager(&mut self, planner_manager: PlannerManager) {
@@ -184,15 +188,12 @@ impl InnerActingManager {
         self.processes.clear();
         self.models.clear();
         self.acting_vars.clear().await;
-        self.st = RefSymTable::default();
+        self.st.clear();
+        self.init();
     }
 
     pub fn st(&self) -> RefSymTable {
         self.st.clone()
-    }
-
-    pub fn instant(&self) -> Timepoint {
-        self.time_reference.elapsed().as_millis().into()
     }
 
     fn new_model(&mut self, model: ActingModel) -> AMId {
@@ -333,7 +334,7 @@ impl InnerActingManager {
     }
 
     pub async fn set_start(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
-        let instant = t.unwrap_or(self.instant());
+        let instant = t.unwrap_or(self.clock_manager.now().await);
         let val = self.processes[*id].start.set_val(instant);
         if let Some(val) = val {
             self.set_execution_vals(vec![val]).await;
@@ -347,7 +348,7 @@ impl InnerActingManager {
         t: Option<Timepoint>,
         status: ProcessStatus,
     ) {
-        let instant = t.unwrap_or(self.instant());
+        let instant = t.unwrap_or(self.clock_manager.now().await);
         let val = self.processes[*id].end.set_val(instant);
         if let Some(val) = val {
             self.set_execution_vals(vec![val]).await;
@@ -379,7 +380,7 @@ impl InnerActingManager {
     }
 
     pub async fn set_moment(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
-        let instant = t.unwrap_or(self.instant());
+        let instant = t.unwrap_or(self.clock_manager.now().await);
         self.set_start(id, Some(instant)).await;
         self.set_end(id, Some(instant), self.get_status(id)).await;
     }
@@ -882,7 +883,7 @@ impl InnerActingManager {
     }
 
     pub async fn set_s_acq(&mut self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        let instant = instant.unwrap_or(self.instant());
+        let instant = instant.unwrap_or(self.clock_manager.now().await);
         let val = self.processes[*id]
             .inner
             .as_mut_acquire()

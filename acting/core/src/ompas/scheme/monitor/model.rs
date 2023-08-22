@@ -7,9 +7,10 @@ use crate::model::acting_domain::task::Task;
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
+use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::resource::{Capacity, ResourceManager};
 use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::world_state::{StateType, WorldState, WorldStateSnapshot};
+use crate::ompas::manager::state::state_manager::{StateManager, StateType, WorldStateSnapshot};
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::planning::conversion::context::ConversionContext;
 use ompas_language::monitor::model::*;
@@ -28,16 +29,13 @@ use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-
 pub struct ModModel {
-    state: WorldState,
+    state: StateManager,
     st: RefSymTable,
     resource_manager: ResourceManager,
     empty_env: LEnv,
     domain_description: InitScheme,
-    domain: Arc<RwLock<OMPASDomain>>,
+    domain: DomainManager,
 }
 
 impl ModModel {
@@ -58,13 +56,13 @@ impl ModModel {
 
     pub async fn get_conversion_context(&self) -> ConversionContext {
         let state: WorldStateSnapshot = self.get_plan_state().await;
-        let domain: OMPASDomain = self.domain.read().await.clone();
+        let domain: OMPASDomain = self.domain.get_inner().await;
         let env = self.get_plan_env().await;
         ConversionContext::new(domain, self.st.clone(), state, env)
     }
 
     pub async fn get_plan_env(&self) -> LEnv {
-        let env_symbols: LEnvSymbols = self.domain.read().await.get_convert_env();
+        let env_symbols: LEnvSymbols = self.domain.get_convert_env().await;
         let mut env = self.empty_env.clone();
         env.set_new_top_symbols(env_symbols);
         env
@@ -138,13 +136,11 @@ impl From<ModModel> for LModule {
             MACRO_DEF_COMMAND,
             (DOC_DEF_COMMAND, DOC_DEF_COMMAND_VERBOSE),
         );
-        //todo: add macros to define command models
         module.add_macro(
             DEF_TASK,
             MACRO_DEF_TASK,
             (DOC_DEF_TASK, DOC_DEF_TASK_VERBOSE),
         );
-        //todo: add macros to define task models
         module.add_macro(
             DEF_METHOD,
             MACRO_DEF_METHOD,
@@ -313,9 +309,8 @@ pub async fn add_state_function(
     let result_debug = st.format_domain(&result);
     let state_function = StateFunction::new(label.to_string(), params, result, result_debug, body);
     ctx.domain
-        .write()
-        .await
-        .add_state_function(label.to_string(), state_function)?;
+        .add_state_function(label.to_string(), state_function)
+        .await?;
     Ok(())
 }
 
@@ -363,9 +358,8 @@ pub async fn add_function(
     let result_debug = st.format_domain(&result);
     let state_function = StateFunction::new(label.to_string(), params, result, result_debug, body);
     ctx.domain
-        .write()
-        .await
-        .add_state_function(label.to_string(), state_function)?;
+        .add_state_function(label.to_string(), state_function)
+        .await?;
     Ok(())
 }
 
@@ -512,9 +506,8 @@ pub async fn add_command(
     command.set_cost(cost);
 
     ctx.domain
-        .write()
-        .await
-        .add_command(command.get_label().to_string(), command)?;
+        .add_command(command.get_label().to_string(), command)
+        .await?;
 
     Ok(())
 }
@@ -528,10 +521,7 @@ pub async fn add_command_model(
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = create_model(env, model).await?;
     let kind = ModelKind::PlanModel;
-    ctx.domain
-        .write()
-        .await
-        .add_command_model(label, model, kind)?;
+    ctx.domain.add_command_model(label, model, kind).await?;
     Ok(())
 }
 #[async_scheme_fn]
@@ -598,9 +588,8 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
     }
 
     ctx.domain
-        .write()
-        .await
-        .add_task(task.get_label().to_string(), task)?;
+        .add_task(task.get_label().to_string(), task)
+        .await?;
 
     Ok(())
 }
@@ -614,10 +603,7 @@ pub async fn add_task_model(
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = create_model(env, model).await?;
     let kind = ModelKind::PlanModel;
-    ctx.domain
-        .write()
-        .await
-        .add_task_model(label, model, kind)?;
+    ctx.domain.add_task_model(label, model, kind).await?;
     Ok(())
 }
 
@@ -735,10 +721,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
 
     method.lambda_body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
 
-    ctx.domain
-        .write()
-        .await
-        .add_method(method.label.clone(), method)?;
+    ctx.domain.add_method(method.label.clone(), method).await?;
 
     Ok(())
 }
@@ -769,7 +752,7 @@ pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<()
     let mut e = get_root_env().await;
     let result = eval(&expanded, &mut e, None).await?;
     if let LValue::Lambda(_) = &result {
-        ctx.domain.write().await.add_lambda(label, result);
+        ctx.domain.add_lambda(label, result).await;
     }
     Ok(())
 }
@@ -781,7 +764,7 @@ pub async fn add_env(env: &LEnv, label: String, value: &LValue) -> Result<(), LR
     let expanded = expand(value, true, &mut env).await?;
     let mut e = get_root_env().await;
     let value = eval(&expanded, &mut e, None).await?;
-    ctx.domain.write().await.add_env(label, value);
+    ctx.domain.add_env(label, value).await;
 
     Ok(())
 }

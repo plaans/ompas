@@ -3,7 +3,8 @@ use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::select_mode::{Planner, RAEPlanConfig, SelectMode};
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::ompas::scheme::exec::refinement::c_choice::Cost;
 use crate::ompas::scheme::exec::refinement::greedy_select;
 use crate::ompas::scheme::exec::state::ModState;
@@ -140,7 +141,7 @@ pub struct ModRaePlan {
     efficiency: Arc<RwLock<Efficiency>>,
     config: RAEPlanConfig,
     level: Arc<AtomicU64>,
-    domain: Arc<RwLock<OMPASDomain>>,
+    domain: DomainManager,
 }
 
 impl From<ModRaePlan> for Context {
@@ -342,7 +343,7 @@ pub async fn rae_plan_select(
     let new_env = env.clone();
     let ctx = env.get_context::<ModRaePlan>(MOD_RAE_PLAN).unwrap();
 
-    let mut new_env: LEnv = rae_plan_env(new_env, &ctx.domain.read().await.clone()).await;
+    let mut new_env: LEnv = rae_plan_env(new_env, &ctx.domain.get_inner().await).await;
     new_env.import_module(ctx.new_from_tried(greedy.tried.to_vec(), 0), WithoutPrefix);
     new_env.update_context(ModState::new_from_snapshot(state.clone()));
 

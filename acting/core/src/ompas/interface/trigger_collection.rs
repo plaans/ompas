@@ -3,7 +3,7 @@ use crate::ompas::manager::acting::ActionId;
 use ompas_utils::other::get_and_update_id_counter;
 use sompas_structs::lasynchandler::LAsyncHandle;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -16,6 +16,14 @@ pub struct TriggerCollection {
 }
 
 impl TriggerCollection {
+    pub async fn clear(&self) {
+        self.inner.write().await.clear();
+        let n = self.next_id.load(Ordering::Acquire);
+        let _ = self
+            .next_id
+            .compare_exchange(n, 0, Ordering::Acquire, Ordering::Relaxed);
+    }
+
     pub async fn add_task(&self, task_trigger: TaskTrigger) -> usize {
         let id = self.get_next_id();
         self.inner.write().await.insert(id, task_trigger);

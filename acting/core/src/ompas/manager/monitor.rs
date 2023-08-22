@@ -1,3 +1,5 @@
+use crate::ompas::manager::acting::interval::Timepoint;
+use crate::ompas::manager::clock::ClockManager;
 use ompas_language::process::*;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::{LogLevel, ProcessInterface};
@@ -8,9 +10,19 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, oneshot, Mutex};
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct MonitorManager {
     inner: Arc<Mutex<MonitorCollectionInner>>,
+    clock_manager: ClockManager,
+}
+
+impl From<ClockManager> for MonitorManager {
+    fn from(value: ClockManager) -> Self {
+        Self {
+            inner: Default::default(),
+            clock_manager: value,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -34,6 +46,7 @@ impl MonitorManager {
         //println!("new waiter: {}", lambda);
         let w = WaitFor {
             lambda,
+            date: self.clock_manager.now().await,
             channel: tx,
         };
         let id = inner.new_id();
@@ -67,18 +80,18 @@ impl MonitorManager {
     }
 
     pub async fn get_debug(&self) -> String {
-        let lambdas: Vec<LValue> = self
-            .inner
-            .lock()
-            .await
-            .map
-            .values()
-            .map(|v| v.lambda.clone())
-            .collect();
-        let mut str = "'monitor' lambdas: \n".to_string();
-        for l in lambdas {
-            str.push('-');
-            str.push_str(l.to_string().as_str());
+        /*let lambdas: Vec<LValue> = self
+        .inner
+        .lock()
+        .await
+        .map
+        .values()
+        .map(|v| v.lambda.clone())
+        .collect();*/
+        let mut str = "'monitored dynamic expression(s): \n".to_string();
+        for wf in self.inner.lock().await.map.values() {
+            str.push_str(format!("- [{:.^3}]", wf.date).as_str());
+            str.push_str(wf.lambda.to_string().as_str());
             str.push('\n');
         }
         str
@@ -91,6 +104,7 @@ impl MonitorManager {
 
 pub struct WaitFor {
     lambda: LValue,
+    date: Timepoint,
     channel: oneshot::Sender<bool>,
 }
 

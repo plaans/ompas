@@ -1,5 +1,5 @@
-use crate::ompas::scheme::exec::platform::lisp_domain::LispDomain;
-use crate::ompas::scheme::exec::platform::PlatformDescriptor;
+use crate::ompas::manager::platform::lisp_domain::LispDomain;
+use crate::ompas::manager::platform::PlatformDescriptor;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;

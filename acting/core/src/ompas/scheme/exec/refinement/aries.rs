@@ -1,7 +1,7 @@
-use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::manager::acting::process::task::RefinementInner;
 use crate::ompas::manager::acting::ActingManager;
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::planner::problem::PlanningDomain;
 use ompas_middleware::logger::LogClient;
@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 pub struct CtxAries {
     _log: LogClient,
     _acting_manager: ActingManager,
-    _domain: Arc<RwLock<OMPASDomain>>,
+    _domain: DomainManager,
     _pd: Arc<RwLock<Option<PlanningDomain>>>,
 }
 

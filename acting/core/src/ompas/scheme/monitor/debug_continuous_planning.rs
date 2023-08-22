@@ -1,6 +1,6 @@
-use crate::model::acting_domain::OMPASDomain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
+use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::model::ModModel;
@@ -14,13 +14,12 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
-use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub struct ModContinuousPlanning {
     _st: RefSymTable,
-    _domain: Arc<RwLock<OMPASDomain>>,
+    _domain: DomainManager,
 }
 
 impl ModContinuousPlanning {

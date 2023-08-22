@@ -7,7 +7,7 @@ use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::acting::planning::ActingVarRefTable;
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::generate_instances;
 use crate::planning::planner::problem::ChronicleInstance;

@@ -368,8 +368,13 @@ impl Master {
             },
         );
 
-        self.subscribe_to_topic(id, process_topic).await;
-
+        self.subscribe_to_topic(id, process_topic.to_string()).await;
+        let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
+        log.debug(format!(
+            "Creating process {} of topic {}",
+            label, process_topic
+        ))
+        .await;
         ProcessInterface {
             label: label.to_string(),
             id,

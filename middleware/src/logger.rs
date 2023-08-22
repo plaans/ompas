@@ -10,9 +10,10 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use std::{env, fs, mem};
 use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::time::sleep;
 
 fn default_log_directory() -> String {
     format!(
@@ -215,17 +216,37 @@ impl Logger {
                 let path: PathBuf = topic.absolute_path.clone();
                 let topic_name = topic.label.to_string();
                 tokio::spawn(async move {
-                    let child = Command::new("gnome-terminal")
-                        .args(["--title", topic_name.as_str(), "--disable-factory"])
-                        .args(["--", "tail", "-f", path.to_str().unwrap()])
+                    //TODO: Make the terminal opening platform independant
+                    let mut command = Command::new("x-terminal-emulator");
+                    let pid_file = format!("/tmp/pid_logger_{}", Utc::now().timestamp());
+                    command
+                        .args(["--title", topic_name.as_str()])
+                        .args([
+                            "-e",
+                            "echo",
+                            "$$",
+                            ">",
+                            pid_file.as_str(),
+                            ";",
+                            "tail",
+                            "-f",
+                            path.to_str().unwrap(),
+                        ])
                         .stdout(Stdio::null())
-                        .stderr(Stdio::null())
-                        .spawn()
-                        .expect("could not spawn terminal");
+                        .stderr(Stdio::null());
+
+                    command.spawn().expect("could not spawn terminal");
+                    sleep(Duration::from_millis(1000)).await;
+                    let pid = fs::read_to_string(&pid_file)
+                        .unwrap_or_else(|e| panic!("pid_file = {}: {}", pid_file, e));
+                    //println!("pid = {}", pid);
+                    let pid = pid.replace("\n", "");
+                    //println!("pid = {}", pid);
+                    //let pid: i64 = pid.parse().unwrap();
                     killed.recv().await.expect("error on receiver");
-                    //println!("killing rae log process : {}", child.id());
-                    Command::new("pkill")
-                        .args(["-P", child.id().to_string().as_str()])
+                    //println!("killing rae log process : {}", pid);
+                    Command::new("kill")
+                        .args(["-9", pid.as_str()])
                         .spawn()
                         .expect("error on killing process");
                 });

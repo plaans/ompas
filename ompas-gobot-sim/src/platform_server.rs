@@ -1,10 +1,11 @@
-use crate::{PROCESS_TOPIC_GOBOT_SIM, TOKIO_CHANNEL_SIZE};
+use crate::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use ompas_interface::platform_interface::platform_interface_server::PlatformInterface;
 use ompas_interface::platform_interface::{
     CommandRequest, CommandResponse, InitGetUpdate, PlatformUpdate,
 };
 use ompas_language::interface::*;
+use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::{LogLevel, ProcessInterface};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
@@ -31,7 +32,7 @@ impl PlatformInterface for PlatformGobotSimService {
     ) -> Result<Response<Self::GetUpdatesStream>, Status> {
         let mut process = ProcessInterface::new(
             PROCESS_GOBOT_SIM_SERVICE_GET_UPDATES,
-            PROCESS_TOPIC_GOBOT_SIM,
+            PROCESS_TOPIC_OMPAS,
             LOG_TOPIC_PLATFORM,
         )
         .await;
@@ -50,7 +51,7 @@ impl PlatformInterface for PlatformGobotSimService {
                     msg = state_update.recv() => {
                         if let Ok(msg) = msg {
                             if tx.send(Ok(msg)).await.is_err() {
-                                process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                process.kill(PROCESS_TOPIC_OMPAS).await;
                                 break; //process.die();
                             }
                         }
@@ -74,7 +75,7 @@ impl PlatformInterface for PlatformGobotSimService {
     ) -> Result<Response<Self::SendCommandsStream>, Status> {
         let mut process: ProcessInterface = ProcessInterface::new(
             PROCESS_GOBOT_SIM_SERVICE_SEND_COMMANDS,
-            PROCESS_TOPIC_GOBOT_SIM,
+            PROCESS_TOPIC_OMPAS,
             LOG_TOPIC_PLATFORM,
         )
         .await;
@@ -99,7 +100,7 @@ impl PlatformInterface for PlatformGobotSimService {
                         if let Ok(Some(request)) = msg {
                             process.log("Received new command request.", LogLevel::Debug).await;
                             if command_request_to_godot.send(request).await.is_err() {
-                                process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                process.kill(PROCESS_TOPIC_OMPAS).await;
                                 break; //process.die();
                             }
                         }
@@ -107,7 +108,7 @@ impl PlatformInterface for PlatformGobotSimService {
                     msg = command_response_receiver.recv() => {
                         if let Ok(response) = msg {
                             if tx.send(Ok(response)).await.is_err() {
-                                process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                process.kill(PROCESS_TOPIC_OMPAS).await;
                                 break;// process.die();
                             }
                         }

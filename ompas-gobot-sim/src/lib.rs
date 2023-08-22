@@ -9,7 +9,7 @@ pub mod tcp;
 
 /// Const defining the size of the channels.
 const TOKIO_CHANNEL_SIZE: usize = 100;
-const PROCESS_TOPIC_GOBOT_SIM: &str = "__PROCESS_TOPIC_GOBOT_SIM__";
+//const PROCESS_TOPIC_GOBOT_SIM: &str = "__PROCESS_TOPIC_GOBOT_SIM__";
 
 pub const GODOT_PATH: &str = "GODOT3_PATH";
 pub const GODOT_HEADLESS_PATH: &str = "GODOT3_HEADLESS_PATH";

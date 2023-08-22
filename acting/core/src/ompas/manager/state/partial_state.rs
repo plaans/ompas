@@ -1,4 +1,4 @@
-use crate::ompas::manager::state::world_state::StateType;
+use crate::ompas::manager::state::state_manager::StateType;
 use im::HashMap;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;

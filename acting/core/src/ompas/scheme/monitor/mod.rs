@@ -18,11 +18,11 @@ pub mod planning;
 
 use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
-use crate::ompas::interface::rae_options::OMPASOptions;
 use crate::ompas::manager::acting::ActingManager;
-use crate::ompas::scheme::exec::platform::exec_platform::ExecPlatform;
-use crate::ompas::scheme::exec::platform::platform_declaration::PlatformDeclaration;
-use crate::ompas::scheme::exec::platform::Platform;
+use crate::ompas::manager::ompas::OMPASManager;
+use crate::ompas::manager::platform::exec_platform::ExecPlatform;
+use crate::ompas::manager::platform::platform_declaration::PlatformDeclaration;
+use crate::ompas::manager::platform::PlatformManager;
 use crate::ompas::scheme::exec::ModExec;
 use crate::ompas::scheme::monitor::debug_continuous_planning::ModContinuousPlanning;
 use crate::ompas::scheme::monitor::log::ModLog;
@@ -40,11 +40,11 @@ use sompas_structs::lenv::{ImportType, LEnv};
 
 #[derive(Default)]
 pub struct ModMonitor {
-    pub(crate) options: Arc<RwLock<OMPASOptions>>,
+    pub(crate) options: OMPASManager,
     pub acting_manager: ActingManager,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
-    pub(crate) platform: Platform,
+    pub(crate) platform: PlatformManager,
     pub(crate) empty_env: LEnv,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
 }
@@ -82,7 +82,7 @@ impl ModMonitor {
         let platform = match platform.into() {
             PlatformDeclaration::Exec(exec) => {
                 let lisp_domain = exec.read().await.domain().await;
-                Platform::new(
+                PlatformManager::new(
                     module.acting_manager.domain.clone(),
                     module.acting_manager.clone(),
                     Some(
@@ -98,7 +98,7 @@ impl ModMonitor {
                     lisp_domain,
                 )
             }
-            PlatformDeclaration::Simu(s) => Platform::new(
+            PlatformDeclaration::Simu(s) => PlatformManager::new(
                 module.acting_manager.domain.clone(),
                 module.acting_manager.clone(),
                 None,

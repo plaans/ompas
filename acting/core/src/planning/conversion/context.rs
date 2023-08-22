@@ -1,7 +1,7 @@
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use ompas_language::sym_table::{
     TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_OBJECT_TYPE, TYPE_STATE_FUNCTION,
 };

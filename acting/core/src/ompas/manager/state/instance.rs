@@ -1,58 +1,12 @@
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::world_state::StateType;
+use crate::ompas::manager::state::state_manager::StateType;
 use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::TYPE_OBJECT;
 use sompas_structs::list;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
-
-/*#[derive(Default, Clone)]
-pub struct InstanceCollectionSnapshot {
-    pub st: RefSymTable,
-    pub inner: HashMap<String, HashSet<String>>,
-}
-
-impl From<InstanceCollectionSnapshot> for PartialState {
-    fn from(i: InstanceCollectionSnapshot) -> Self {
-        let mut p = PartialState {
-            inner: Default::default(),
-            _type: Some(StateType::Instance),
-        };
-        for (t, set) in i.inner {
-            let v: LValueS = set.iter().cloned().collect::<Vec<_>>().into();
-            p.insert(list![INSTANCE.into(), t.into()].try_into().unwrap(), v);
-        }
-        p
-    }
-}
-
-impl InstanceCollectionSnapshot {
-    pub fn is_of_type(&self, i: &str, t: &str) -> bool {
-        match self.inner.get(t) {
-            Some(set) => set.contains(i),
-            None => false,
-        }
-    }
-
-    pub fn get_instances(&self, t: &str) -> Vec<String> {
-        match self.inner.get(t) {
-            Some(set) => set.iter().cloned().collect(),
-            None => vec![],
-        }
-    }
-}
-
-impl From<InstanceCollectionSnapshot> for InstanceCollection {
-    fn from(value: InstanceCollectionSnapshot) -> Self {
-        Self {
-            st: value.st,
-            inner: value.inner,
-        }
-    }
-}
-*/
 
 #[derive(Clone, Default)]
 pub struct InstanceCollection {

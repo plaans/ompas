@@ -24,6 +24,10 @@ impl RefSymTable {
         self.0.read().unwrap().clone()
     }
 
+    pub fn clear(&self) {
+        self.0.write().unwrap().clear();
+    }
+
     pub fn set_declaration(&self, id: &VarId, timepoint: &VarId) {
         self.0.write().unwrap().set_declaration(id, timepoint)
     }

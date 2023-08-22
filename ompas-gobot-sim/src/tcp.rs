@@ -1,7 +1,6 @@
 use crate::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeCancelRequest, SerdeCommand,
 };
-use crate::PROCESS_TOPIC_GOBOT_SIM;
 use ompas_core::ompas::manager::state::partial_state::PartialState;
 use ompas_interface::platform_interface::command_request::Request;
 use ompas_interface::platform_interface::{
@@ -11,6 +10,7 @@ use ompas_interface::platform_interface::{
 };
 use ompas_interface::platform_interface::{CommandCancelled, ResourceKind};
 use ompas_language::interface::*;
+use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::ProcessInterface;
 use sompas_structs::lvalues::LValueS;
 use std::collections::HashMap;
@@ -63,7 +63,7 @@ async fn async_write_socket(
 ) {
     let mut process = ProcessInterface::new(
         PROCESS_GOBOT_WRITE_TCP,
-        PROCESS_TOPIC_GOBOT_SIM,
+        PROCESS_TOPIC_OMPAS,
         LOG_TOPIC_PLATFORM,
     )
     .await;
@@ -159,7 +159,7 @@ async fn async_read_socket(
 ) {
     let mut process = ProcessInterface::new(
         PROCESS_GOBOT_READ_TCP,
-        PROCESS_TOPIC_GOBOT_SIM,
+        PROCESS_TOPIC_OMPAS,
         LOG_TOPIC_PLATFORM,
     )
     .await;
@@ -185,14 +185,14 @@ async fn async_read_socket(
                 match msg {
                     Ok(_) => {}
                     Err(_) => {
-                        process.kill(PROCESS_TOPIC_PLATFORM).await;
+                        process.kill(PROCESS_TOPIC_OMPAS).await;
                     }//panic!("Error while reading buffer"),
                 };
                 let size = read_size_from_buf(&size_buf);
                 match buf_reader.read_exact(&mut buf[0..size]).await {
                     Ok(_) => {}
                     Err(_) => {
-                        process.kill(PROCESS_TOPIC_PLATFORM).await;
+                        process.kill(PROCESS_TOPIC_OMPAS).await;
                     }
                 };
 
@@ -218,7 +218,7 @@ async fn async_read_socket(
                             for update in updates {
                                 if state_update_sender.send(update).is_err()
                                 {
-                                    process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                    process.kill(PROCESS_TOPIC_OMPAS).await;
                                     break 'outer;
                                 }
                             }
@@ -230,7 +230,7 @@ async fn async_read_socket(
                             for update in updates {
                                 if state_update_sender.send(update).is_err()
                                 {
-                                    process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                    process.kill(PROCESS_TOPIC_OMPAS).await;
                                     break 'outer;
                                 }
                             }
@@ -242,7 +242,7 @@ async fn async_read_socket(
                                         if command_response_sender.send(CommandRejected {
                                                 command_id : ar.temp_id as u64
                                             }.into()).is_err() {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.kill(PROCESS_TOPIC_OMPAS).await;
                                             //process.die().await;
                                             break 'outer;
                                         }
@@ -259,7 +259,7 @@ async fn async_read_socket(
                                                 command_id : ar.temp_id as u64
                                             }.into()).is_err()
                                              {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.kill(PROCESS_TOPIC_OMPAS).await;
                                             //process.die().await;
                                             break 'outer;
                                         }
@@ -277,7 +277,7 @@ async fn async_read_socket(
                                     command_id,
                                     progress: af.feedback
                                 }.into()).is_err() {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.kill(PROCESS_TOPIC_OMPAS).await;
                                             //process.die().await;
                                             break 'outer;
                                         }
@@ -292,7 +292,7 @@ async fn async_read_socket(
                                     command_id,
                                     result: ar.result
                                 }.into()).is_err()  {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.kill(PROCESS_TOPIC_OMPAS).await;
                                             //process.die().await;
                                             break 'outer;
                                         }
@@ -310,7 +310,7 @@ async fn async_read_socket(
                                     command_id,
                                     result: ac.cancelled
                                 }.into()).is_err()  {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.kill(PROCESS_TOPIC_OMPAS).await;
                                             //process.die().await;
                                             break 'outer;
                                         }

@@ -1,23 +1,20 @@
 use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
-use crate::ompas::interface::rae_options::OMPASOptions;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
 use crate::ompas::interface::trigger_collection::{Response, TaskTrigger, TriggerCollection};
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::manager::monitor::task_check_wait_for;
+use crate::ompas::manager::ompas::OMPASManager;
+use crate::ompas::manager::platform::platform_config::PlatformConfig;
+use crate::ompas::manager::platform::PlatformManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::world_state::StateType;
-use crate::ompas::scheme::exec::platform::platform_config::PlatformConfig;
-use crate::ompas::scheme::exec::platform::Platform;
+use crate::ompas::manager::state::state_manager::StateType;
 use crate::ompas::scheme::exec::ModExec;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::ompas::{rae, TOKIO_CHANNEL_SIZE};
-use crate::planning::conversion::context::ConversionContext;
-use crate::planning::conversion::convert_acting_domain;
-use crate::planning::planner::problem::PlanningDomain;
 use crate::planning::planner::solver::PMetric;
 use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
 use ompas_language::monitor::control::*;
@@ -44,17 +41,15 @@ use sompas_structs::{lruntimeerror, wrong_type};
 use std::mem;
 use std::sync::Arc;
 use std::time::Duration;
-use std::time::Instant;
 use tokio::sync::{mpsc, RwLock};
 
 pub struct ModControl {
-    pub(crate) options: Arc<RwLock<OMPASOptions>>,
+    pub(crate) options: OMPASManager,
     pub acting_manager: ActingManager,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
-    pub(crate) platform: Platform,
+    pub(crate) platform: PlatformManager,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
-    pub(crate) pd: Arc<RwLock<Option<PlanningDomain>>>,
     pub(crate) triggers: TriggerCollection,
 }
 
@@ -67,49 +62,8 @@ impl ModControl {
             task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
             tasks_to_execute: monitor.tasks_to_execute.clone(),
-            pd: Arc::new(Default::default()),
             triggers: Default::default(),
         }
-    }
-
-    pub async fn convert_domain(&self) {
-        let select_mode = *self.options.read().await.get_select_mode();
-
-        let pd: Option<PlanningDomain> =
-            if matches!(select_mode, SelectMode::Planning(Planner::Aries(_))) {
-                let instant = Instant::now();
-                match convert_acting_domain(&ConversionContext::new(
-                    self.acting_manager.domain.read().await.clone(),
-                    self.acting_manager.st.clone(),
-                    self.acting_manager.state.get_snapshot().await,
-                    self.get_exec_env().await,
-                ))
-                .await
-                {
-                    Ok(r) => {
-                        self.log
-                            .info(format!(
-                                "Conversion time: {:.3} ms",
-                                instant.elapsed().as_micros() as f64 / 1000.0
-                            ))
-                            .await;
-                        Some(r)
-                    }
-                    Err(e) => {
-                        self.options
-                            .write()
-                            .await
-                            .set_select_mode(SelectMode::Greedy);
-                        self.log
-                            .warn(format!("Cannot plan with the domain...{e}"))
-                            .await;
-                        None
-                    }
-                }
-            } else {
-                None
-            };
-        *self.pd.write().await = pd;
     }
 
     pub async fn get_exec_env(&self) -> LEnv {
@@ -137,8 +91,7 @@ impl ModControl {
         env.import_module(ModExec::new(self).await, WithoutPrefix);
         eval_init(&mut env).await;
 
-        let domain_exec_symbols: LEnvSymbols =
-            self.acting_manager.domain.read().await.get_exec_env();
+        let domain_exec_symbols: LEnvSymbols = self.acting_manager.domain.get_exec_env().await;
 
         env.set_new_top_symbols(domain_exec_symbols);
 
@@ -147,6 +100,13 @@ impl ModControl {
 
     pub async fn get_sender(&self) -> Option<tokio::sync::mpsc::Sender<OMPASJob>> {
         self.task_stream.read().await.clone()
+    }
+
+    pub async fn reboot(&self) {
+        self.acting_manager.clear().await;
+        self.triggers.clear().await;
+        *self.task_stream.write().await = None;
+        self.tasks_to_execute.write().await.clear();
     }
 }
 
@@ -248,6 +208,7 @@ impl From<ModControl> for LModule {
 pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let acting_manager = ctx.acting_manager.clone();
+    acting_manager.clock_manager.reset().await;
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
         &mut *ctx.tasks_to_execute.write().await,
@@ -274,10 +235,6 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
         rae(acting_manager, log, env, rx).await;
     });
 
-    /*if ctx.interface.log.display {
-        ompas_log::display_logger(killer.subscribe(), ctx.interface.log.path.clone());
-    }*/
-
     for t in tasks_to_execute {
         ctx.task_stream
             .read()
@@ -296,7 +253,6 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
 #[async_scheme_fn]
 pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
-    //let mut context: ConversionContext = ctx.get_conversion_context().await;
     let plan_env: LEnv = ctx.get_plan_env().await;
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let acting_manager = ctx.acting_manager.clone();
@@ -329,10 +285,6 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
         rae(acting_manager, log, env, rx).await;
     });
 
-    /*if ctx.interface.log.display {
-        ompas_log::display_logger(killer.subscribe(), ctx.interface.log.path.clone());
-    }*/
-
     for t in tasks_to_execute {
         ctx.task_stream
             .read()
@@ -359,8 +311,7 @@ pub async fn stop(env: &LEnv) {
     ctx.platform.stop().await;
 
     tokio::time::sleep(Duration::from_secs(1)).await; //hardcoded moment to wait for all process to be killed.
-    *ctx.task_stream.write().await = None;
-    ctx.acting_manager.clear().await;
+    ctx.reboot().await;
 }
 
 /// Sends via a channel a task to execute.
@@ -399,7 +350,7 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntime
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let task = args[0].to_string();
-    if !ctx.acting_manager.domain.read().await.is_task(&task) {
+    if !ctx.acting_manager.domain.is_task(&task).await {
         return Err(LRuntimeError::new(
             TRIGGER_TASK,
             format!("{} is not a task.", task),
@@ -436,7 +387,7 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
     let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
     let task = args[0].to_string();
 
-    if !ctx.acting_manager.domain.read().await.is_task(&task) {
+    if !ctx.acting_manager.domain.is_task(&task).await {
         return Err(LRuntimeError::new(
             ADD_TASK_TO_EXECUTE,
             format!("{} is not a task.", task),
@@ -545,7 +496,7 @@ pub async fn get_config_platform(env: &LEnv) -> Result<String, LRuntimeError> {
 pub async fn get_select(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    ctx.options.read().await.get_select_mode().to_string()
+    ctx.options.get_select_mode().await.to_string()
 }
 
 #[async_scheme_fn]
@@ -572,7 +523,7 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
         }
     };
 
-    ctx.options.write().await.set_select_mode(select_mode);
+    ctx.options.set_select_mode(select_mode).await;
     Ok(())
 }
 
@@ -673,32 +624,28 @@ pub async fn get_monitors(env: &LEnv) -> LResult {
 #[async_scheme_fn]
 pub async fn get_commands(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.acting_manager.domain.read().await.get_list_commands())
+    Ok(ctx.acting_manager.domain.get_list_commands().await)
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
 pub async fn get_tasks(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.acting_manager.domain.read().await.get_list_tasks())
+    Ok(ctx.acting_manager.domain.get_list_tasks().await)
 }
 
 ///Get the methods of a given task
 #[async_scheme_fn]
 pub async fn get_methods(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.acting_manager.domain.read().await.get_list_methods())
+    Ok(ctx.acting_manager.domain.get_list_methods().await)
 }
 
 ///Get the list of state functions in the environment
 #[async_scheme_fn]
 pub async fn get_state_functions(env: &LEnv) -> LValue {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.acting_manager
-        .domain
-        .read()
-        .await
-        .get_list_state_functions()
+    ctx.acting_manager.domain.get_list_state_functions().await
 }
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
@@ -718,13 +665,12 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     match key {
-        None => Ok(ctx.acting_manager.domain.read().await.to_string().into()),
+        None => Ok(ctx.acting_manager.domain.format().await.into()),
         Some(key) => Ok(ctx
             .acting_manager
             .domain
-            .read()
-            .await
             .get_element_description(key.as_ref())
+            .await
             .into()),
     }
 }

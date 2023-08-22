@@ -20,7 +20,7 @@ pub enum StateType {
 }
 
 #[derive(Clone)]
-pub struct WorldState {
+pub struct StateManager {
     r#static: Arc<RwLock<PartialState>>,
     dynamic: Arc<RwLock<PartialState>>,
     inner_static: Arc<RwLock<PartialState>>,
@@ -29,13 +29,13 @@ pub struct WorldState {
     sem_update: Arc<Mutex<Option<broadcast::Sender<bool>>>>,
 }
 
-impl Default for WorldState {
+impl Default for StateManager {
     fn default() -> Self {
         Self::new(RefSymTable::default())
     }
 }
 
-impl WorldState {
+impl StateManager {
     pub fn new(st: RefSymTable) -> Self {
         Self {
             r#static: Arc::new(Default::default()),
@@ -87,7 +87,7 @@ impl WorldStateSnapshot {
     }
 }
 
-impl From<WorldStateSnapshot> for WorldState {
+impl From<WorldStateSnapshot> for StateManager {
     fn from(w: WorldStateSnapshot) -> Self {
         Self {
             r#static: Arc::new(RwLock::new(w.r#static)),
@@ -134,7 +134,7 @@ impl From<WorldStateSnapshot> for LValue {
 
 const RAE_STATE_SEM_UPDATE_CHANNEL_SIZE: usize = 64;
 
-impl WorldState {
+impl StateManager {
     pub async fn add_type(&self, t: &str, p: Option<&str>) {
         self.instance.write().await.add_type(t, p);
     }

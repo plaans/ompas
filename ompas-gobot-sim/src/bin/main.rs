@@ -1,6 +1,6 @@
 use std::fs;
 //use ompas_gobotsim::mod_godot::CtxGodot;
-use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::manager::platform::lisp_domain::LispDomain;
 use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_core::{OMPAS_DEBUG_ON, OMPAS_LOG_ON};
 use ompas_gobotsim::default_gobot_sim_domain;

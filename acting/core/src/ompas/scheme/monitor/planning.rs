@@ -10,7 +10,8 @@ use crate::ompas::manager::acting::planning::problem_update::ExecutionProblem;
 use crate::ompas::manager::acting::planning::{
     encode, extract_choices, populate_problem, ActingVarRefTable,
 };
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::model::ModModel;
@@ -41,7 +42,7 @@ pub struct ModPlanning {
     goals: Arc<RwLock<Vec<Goal>>>,
     tasks: Arc<RwLock<Vec<NewTask>>>,
     _st: RefSymTable,
-    _domain: Arc<RwLock<OMPASDomain>>,
+    _domain: DomainManager,
 }
 
 impl ModPlanning {
@@ -184,7 +185,7 @@ pub async fn __plan(
     env.update_context(ModState::new_from_snapshot(state));
     let opt = if opt { Some(PMetric::Makespan) } else { None };
     let st = acting_manager.st.clone();
-    let domain: OMPASDomain = acting_manager.domain.read().await.clone();
+    let domain: OMPASDomain = acting_manager.domain.get_inner().await;
     add_domain_symbols(&st, &domain);
 
     let mut state = acting_manager.state.get_snapshot().await;

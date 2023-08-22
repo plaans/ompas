@@ -30,7 +30,7 @@ pub mod scheme;
 
 pub type ReactiveTriggerId = usize;
 
-pub const PROCESS_MAIN: &str = "__PROCESS_MAIN__";
+pub const PROCESS_OMPAS_MAIN: &str = "__PROCESS_OMPAS_MAIN__";
 
 /// Main RAE Loop:
 /// Receives Job to handle in separate tasks.
@@ -41,7 +41,7 @@ pub async fn rae(
     mut command_rx: Receiver<OMPASJob>,
 ) {
     let mut process =
-        ProcessInterface::new(PROCESS_MAIN, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
+        ProcessInterface::new(PROCESS_OMPAS_MAIN, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
 
     let mut killers = vec![];
 

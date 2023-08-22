@@ -1,16 +1,15 @@
 use ompas_language::interface::{
     LOG_TOPIC_PLATFORM, PROCESS_GET_UPDATES, PROCESS_SEND_COMMANDS, PROCESS_START_PLATFORM,
-    PROCESS_TOPIC_PLATFORM,
 };
 
 use crate::ompas::manager::acting::ActingManager;
+use crate::ompas::manager::platform::lisp_domain::LispDomain;
+use crate::ompas::manager::platform::platform_config::PlatformConfig;
+use crate::ompas::manager::platform::PlatformDescriptor;
 use crate::ompas::manager::resource::Capacity;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::world_state::StateType;
-use crate::ompas::scheme::exec::platform::lisp_domain::LispDomain;
-use crate::ompas::scheme::exec::platform::platform_config::PlatformConfig;
-use crate::ompas::scheme::exec::platform::PlatformDescriptor;
+use crate::ompas::manager::state::state_manager::StateType;
 use crate::ompas::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use ompas_interface::platform_interface::command_request::Request;
@@ -26,7 +25,7 @@ use ompas_interface::platform_interface::{
 };
 use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::{Master, ProcessInterface};
+use ompas_middleware::ProcessInterface;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
@@ -52,8 +51,8 @@ impl ExecPlatform {
         log: LogClient,
         config: Arc<RwLock<PlatformConfig>>,
     ) -> Self {
-        Master::set_child_process(PROCESS_TOPIC_PLATFORM, PROCESS_TOPIC_OMPAS).await;
-        Master::set_child_process(PROCESS_TOPIC_OMPAS, PROCESS_TOPIC_PLATFORM).await;
+        //Master::set_child_process(PROCESS_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS).await;
+        //Master::set_child_process(PROCESS_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS).await;
 
         Self {
             inner,
@@ -103,19 +102,16 @@ impl ExecPlatform {
             .unwrap()
             .send(request)
             .await
-            .unwrap_or_else(|_| todo!());
+            .unwrap_or_else(|e| panic!("{}", e));
     }
 
     async fn get_updates(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
         acting_manager: ActingManager,
     ) {
-        let mut process_interface: ProcessInterface = ProcessInterface::new(
-            PROCESS_GET_UPDATES,
-            PROCESS_TOPIC_PLATFORM,
-            LOG_TOPIC_PLATFORM,
-        )
-        .await;
+        let mut process_interface: ProcessInterface =
+            ProcessInterface::new(PROCESS_GET_UPDATES, PROCESS_TOPIC_OMPAS, LOG_TOPIC_PLATFORM)
+                .await;
         let request = tonic::IntoRequest::into_request(InitGetUpdate {});
 
         process_interface.log_info("Initiating update stream").await;
@@ -126,7 +122,7 @@ impl ExecPlatform {
                 process_interface
                     .log_error(format!("Error starting update stream: {e}"))
                     .await;
-                process_interface.kill(PROCESS_TOPIC_PLATFORM).await;
+                process_interface.kill(PROCESS_TOPIC_OMPAS).await;
                 return;
             }
         };
@@ -145,7 +141,7 @@ impl ExecPlatform {
                         }
                         Ok(None) => {
                             process_interface.log_error("Grpc stream closed").await;
-                            process_interface.kill(PROCESS_TOPIC_PLATFORM).await;
+                            process_interface.kill(PROCESS_TOPIC_OMPAS).await;
                         }
                         Ok(Some(msg)) => {
                             if let Some(update) =  msg.update {
@@ -225,7 +221,7 @@ impl ExecPlatform {
     ) {
         let mut process = ProcessInterface::new(
             PROCESS_SEND_COMMANDS,
-            PROCESS_TOPIC_PLATFORM,
+            PROCESS_TOPIC_OMPAS,
             LOG_TOPIC_PLATFORM,
         )
         .await;
@@ -239,7 +235,7 @@ impl ExecPlatform {
                 process
                     .log_error(format!("Error starting command stream: {e}"))
                     .await;
-                process.kill(PROCESS_TOPIC_PLATFORM).await;
+                process.kill(PROCESS_TOPIC_OMPAS).await;
                 return;
             }
         };
@@ -257,7 +253,7 @@ impl ExecPlatform {
                         }
                         Ok(None) => {
                             process.log_error("Grpc stream closed").await;
-                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                            process.kill(PROCESS_TOPIC_OMPAS).await;
                         }
                         Ok(Some(command_response)) => {
                             let command_response: CommandResponse = command_response;
@@ -311,7 +307,7 @@ impl PlatformDescriptor for ExecPlatform {
     async fn start(&self, _: PlatformConfig) {
         let process = ProcessInterface::new(
             PROCESS_START_PLATFORM,
-            PROCESS_TOPIC_PLATFORM,
+            PROCESS_TOPIC_OMPAS,
             LOG_TOPIC_PLATFORM,
         )
         .await;
@@ -333,7 +329,7 @@ impl PlatformDescriptor for ExecPlatform {
                     process
                         .log_error(format!("Error connecting to client: {:?}", e))
                         .await;
-                    process.kill(PROCESS_TOPIC_PLATFORM).await;
+                    process.kill(PROCESS_TOPIC_OMPAS).await;
                     return;
                 }
             };

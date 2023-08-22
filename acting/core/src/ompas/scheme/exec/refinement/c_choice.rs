@@ -2,7 +2,8 @@ use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::select_mode::{CChoiceConfig, Planner, SelectMode};
 use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::ompas::scheme::exec::refinement::greedy_select;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::exec::ModExec;
@@ -33,7 +34,7 @@ pub struct ModCChoice {
     cost: Arc<RwLock<Cost>>,
     config: CChoiceConfig,
     level: Arc<AtomicU64>,
-    domain: Arc<RwLock<OMPASDomain>>,
+    domain: DomainManager,
 }
 
 impl From<ModCChoice> for Context {
@@ -143,7 +144,7 @@ impl ModCChoice {
             cost: Arc::new(RwLock::new(Cost::Some(0.0))),
             config: Default::default(),
             level: Arc::new(AtomicU64::new(level)),
-            domain: Arc::new(Default::default()),
+            domain: Default::default(),
         }
     }
 }
@@ -315,7 +316,7 @@ pub async fn c_choice_select(
     let new_env = env.clone();
     let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE).unwrap();
 
-    let mut new_env: LEnv = c_choice_env(new_env, &ctx.domain.read().await.clone()).await;
+    let mut new_env: LEnv = c_choice_env(new_env, &ctx.domain.get_inner().await).await;
     new_env.import_module(
         ModCChoice::new_from_tried(greedy.tried.to_vec(), 0),
         WithoutPrefix,
@@ -327,13 +328,15 @@ pub async fn c_choice_select(
     });
     let method: LValue = eval(&greedy.task_value, &mut new_env, None).await?;
 
+    let now = env
+        .get_context::<ModExec>(MOD_EXEC)
+        .unwrap()
+        .acting_manager
+        .clock_manager
+        .now()
+        .await;
     greedy.method_value = method;
-    greedy.interval.set_end(
-        env.get_context::<ModExec>(MOD_EXEC)
-            .unwrap()
-            .acting_manager
-            .instant(),
-    );
+    greedy.interval.set_end(now);
 
     Ok(greedy)
 }

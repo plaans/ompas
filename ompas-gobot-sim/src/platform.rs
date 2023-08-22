@@ -1,21 +1,19 @@
+use crate::default_gobot_sim_path;
 use crate::platform_server::PlatformGobotSimService;
 use crate::tcp::task_tcp_connection;
 use crate::TOKIO_CHANNEL_SIZE;
-use crate::{default_gobot_sim_path, PROCESS_TOPIC_GOBOT_SIM};
 use async_trait::async_trait;
-use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
-use ompas_core::ompas::scheme::exec::platform::platform_config::{
-    InnerPlatformConfig, PlatformConfig,
-};
-use ompas_core::ompas::scheme::exec::platform::PlatformDescriptor;
+use ompas_core::ompas::manager::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::manager::platform::platform_config::{InnerPlatformConfig, PlatformConfig};
+use ompas_core::ompas::manager::platform::PlatformDescriptor;
 use ompas_core::ompas_path;
 use ompas_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
 use ompas_language::interface::{
     DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT, LOG_TOPIC_PLATFORM,
-    PROCESS_TOPIC_PLATFORM,
 };
+use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::ProcessInterface;
+use ompas_middleware::{LogLevel, ProcessInterface};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
@@ -137,18 +135,13 @@ impl PlatformGobotSim {
             },
         };
 
-        let mut process = ProcessInterface::new(
-            PROCESS_GOBOT_SIM,
-            PROCESS_TOPIC_GOBOT_SIM,
-            LOG_TOPIC_PLATFORM,
-        )
-        .await;
+        let mut process =
+            ProcessInterface::new(PROCESS_GOBOT_SIM, PROCESS_TOPIC_OMPAS, LOG_TOPIC_PLATFORM).await;
 
         tokio::spawn(async move {
-            //blocked on the reception of the end signal.
             process.recv().await.expect("error receiving kill message");
             child.kill().expect("could not kill godot");
-            //process.die().await;
+            process.log("Godot simulator killed", LogLevel::Info).await;
         });
         Ok(LValue::Nil)
     }
@@ -168,12 +161,9 @@ impl PlatformGobotSim {
         };
         let server_info: SocketAddr = self.socket().await;
         tokio::spawn(async move {
-            let mut process = ProcessInterface::new(
-                PROCESS_SERVER_GRPC,
-                PROCESS_TOPIC_PLATFORM,
-                LOG_TOPIC_PLATFORM,
-            )
-            .await;
+            let mut process =
+                ProcessInterface::new(PROCESS_SERVER_GRPC, PROCESS_TOPIC_OMPAS, LOG_TOPIC_PLATFORM)
+                    .await;
 
             //println!("Serving : {}", server_info);
             let server = Server::builder().add_service(PlatformInterfaceServer::new(service));
@@ -357,9 +347,7 @@ impl PlatformDescriptor for PlatformGobotSim {
     }
 
     async fn stop(&self) {
-        self.log
-            .info("Process Gobot-Sim killed via subscriptions of its different processes.")
-            .await;
+        //
     }
 
     async fn domain(&self) -> LispDomain {

@@ -1,6 +1,6 @@
 use crate::ompas::manager::resource::WaiterPriority::{Execution, Planner};
 use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::world_state::{StateType, WorldStateSnapshot};
+use crate::ompas::manager::state::state_manager::{StateType, WorldStateSnapshot};
 use im::HashSet;
 use itertools::Itertools;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
@@ -367,7 +367,6 @@ impl ResourceManager {
     pub async fn clear(&self) {
         *self.inner.lock().await = Default::default();
         assert!(self.inner.lock().await.is_empty());
-        println!("mutex map cleared");
     }
 
     async fn get_id(&self, label: &str) -> Option<ResourceId> {

@@ -86,6 +86,10 @@ impl Default for SymTable {
 }
 
 impl SymTable {
+    pub fn clear(&mut self) {
+        *self = Self::new_from(self.lattice.clone())
+    }
+
     pub fn new_from(lattice: TypeLattice) -> Self {
         let mut st = Self {
             domains: Default::default(),

@@ -13,7 +13,7 @@
     (def-state-function pos (:params (o object)) (:result position))
     (def-state-function emergency_handling (:params (r robot)) (:result bool))
     (def-state-function view (:params (l location)) (:result bool))
-    (def-static-state-function containers (:params (l location)) (:result (list object)))
+    (def-function containers (:params (l location)) (:result (list object)))
 
 
     (def-prob

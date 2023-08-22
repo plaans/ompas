@@ -11,7 +11,7 @@
     (def-state-function occupied (:params (o object)) (:result bool))
     (def-state-function owe (:params (a agent)) (:result float))
     (def-state-function cash (:params (a agent)) (:result float))
-    (def-static-state-function dist (:params (l1 location) (l2 location)) (:result int))
+    (def-function dist (:params (l1 location) (l2 location)) (:result int))
     ;commands
     (def-command walk 
         (:params (a agent) (x location) (y location))

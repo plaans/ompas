@@ -4,5 +4,5 @@
     (read planning_domain/lambdas.lisp)
     (read planning_domain/plan_model_debug.lisp)
     (read planning_domain/problems/p1_debug.lisp)
-    (plan-task t_jobshop)
+    (plan t_jobshop)
 )

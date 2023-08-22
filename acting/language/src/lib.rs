@@ -528,8 +528,8 @@ pub mod monitor {
         pub const ADD_STATE_FUNCTION: &str = "add-state-function";
         pub const DOC_ADD_STATE_FUNCTION: &str = "Add a state function to the domain. The state-function is defined by a label, typed parameters and a type for the result.";
 
-        pub const ADD_STATIC_STATE_FUNCTION: &str = "add-static-state-function";
-        pub const DOC_ADD_STATIC_STATE_FUNCTION: &str = "Add a state function to the domain. The state-function is defined by a label, typed parameters and a type for the result.";
+        pub const ADD_FUNCTION: &str = "add-function";
+        pub const DOC_ADD_FUNCTION: &str = "Add a state function to the domain. The state-function is defined by a label, typed parameters and a type for the result.";
 
         pub const ADD_COMMAND: &str = "add-command";
         pub const DOC_ADD_COMMAND: &str= "Add a command to the domain. A command is defined by a label, typed parameters and an optional model.";
@@ -604,12 +604,12 @@ pub mod monitor {
             `(add-state-function (map 
                 (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
 
-        pub const DEF_STATIC_STATE_FUNCTION: &str = "def-static-state-function";
-        pub const DOC_DEF_STATIC_STATE_FUNCTION: &str =
-            "Wrapper around add-state-function to ease the definition of new state-function.";
-        pub const DOC_DEF_STATIC_STATE_FUNCTION_VERBOSE: &str =
+        pub const DEF_FUNCTION: &str = "def-function";
+        pub const DOC_DEF_FUNCTION: &str =
+            "Wrapper around add-function to ease the definition of new state-function.";
+        pub const DOC_DEF_FUNCTION_VERBOSE: &str =
             "Example: (def-state-function at (:params (?r robot)) (:result location))";
-        pub const MACRO_DEF_STATIC_STATE_FUNCTION: &str = "(lambda attributes
+        pub const MACRO_DEF_FUNCTION: &str = "(lambda attributes
         (let ((label (car attributes))
                 (attributes (cdr attributes)))
 
@@ -620,7 +620,7 @@ pub mod monitor {
                  (cons 
                         (cons (caar l) (list (cdar l)))
                         (__l__ (cdr l))))))
-            `(add-static-state-function (map 
+            `(add-function (map 
                 (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
 
         pub const DEF_COMMAND: &str = "def-command";

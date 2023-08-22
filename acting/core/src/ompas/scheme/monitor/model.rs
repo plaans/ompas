@@ -94,12 +94,7 @@ impl From<ModModel> for LModule {
             DOC_ADD_STATE_FUNCTION,
             false,
         );
-        module.add_async_fn(
-            ADD_STATIC_STATE_FUNCTION,
-            add_static_state_function,
-            DOC_ADD_STATIC_STATE_FUNCTION,
-            false,
-        );
+        module.add_async_fn(ADD_FUNCTION, add_function, DOC_ADD_FUNCTION, false);
         module.add_async_fn(ADD_COMMAND, add_command, DOC_ADD_COMMAND, false);
         module.add_async_fn(
             ADD_COMMAND_MODEL,
@@ -134,8 +129,8 @@ impl From<ModModel> for LModule {
         );
 
         module.add_macro(
-            DEF_STATIC_STATE_FUNCTION,
-            MACRO_DEF_STATIC_STATE_FUNCTION,
+            DEF_FUNCTION,
+            MACRO_DEF_FUNCTION,
             (DOC_DEF_STATE_FUNCTION, DOC_DEF_STATE_FUNCTION_VERBOSE),
         );
         module.add_macro(
@@ -325,7 +320,7 @@ pub async fn add_state_function(
 
 /// Defines a state function in RAE environment.
 #[async_scheme_fn]
-pub async fn add_static_state_function(
+pub async fn add_function(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {

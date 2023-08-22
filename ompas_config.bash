@@ -6,7 +6,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 export OMPAS_CHRONICLE_DEBUG=full
 
 # print the plan formatted for the acting tree
-export OMPAS_PLAN_OUTPUT=false
+export OMPAS_PLAN_OUTPUT=true
 
 # activate the debug of OMPAS
 export OMPAS_DEBUG=false

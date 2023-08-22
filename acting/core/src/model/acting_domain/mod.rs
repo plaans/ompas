@@ -292,40 +292,20 @@ impl OMPASDomain {
 
     pub fn get_exec_env(&self) -> LEnvSymbols {
         let mut env = self.env.clone();
-        /*let mut map_task_method: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_score: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_types: HashMap<LValue, LValue> = Default::default();
-        let mut map_action_model: HashMap<LValue, LValue> = Default::default();*/
 
         //Add all tasks to env:
         for (label, task) in self.get_tasks() {
             env.insert(label.clone(), task.get_body().clone());
-            //map_task_method.insert(label.into(), task.get_methods().into());
         }
 
         //Add all methods to env:
-
         for (label, method) in self.get_methods() {
             env.insert(label.to_string(), method.lambda_body.clone());
-            /*map_method_pre_conditions.insert(
-                label.to_string().into(),
-                method.lambda_pre_conditions.clone(),
-            );
-            map_method_score.insert(label.to_string().into(), method.lambda_score.clone());
-            map_method_types.insert(
-                label.to_string().into(),
-                method.parameters.get_types_as_lvalue(),
-            );*/
         }
 
         //Add all actions to env:
         for (label, action) in self.get_commands() {
             env.insert(label.clone(), action.get_body().clone());
-            /*map_action_model.insert(
-                label.into(),
-                action.get_model(&ModelKind::PlantModel).unwrap().clone(),
-            );*/
         }
 
         //Add all state functions to env:
@@ -337,32 +317,6 @@ impl OMPASDomain {
         for (label, lambda) in self.get_lambdas() {
             env.insert(label.clone(), lambda.clone())
         }
-
-        /*env.insert(__COMMANDS_LIST__.to_string(), self.get_list_commands());
-        env.insert(__METHODS_LIST__.to_string(), self.get_list_methods());
-        env.insert(__TASKS_LIST__.to_string(), self.get_list_tasks());
-        env.insert(
-            __STATE_FUNCTION_LIST__.to_string(),
-            self.get_list_state_functions(),
-        );
-        env.insert(
-            __SYMBOL_TYPE__.to_string(),
-            self.get_map_symbol_type().into(),
-        );
-        /*env.insert(
-            RAE_METHOD_GENERATOR_MAP.to_string(),
-            map_method_generator.into(),
-        );*/
-        env.insert(__TASKS_METHODS_MAP__.to_string(), map_task_method.into());
-        env.insert(__METHOD_TYPES_MAP__.to_string(), map_method_types.into());
-        env.insert(
-            __METHOD_PRE_CONDITIONS_MAP__.to_string(),
-            map_method_pre_conditions.into(),
-        );
-
-        env.insert(__METHOD_SCORE_MAP__.to_string(), map_method_score.into());
-
-        env.insert(__COMMAND_MODEL_MAP__.to_string(), map_action_model.into());*/
 
         env
     }

@@ -33,19 +33,6 @@ impl Method {
     pub fn get_label(&self) -> &str {
         &self.label
     }
-    /*pub fn get_lambda(&self) -> LValue {
-        let l1: LLambda = self.lambda_pre_conditions.borrow().try_into().expect("");
-        let l2: LLambda = self.lambda_body.borrow().try_into().expect("");
-        let body: LValue = vec![
-            LCoreOperator::Do.into(),
-            l1.get_body().clone(),
-            l2.get_body().clone(),
-        ]
-        .into();
-        let mut env = l1.get_env_symbols();
-        env.set_outer(l2.get_env_symbols());
-        LLambda::new(l1.get_params(), body, env).into()
-    }*/
 }
 
 impl Method {

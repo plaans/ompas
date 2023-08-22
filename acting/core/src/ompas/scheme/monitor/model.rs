@@ -310,7 +310,8 @@ pub async fn add_state_function(
         }
     );
     let body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
-    let state_function = StateFunction::new(label.to_string(), params, result, body);
+    let result_debug = st.format_domain(&result);
+    let state_function = StateFunction::new(label.to_string(), params, result, result_debug, body);
     ctx.domain
         .write()
         .await
@@ -359,7 +360,8 @@ pub async fn add_function(
         }
     );
     let body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
-    let state_function = StateFunction::new(label.to_string(), params, result, body);
+    let result_debug = st.format_domain(&result);
+    let state_function = StateFunction::new(label.to_string(), params, result, result_debug, body);
     ctx.domain
         .write()
         .await

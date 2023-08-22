@@ -166,18 +166,6 @@ impl OMPASDomain {
         self.env.insert(label, value);
     }
 
-    /*pub async fn add_type(&mut self, t: String, p: Option<String>) {
-        let parents: Vec<TypeId> = vec![self
-            .lattice
-            .get_type_id(match p {
-                Some(p) => p.to_string(),
-                None => TYPE_OBJECT.to_string(),
-            })
-            .await
-            .unwrap()];
-        self.lattice.add_type(t, parents).await;
-    }*/
-
     //List of symbols
     pub fn get_list_tasks(&self) -> LValue {
         self.tasks
@@ -222,32 +210,6 @@ impl OMPASDomain {
     pub fn get_map_symbol_type(&self) -> &HashMap<String, String> {
         &self.map_symbol_type
     }
-
-    /*pub async fn get_parents(&self, t: &str) -> Vec<String> {
-        let id: &TypeId = &self.lattice.get_type_id(t).await.unwrap();
-        let mut parents: Vec<TypeId> = self.lattice.get_parents(id).await;
-
-        let mut new_parents = vec![];
-
-        for p in parents.drain(..) {
-            new_parents.push(self.lattice.format_type(&p).await)
-        }
-
-        new_parents
-    }*/
-
-    /*pub async fn get_childs(&self, t: &str) -> Vec<String> {
-        let id = &self.lattice.get_type_id(t).await.unwrap();
-        let mut childs: Vec<TypeId> = self.lattice.get_all_childs(id).await;
-
-        let mut new_childs = vec![];
-
-        for p in childs.drain(..) {
-            new_childs.push(self.lattice.format_type(&p).await)
-        }
-
-        new_childs
-    }*/
 
     //Displayers
     pub fn print_tasks(&self) -> String {

@@ -509,8 +509,8 @@ pub mod monitor {
         pub const NEW_TASK: &str = "cp.new-task";
         pub const DOC_NEW_TASK: &str = "Simulates a new task to face.";
 
-        pub const NEW_INSTANTIATION: &str = "cp.new-instantiation";
-        pub const DOC_NEW_INSTANTIATION: &str = "Simulates the instantiation of a variable.";
+        pub const SET_START: &str = "cp.set-start";
+        pub const DOC_SET_START: &str = "Simulates the instantiation of the start of a task.";
 
         pub const NEW_EVENT: &str = "cp.new-event";
         pub const DOC_NEW_EVENT: &str = "Simulates the occurrence of a new event.";

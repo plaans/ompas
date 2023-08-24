@@ -13,6 +13,8 @@ pub const OMPAS_DEBUG: &str = "OMPAS_DEBUG";
 pub const OMPAS_PATH: &str = "OMPAS_PATH";
 pub const OMPAS_LOG: &str = "OMPAS_LOG";
 pub const OMPAS_PLAN_ENCODING_OPTIMIZATION: &str = "OMPAS_PLAN_ENCODING_OPTIMIZATION";
+pub const OMPAS_DELIBERATION_FREQUENCY: &str = "OMPAS_DELIBERATION_FREQUENCY";
+pub const OMPAS_DEFAULT_FREQUENCY: &str = "1";
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum ChronicleDebug {
@@ -41,6 +43,8 @@ pub static OMPAS_LOG_ON: EnvParam<bool> = EnvParam::new(OMPAS_LOG, "false");
 static OMPAS_PLAN_OUTPUT_ON: EnvParam<bool> = EnvParam::new(OMPAS_PLAN_OUTPUT, "false");
 static OMPAS_PLAN_ENCODING_OPTIMIZATION_ON: EnvParam<bool> =
     EnvParam::new(OMPAS_PLAN_ENCODING_OPTIMIZATION, "true");
+static OMPAS_FREQUENCY: EnvParam<u64> =
+    EnvParam::new(OMPAS_DELIBERATION_FREQUENCY, OMPAS_DEFAULT_FREQUENCY);
 
 pub fn ompas_path() -> String {
     if let Ok(s) = std::env::var(OMPAS_PATH) {

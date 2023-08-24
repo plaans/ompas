@@ -6,11 +6,10 @@ use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::interval::Interval;
-use crate::ompas::manager::acting::planning::problem_update::ExecutionProblem;
-use crate::ompas::manager::acting::planning::{
-    encode, extract_choices, populate_problem, ActingVarRefTable,
-};
 use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
+use crate::ompas::manager::planning::problem_update::ExecutionProblem;
+use crate::ompas::manager::planning::{encode, extract_choices, populate_problem};
 use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
@@ -114,7 +113,7 @@ async fn _plan_in_ompas(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
     env.update_context(ModState::new_from_snapshot(state));
 
     acting_manager
-        .start_continuous_planning(env, if opt { Some(PMetric::Makespan) } else { None })
+        .start_planner_manager(env, if opt { Some(PMetric::Makespan) } else { None })
         .await;
 
     let debug = LValue::from(args).to_string();

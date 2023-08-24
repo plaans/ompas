@@ -1,5 +1,6 @@
 use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
+use crate::model::add_domain_symbols;
 use crate::model::chronicle::acting_binding::ActingBinding;
 use crate::model::chronicle::ChronicleKind;
 use crate::model::process_ref::{Label, ProcessRef};
@@ -7,13 +8,14 @@ use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::VarId;
-use crate::ompas::manager::acting::acting_var::{ActingVarRef, AsCst};
-use crate::ompas::manager::acting::planning::plan_update::{
-    Choice, ChoiceAcquire, ChoiceArbitrary, ChoiceInner, ChoiceRefinement, ChoiceSubTask,
-    PlanUpdate,
-};
-use crate::ompas::manager::acting::planning::problem_update::{ExecutionProblem, ProblemUpdate};
-use crate::ompas::manager::resource::WaiterPriority;
+use crate::ompas::manager::acting::acting_var::AsCst;
+use crate::ompas::manager::acting::RefInnerActingManager;
+use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
+use crate::ompas::manager::planning::plan_update::*;
+use crate::ompas::manager::planning::problem_update::{ExecutionProblem, PlannerUpdate, VarUpdate};
+use crate::ompas::manager::resource::{ResourceManager, WaiterPriority};
+use crate::ompas::manager::state::state_manager::StateManager;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::{encode_init, generate_instances};
@@ -23,92 +25,316 @@ use crate::planning::planner::encoding::problem_generation::{
 use crate::planning::planner::encoding::{PlannerDomain, PlannerProblem};
 use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
-use crate::planning::planner::solver::run_planner;
-use crate::planning::planner::solver::PMetric;
-use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON};
+use crate::planning::planner::solver::{run_planner, PMetric};
+use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON, TOKIO_CHANNEL_SIZE};
 use aries::collections::seq::Seq;
 use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
-use aries::model::lang::{Atom, Variable};
+use aries::model::lang::Variable;
 use aries::model::Model;
 use aries_planning::chronicles;
-use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId, VarLabel};
+use futures::future::abortable;
 use itertools::Itertools;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::ProcessInterface;
+use planner_manager_interface::PlannerManagerInterface;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::LLambda;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
+use std::mem;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
+pub mod acting_var_ref_table;
 pub mod plan_update;
+pub mod planner_manager_interface;
 pub mod problem_update;
 
-#[derive(Default)]
-pub struct ActingVarRefTable {
-    inner: im::HashMap<ActingVarRef, Variable>,
-    reverse: im::HashMap<Variable, ActingVarRef>,
+const PROCESS_PLANNER_MANAGER: &str = "__PROCESS_PLANNER_MANAGER__";
+struct PlannerManagerConfig {
+    acting_manager: RefInnerActingManager,
+    state_manager: StateManager,
+    resource_manager: ResourceManager,
+    clock_manager: ClockManager,
+    domain: OMPASDomain,
+    st: RefSymTable,
+    env: LEnv,
+    opt: Option<PMetric>,
+    rx_update: mpsc::Receiver<PlannerUpdate>,
 }
 
-impl ActingVarRefTable {
-    pub fn clear(&mut self) {
-        self.inner.clear();
-        self.reverse.clear();
+pub struct PlannerManager {}
+
+impl PlannerManager {
+    pub async fn run(
+        acting_manager: RefInnerActingManager,
+        state_manager: StateManager,
+        resource_manager: ResourceManager,
+        clock_manager: ClockManager,
+        domain: OMPASDomain,
+        st: RefSymTable,
+        env: LEnv,
+        opt: Option<PMetric>,
+    ) -> PlannerManagerInterface {
+        let (tx_update, rx_update) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+
+        let pmi = PlannerManagerInterface::new(tx_update);
+
+        tokio::spawn(Self::continuous_planning(PlannerManagerConfig {
+            acting_manager,
+            state_manager,
+            resource_manager,
+            clock_manager,
+            domain,
+            st,
+            env,
+            opt,
+            rx_update,
+        }));
+        pmi
     }
 
-    pub fn add_binding(&mut self, id: impl Into<ActingVarRef>, var: Variable) {
-        let id = id.into();
-        self.inner.insert(id, var);
-        self.reverse.insert(var, id);
-    }
+    async fn continuous_planning(config: PlannerManagerConfig) {
+        let PlannerManagerConfig {
+            acting_manager,
+            state_manager,
+            resource_manager,
+            clock_manager,
+            domain,
+            st,
+            env,
+            opt,
+            mut rx_update,
+        } = config;
 
-    pub fn contains(&mut self, id: impl Into<ActingVarRef>) -> bool {
-        let id = id.into();
-        self.inner.contains_key(&id)
-    }
+        add_domain_symbols(&st, &domain);
+        let mut process = ProcessInterface::new(
+            PROCESS_PLANNER_MANAGER,
+            PROCESS_TOPIC_OMPAS,
+            LOG_TOPIC_OMPAS,
+        )
+        .await;
 
-    pub fn get_var(&self, id: impl Into<ActingVarRef>) -> Option<&Variable> {
-        let id = id.into();
-        self.inner.get(&id)
-    }
+        let mut planning = false;
+        let mut interrupter: Option<oneshot::Sender<bool>> = None;
+        let mut updater: Option<mpsc::Sender<VarUpdate>> = None;
+        let mut plan_receiver: Option<oneshot::Receiver<ActingTreeUpdate>> = None;
 
-    pub fn get_id(&self, var: &Variable) -> Option<&ActingVarRef> {
-        self.reverse.get(var)
-    }
-}
-
-impl FormatWithSymTable for ActingVarRefTable {
-    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
-        let mut str = "#BINDINGS: \n".to_string();
-        for (var, r#ref) in &self.reverse {
-            str.push_str(
-                format!(
-                    "{:?} <- {}\n",
-                    Atom::from(*var),
-                    r#ref.var_id().format(st, sym_version)
-                )
-                .as_str(),
-            )
+        async fn wait_plan(
+            plan_receiver: &mut Option<oneshot::Receiver<ActingTreeUpdate>>,
+        ) -> Option<ActingTreeUpdate> {
+            if let Some(plan_receiver) = plan_receiver {
+                match plan_receiver.await {
+                    Ok(pu) => Some(pu),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            }
         }
-        str
+
+        fn interrupt(interrupter: &mut Option<oneshot::Sender<bool>>) {
+            let interrupter = mem::replace(interrupter, None);
+            if let Some(interrupter) = interrupter {
+                let _ = interrupter.send(true);
+            }
+        }
+
+        let mut clock = clock_manager.subscribe_to_clock().await;
+
+        'main: loop {
+            tokio::select! {
+                Some(pu) = wait_plan(&mut plan_receiver) => {
+                    plan_receiver = None;
+                    interrupter = None;
+                    updater = None;
+                    acting_manager.write().await.update_acting_tree(pu).await
+                }
+                _ = process.recv() => {
+                    interrupt(&mut interrupter);
+                    break 'main;
+                }
+                Ok(_) = clock.changed() => {
+
+                        //println!("tick {}", index);
+                        let tick = *clock.borrow();
+                        let mut updates = vec![];
+                        while let Ok(update) = rx_update.try_recv() {
+                            updates.push(update)
+                        }
+                        if !updates.is_empty() {
+
+                        //Debug
+                        let explanation = {
+
+                            let mut explanation = format!("Planning tick n°{tick}\n");
+                            for update in updates {
+                                let update: PlannerUpdate = update;
+                                match update {
+                                    PlannerUpdate::VarUpdate(v) => {
+                                        writeln!(explanation, "- Update of vars {}.", v.format(&st, true)).unwrap();
+                                    }
+                                    PlannerUpdate::ProblemUpdate(a) => {
+                                        writeln!(explanation, "- Planning with new process {a}.").unwrap();
+                                    }
+                                    PlannerUpdate::StateUpdate(_s) => {
+                                        writeln!(explanation, "- State Update").unwrap();
+                                    }
+                                    PlannerUpdate::Plan => {
+                                        writeln!(explanation, "- Requested replanning of tree.").unwrap();
+                                    }
+                                }
+                            }
+                            explanation
+                        };
+                        if planning {
+                            interrupt(&mut interrupter);
+                        }
+                        let mut state = state_manager.get_snapshot().await;
+                        let resource_state = resource_manager.get_snapshot().await;
+                        state.absorb(resource_state);
+                        let ep = ExecutionProblem {
+                            state,
+                            chronicles: acting_manager.read().await.get_current_chronicles(),
+                        };
+                        let mut env = env.clone();
+                        env.update_context(ModState::new_from_snapshot(ep.state.clone()));
+
+                        let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
+                        if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                            for (origin, chronicle) in pp
+                                .instances
+                                .iter()
+                                .map(|i| (i.origin.clone(), i.am.chronicle.as_ref().unwrap()))
+                            {
+                                println!("{:?}:\n{}", origin, chronicle)
+                            }
+                        }
+
+                        let (problem, table) = encode(&st, &pp).await.unwrap();
+                        let PlannerInstance {
+                            _updater: u,
+                            interrupter: i,
+                            plan_receiver: p,
+                        } = PlannerInstance::new(pp, problem, table, opt,explanation );
+                        updater = Some(u);
+                        interrupter = Some(i);
+                        plan_receiver = Some(p);
+                        planning = true;
+                    }
+                }
+            }
+        }
     }
 }
 
-const CONTINUOUS_PLANNING: &str = "continuous_planning";
-
-pub struct ContinuousPlanningConfig {
-    pub problem_receiver: mpsc::Receiver<ProblemUpdate>,
-    pub plan_sender: mpsc::Sender<PlanUpdate>,
-    pub domain: OMPASDomain,
-    pub st: RefSymTable,
-    pub env: LEnv,
-    pub opt: Option<PMetric>,
+pub struct PlannerInstance {
+    _updater: mpsc::Sender<VarUpdate>,
+    interrupter: oneshot::Sender<bool>,
+    plan_receiver: oneshot::Receiver<ActingTreeUpdate>,
 }
 
-pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
+impl PlannerInstance {
+    pub fn new(
+        planner_problem: PlannerProblem,
+        problem: chronicles::Problem,
+        table: ActingVarRefTable,
+        opt: Option<PMetric>,
+        explanation: String,
+    ) -> Self {
+        println!("Planning for:\n{}", explanation);
+        let (_updater, _updated) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (interrupter, interrupted) = oneshot::channel();
+        let (plan_sender, plan_receiver) = oneshot::channel();
+
+        let (planner, handle) = abortable(tokio::spawn(async move {
+            let result = run_planner(problem, opt);
+            //println!("{}", format_partial_plan(&pb, &x)?);
+
+            if let Ok(Some(pr)) = result {
+                //result::print_chronicles(&pr);
+                let PlanResult { ass, fp } = pr;
+
+                let choices = extract_choices(&table, &ass, &fp.model, &planner_problem);
+                let new_ams = extract_new_acting_models(&table, &ass, &fp.model, planner_problem);
+
+                if OMPAS_PLAN_OUTPUT_ON.get() {
+                    println!("Plan found");
+                    for choice in &choices {
+                        println!("{}:{}", choice.process_ref, choice.choice_inner)
+                    }
+                }
+
+                //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
+                Some(ActingTreeUpdate {
+                    acting_models: new_ams,
+                    choices,
+                })
+            } else {
+                println!("No solution found for planner");
+                None
+            }
+        }));
+
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = interrupted => {
+                    handle.abort();
+                    println!("Interrupted planning for: \n{}", explanation);
+                }
+                Ok(Ok(Some(pu))) = planner => {
+                    println!("Successfully planned for:\n{}", explanation);
+                    if plan_sender.send(pu).is_err() {
+                        panic!("error sending plan update");
+                    }
+                }
+            }
+        });
+
+        Self {
+            _updater,
+            interrupter,
+            plan_receiver,
+        }
+    }
+
+    pub async fn wait(self) -> ActingTreeUpdate {
+        self.plan_receiver.await.unwrap()
+    }
+
+    pub fn interrupt(self) {
+        let _ = self.interrupter.send(true);
+    }
+
+    pub async fn update(&self, updates: Vec<VarUpdate>) {
+        for update in updates {
+            let _ = self._updater.send(update).await;
+        }
+    }
+}
+
+/*p = rx_update.recv() => {
+
+
+
+
+        }
+        PlannerUpdate::UpdateState(_) => {
+            todo!()
+        }
+        PlannerUpdate::Instanciation(_) => {
+            todo!()
+        }
+    }
+}else {
+    break 'main;
+}
+}*/
+
+/*pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
     let mut process =
         ProcessInterface::new(CONTINUOUS_PLANNING, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
 
@@ -129,9 +355,9 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
             }
             p = problem_receiver.recv() => {
                 if let Some(p) = p {
-                    let p: ProblemUpdate = p;
+                    let p: PlannerUpdate = p;
                     match p {
-                        ProblemUpdate::ExecutionProblem(ep) => {
+                        PlannerUpdate::ExecutionProblem(ep) => {
                             let mut env = env.clone();
                             env.update_context(ModState::new_from_snapshot(ep.state.clone()));
 
@@ -189,10 +415,10 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
                                 println!("No solution found for planner")
                             };
                         }
-                        ProblemUpdate::UpdateState(_) => {
+                        PlannerUpdate::UpdateState(_) => {
                             todo!()
                         }
-                        ProblemUpdate::Instanciation(_) => {
+                        PlannerUpdate::Instanciation(_) => {
                             todo!()
                         }
                     }
@@ -203,7 +429,7 @@ pub async fn run_continuous_planning(config: ContinuousPlanningConfig) {
 
         }
     }
-}
+}*/
 
 /// Takes a finite execution model and adds needed chronicles to complete the model for the planner.
 /// First it searches tasks that have been refined, and then adds the new Acting Models

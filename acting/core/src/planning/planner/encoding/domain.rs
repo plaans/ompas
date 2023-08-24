@@ -1,3 +1,4 @@
+use crate::model::acting_domain::model::ActingModel;
 use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::lit::Lit;
@@ -12,9 +13,7 @@ use crate::model::sym_domain::{Domain, TypeId};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::GetVariables;
 use crate::model::sym_table::VarId;
-use crate::ompas::manager::acting::planning::ActingVarRefTable;
-
-use crate::model::acting_domain::model::ActingModel;
+use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::state::instance::InstanceCollection;
 use crate::planning::planner::encoding::{
     atom_from_cst, get_type, var_id_into_atom, PlannerDomain,

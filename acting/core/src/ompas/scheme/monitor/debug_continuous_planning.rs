@@ -1,5 +1,6 @@
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
+use crate::ompas::manager::acting::ActingProcessId;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
@@ -38,12 +39,8 @@ impl From<ModContinuousPlanning> for LModule {
         m.add_async_fn(PLAN, plan, DOC_PLAN, false);
         m.add_async_fn(NEW_TASK, new_task, DOC_NEW_TASK, false);
         m.add_async_fn(NEW_EVENT, new_event, DOC_NEW_EVENT, false);
-        m.add_async_fn(
-            NEW_INSTANTIATION,
-            new_instantiation,
-            DOC_NEW_INSTANTIATION,
-            false,
-        );
+
+        m.add_async_fn(SET_START, set_start, DOC_SET_START, false);
 
         m
     }
@@ -63,9 +60,8 @@ pub async fn start(env: &LEnv, opt: bool) -> LResult {
     env.update_context(ModState::new_from_snapshot(state));
 
     acting_manager
-        .start_continuous_planning(env, if opt { Some(PMetric::Makespan) } else { None })
+        .start_planner_manager(env, if opt { Some(PMetric::Makespan) } else { None })
         .await;
-
     Ok(LValue::Nil)
 }
 #[async_scheme_fn]
@@ -76,6 +72,7 @@ pub async fn plan(env: &LEnv) -> LResult {
         .acting_manager
         .clone();
     acting_manager.plan().await;
+    wait_on_planner(env).await?;
     Ok(LValue::Nil)
 }
 async fn wait_on_planner(env: &LEnv) -> LResult {
@@ -106,7 +103,14 @@ pub async fn new_task(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-pub async fn new_instantiation(env: &LEnv, _args: &[LValue]) -> LResult {
+pub async fn set_start(env: &LEnv, id: ActingProcessId, instant: f64) -> LResult {
+    let acting_manager = env
+        .get_context::<ModControl>(MOD_CONTROL)?
+        .acting_manager
+        .clone();
+    println!("set start of {} to {}", id, instant);
+    acting_manager.set_start(&id, Some(instant.into())).await;
+    //panic!("");
     wait_on_planner(env).await?;
     Ok(LValue::Nil)
 }

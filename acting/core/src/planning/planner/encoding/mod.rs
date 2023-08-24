@@ -6,7 +6,7 @@ use crate::model::sym_domain::type_lattice::TypeLattice;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
-use crate::ompas::manager::acting::planning::ActingVarRefTable;
+use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::generate_instances;

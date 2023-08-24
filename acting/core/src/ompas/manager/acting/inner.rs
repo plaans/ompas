@@ -10,8 +10,6 @@ use crate::ompas::manager::acting::acting_var::{
     ActingVal, ActingValUpdate, ActingVarCollection, ActingVarId, ActingVarRef, AsCst, ExecutionVar,
 };
 use crate::ompas::manager::acting::interval::{Interval, Timepoint};
-use crate::ompas::manager::acting::planning::plan_update::{Choice, ChoiceInner};
-use crate::ompas::manager::acting::planning::problem_update::ActingUpdateNotification;
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
 use crate::ompas::manager::acting::process::action::ActionProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
@@ -20,11 +18,13 @@ use crate::ompas::manager::acting::process::root_task::RootProcess;
 use crate::ompas::manager::acting::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
 use crate::ompas::manager::acting::{AMId, ActingProcessId};
 use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::planning::plan_update::{ActingTreeUpdate, Choice, ChoiceInner};
+use crate::ompas::manager::planning::planner_manager_interface::PlannerManagerInterface;
+use crate::ompas::manager::planning::problem_update::{PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::planning::conversion::flow_graph::graph::Dot;
 use crate::planning::planner::problem::ChronicleInstance;
-use crate::TOKIO_CHANNEL_SIZE;
 use aries_planning::chronicles::{ChronicleOrigin, TaskId};
 use async_recursion::async_recursion;
 use chrono::{DateTime, Utc};
@@ -38,8 +38,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
 use std::{env, fs};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{broadcast, watch};
 
 const COLOR_PLANNING: &str = "red";
 const COLOR_EXECUTION: &str = "blue";
@@ -84,21 +83,6 @@ impl Display for ProcessKind {
     }
 }
 
-pub struct PlannerManager {
-    update_notifier: Sender<ActingUpdateNotification>,
-    watcher: (broadcast::Sender<bool>, broadcast::Receiver<bool>),
-}
-
-impl PlannerManager {
-    pub fn new(update_notifier: mpsc::Sender<ActingUpdateNotification>) -> Self {
-        let (tx, rx) = broadcast::channel(TOKIO_CHANNEL_SIZE);
-        Self {
-            update_notifier,
-            watcher: (tx, rx),
-        }
-    }
-}
-
 pub struct InnerActingManager {
     pub(in crate::ompas::manager::acting) processes: Vec<ActingProcess>,
     pub(in crate::ompas::manager::acting) models: Vec<ActingModel>,
@@ -106,7 +90,7 @@ pub struct InnerActingManager {
     pub(in crate::ompas::manager::acting) st: RefSymTable,
     resource_manager: ResourceManager,
     clock_manager: ClockManager,
-    planner_manager: Option<PlannerManager>,
+    planner_manager_interface: Option<PlannerManagerInterface>,
 }
 
 impl InnerActingManager {
@@ -122,7 +106,7 @@ impl InnerActingManager {
             st,
             resource_manager,
             clock_manager,
-            planner_manager: None,
+            planner_manager_interface: None,
         };
         new.init();
         new
@@ -148,39 +132,23 @@ impl InnerActingManager {
         self.models = vec![model];
     }
 
-    pub fn set_planner_manager(&mut self, planner_manager: PlannerManager) {
-        self.planner_manager = Some(planner_manager)
-    }
-
-    pub async fn notify_planner(&mut self, notification: ActingUpdateNotification) {
-        if let Some(notifier) = &self.planner_manager {
+    pub async fn notify_planner(&mut self, pu: PlannerUpdate) {
+        if let Some(planner) = &self.planner_manager_interface {
+            planner.send_update(pu).await;
+        }
+        /*if let Some(notifier) = &self.planner_manager {
             notifier
                 .update_notifier
                 .send(notification)
                 .await
                 .unwrap_or_else(|_| panic!());
-        }
-    }
-
-    pub async fn notify_plan_update(&mut self) {
-        if let Some(notifier) = &self.planner_manager {
-            notifier.watcher.0.send(true).unwrap_or_else(|_| panic!());
-        }
-    }
-
-    pub async fn subscribe_on_plan_update(&self) -> Option<broadcast::Receiver<bool>> {
-        self.planner_manager
-            .as_ref()
-            .map(|pm| pm.watcher.0.subscribe())
+        }*/
     }
 
     pub async fn plan(&mut self) {
-        if let Some(notifier) = &self.planner_manager {
-            notifier
-                .update_notifier
-                .send(ActingUpdateNotification::Plan)
-                .await
-                .unwrap_or_else(|_| panic!());
+        if let Some(planner) = &self.planner_manager_interface {
+            planner.send_update(PlannerUpdate::Plan).await;
+            //.unwrap_or_else(|_| panic!());
         }
     }
 
@@ -304,12 +272,20 @@ impl InnerActingManager {
         let var = &mut self.acting_vars.plan_vars[plan_var_id];
         var.set_execution_val(val.clone());
         for ActingVarRef { var_id, am_id } in var.refs().clone() {
+            /*println!(
+                "set_execution_val: {} => {}",
+                var_id.format(&self.st, true),
+                val
+            );*/
             self.models[am_id]
                 .instantiations
-                .push(Instantiation::new(var_id, self.st.new_cst(val.clone())))
-        }
-        self.notify_planner(ActingUpdateNotification::VarUpdate(plan_var_id))
+                .push(Instantiation::new(var_id, self.st.new_cst(val.clone())));
+            self.notify_planner(PlannerUpdate::VarUpdate(VarUpdate {
+                var_ref: ActingVarRef { var_id, am_id },
+                value: val.clone(),
+            }))
             .await;
+        }
     }
 
     async fn set_execution_vals(&mut self, vals: Vec<ActingValUpdate>) {
@@ -434,8 +410,7 @@ impl InnerActingManager {
         let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
         let rank = root.n_task();
         root.add_top_level_task(id);
-        self.notify_planner(ActingUpdateNotification::NewProcess(id))
-            .await;
+        self.notify_planner(PlannerUpdate::ProblemUpdate(id)).await;
 
         ProcessRef::Relative(0, vec![Label::Action(rank)])
     }
@@ -1193,6 +1168,37 @@ impl InnerActingManager {
             .arg(md_file_name)
             .spawn()
             .unwrap();
+    }
+
+    pub async fn set_planner_manager_interface(&mut self, pmi: PlannerManagerInterface) {
+        self.planner_manager_interface = Some(pmi);
+    }
+
+    pub fn is_planner_launched(&self) -> bool {
+        self.planner_manager_interface.is_some()
+    }
+
+    pub fn notify_planner_tree_update(&mut self) {
+        if let Some(planner) = &self.planner_manager_interface {
+            planner.notify_update_tree();
+        }
+    }
+
+    pub async fn subscribe_on_planner_tree_update(&self) -> Option<broadcast::Receiver<bool>> {
+        self.planner_manager_interface
+            .as_ref()
+            .map(|pmi| pmi.subscribe_on_update())
+    }
+
+    pub(crate) async fn update_acting_tree(&mut self, update: ActingTreeUpdate) {
+        let ActingTreeUpdate {
+            acting_models,
+            choices,
+        } = update;
+        self.add_processes_from_chronicles(acting_models).await;
+        self.absorb_choices(choices).await;
+        //locked.dump_trace(None)
+        self.notify_planner_tree_update();
     }
 
     pub(crate) async fn add_processes_from_chronicles(

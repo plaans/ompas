@@ -257,7 +257,7 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let acting_manager = ctx.acting_manager.clone();
     acting_manager
-        .start_continuous_planning(plan_env, if opt { Some(PMetric::Makespan) } else { None })
+        .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
         .await;
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(

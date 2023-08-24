@@ -7,7 +7,11 @@
     ;(sleep 0.5)
     (cp.new-task pick-and-drop b1 kitchen)
     ;(cp.plan)
-    (cp.new-task pick-and-drop b2 kitchen)
-    (cp.new-task pick-and-drop b3 kitchen)
+    ;(sleep 2)
+    (define h (async (cp.set-start 1 2.5)))
+    (sleep 0.001)
+    (cp.plan)
+    ;(dump_trace)
+    (exit 0)
 )
 

@@ -1,21 +1,18 @@
 use crate::model::acting_domain::model::ActingModel;
-use crate::model::add_domain_symbols;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::filter::ProcessFilter;
-use crate::ompas::manager::acting::inner::{PlannerManager, ProcessKind};
+use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
-use crate::ompas::manager::acting::planning::plan_update::PlanUpdateManager;
-use crate::ompas::manager::acting::planning::problem_update::{
-    ExecutionProblem, ProblemUpdateManager,
-};
-use crate::ompas::manager::acting::planning::{run_continuous_planning, ContinuousPlanningConfig};
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::monitor::MonitorManager;
+use crate::ompas::manager::planning::plan_update::ActingTreeUpdate;
+use crate::ompas::manager::planning::problem_update::ExecutionProblem;
+use crate::ompas::manager::planning::PlannerManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::state_manager::StateManager;
@@ -34,7 +31,6 @@ use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, watch, RwLock};
 
@@ -42,7 +38,6 @@ pub mod acting_var;
 pub mod filter;
 pub mod inner;
 pub mod interval;
-pub mod planning;
 pub mod process;
 pub mod task_network;
 
@@ -52,6 +47,7 @@ pub type ActionId = usize;
 pub type ActingProcessId = usize;
 pub type AMId = usize;
 
+pub type RefInnerActingManager = Arc<RwLock<InnerActingManager>>;
 #[derive(Clone)]
 pub struct ActingManager {
     pub st: RefSymTable,
@@ -59,9 +55,8 @@ pub struct ActingManager {
     pub monitor_manager: MonitorManager,
     pub domain: DomainManager,
     pub state: StateManager,
-    pub inner: Arc<RwLock<InnerActingManager>>,
+    pub inner: RefInnerActingManager,
     pub clock_manager: ClockManager,
-    planning: Arc<AtomicBool>,
 }
 
 impl ActingManager {
@@ -80,7 +75,6 @@ impl ActingManager {
                 st,
             ))),
             clock_manager,
-            planning: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -371,40 +365,24 @@ impl ActingManager {
         self.inner.read().await.get_debug(id).clone()
     }
 
-    pub async fn start_continuous_planning(&self, env: LEnv, opt: Option<PMetric>) {
-        if !self.planning.load(Ordering::Acquire) {
-            self.planning
-                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-                .unwrap_or_else(|_| {
-                    eprintln!("error compare exchange in start_continuous_planning");
-                    false
-                });
-        }
-        let mut locked = self.inner.write().await;
-        let st = self.st.clone();
-        let domain = self.domain.get_inner().await;
-        add_domain_symbols(&st, &domain);
-
-        let (plan_update_manager, tx) = PlanUpdateManager::new(self.clone());
-        let (problem_update_manager, rx, tx_notif) = ProblemUpdateManager::new(self.clone());
-        locked.set_planner_manager(PlannerManager::new(tx_notif));
-        let config = ContinuousPlanningConfig {
-            problem_receiver: rx,
-            plan_sender: tx,
-            domain,
-            st,
+    pub async fn start_planner_manager(&self, env: LEnv, opt: Option<PMetric>) {
+        let pmi = PlannerManager::run(
+            self.inner.clone(),
+            self.state.clone(),
+            self.resource_manager.clone(),
+            self.clock_manager.clone(),
+            self.domain.get_inner().await,
+            self.st.clone(),
             env,
             opt,
-        };
-        tokio::spawn(async {
-            let manager = problem_update_manager;
-            manager.run().await;
-        });
-        tokio::spawn(async {
-            let manager = plan_update_manager;
-            manager.run().await;
-        });
-        tokio::spawn(run_continuous_planning(config));
+        )
+        .await;
+
+        self.inner
+            .write()
+            .await
+            .set_planner_manager_interface(pmi)
+            .await
     }
 
     pub async fn get_execution_problem(&self) -> ExecutionProblem {
@@ -418,7 +396,11 @@ impl ActingManager {
     }
 
     pub async fn subscribe_on_plan_update(&self) -> Option<broadcast::Receiver<bool>> {
-        self.inner.read().await.subscribe_on_plan_update().await
+        self.inner
+            .read()
+            .await
+            .subscribe_on_planner_tree_update()
+            .await
     }
 
     pub async fn plan(&self) {
@@ -473,7 +455,7 @@ impl ActingManager {
         let mut lv_expanded = None;
         let mut chronicle = None;
 
-        if self.planning.load(Ordering::Relaxed) {
+        if self.inner.read().await.is_planner_launched() {
             let st = self.st.clone();
             let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
             let mut name = vec![];
@@ -494,7 +476,6 @@ impl ActingManager {
                 panic!()
             };
             ch.set_name(name);
-            //ch.set_task();
 
             let ch = Some(ch);
             let pp_lv = pre_processing(&lv_om, &p_env).await?;
@@ -520,7 +501,7 @@ impl ActingManager {
         })
     }
 
-    /*pub async fn absorb_plan_result(&self, result: ActingPlanResult) {
-        self.inner.write().await.absorb_planner_result(result).await
-    }*/
+    pub async fn update_acting_tree(&self, update: ActingTreeUpdate) {
+        self.inner.write().await.update_acting_tree(update).await
+    }
 }

@@ -95,7 +95,7 @@ impl From<f64> for Timepoint {
     fn from(value: f64) -> Self {
         Self {
             factor: Self::MILLIS_FACTOR,
-            instant: (value as u64 * Self::MILLIS_FACTOR) as u128,
+            instant: (value * Self::MILLIS_FACTOR as f64) as u128,
         }
     }
 }

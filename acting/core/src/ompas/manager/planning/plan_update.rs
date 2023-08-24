@@ -1,23 +1,16 @@
 use crate::model::process_ref::ProcessRef;
 use crate::model::sym_domain::cst::Cst;
-use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::manager::resource::WaiterPriority;
 use crate::planning::planner::problem::ChronicleInstance;
-use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
-use ompas_middleware::ProcessInterface;
 use std::fmt::{Display, Formatter};
-use tokio::sync::mpsc;
-
-const BUFFER_SIZE: usize = 100;
-const UPDATE_PLAN: &str = "update_plan";
 
 #[derive(Default)]
-pub struct PlanUpdate {
+pub struct ActingTreeUpdate {
     pub(crate) acting_models: Vec<ChronicleInstance>,
     pub(crate) choices: Vec<Choice>,
 }
 
-impl PlanUpdate {
+impl ActingTreeUpdate {
     pub fn add_am(&mut self, ci: ChronicleInstance) {
         self.acting_models.push(ci);
     }
@@ -124,13 +117,13 @@ pub struct ChoiceRefinement {
     pub end: Cst,
 }
 
-pub struct PlanUpdateManager {
+/*pub struct PlanUpdateManager {
     acting_manager: ActingManager,
-    channel: mpsc::Receiver<PlanUpdate>,
+    channel: mpsc::Receiver<ActingTreeUpdate>,
 }
 
 impl PlanUpdateManager {
-    pub fn new(acting_manager: ActingManager) -> (Self, mpsc::Sender<PlanUpdate>) {
+    pub fn new(acting_manager: ActingManager) -> (Self, mpsc::Sender<ActingTreeUpdate>) {
         let (tx, rx) = mpsc::channel(BUFFER_SIZE);
         (
             Self {
@@ -154,7 +147,7 @@ impl PlanUpdateManager {
                 }
                 plan = self.channel.recv() =>  {
                     if let Some(update) = plan {
-                        let PlanUpdate {
+                        let ActingTreeUpdate {
                             acting_models,
                             choices,
                         } = update;
@@ -172,3 +165,4 @@ impl PlanUpdateManager {
         }
     }
 }
+*/

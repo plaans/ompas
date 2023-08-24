@@ -9,7 +9,7 @@ use std::fmt::{Display, Formatter};
 
 pub type ActingVarId = usize;
 
-#[derive(Copy, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct ActingVarRef {
     pub(in crate::ompas::manager::acting) var_id: VarId,
     pub(in crate::ompas::manager::acting) am_id: AMId,

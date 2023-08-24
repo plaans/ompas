@@ -1,19 +1,16 @@
-use crate::ompas::manager::acting::acting_var::ActingVarId;
-use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
+use crate::model::sym_domain::cst::Cst;
+use crate::model::sym_table::r#ref::RefSymTable;
+use crate::model::sym_table::r#trait::FormatWithSymTable;
+use crate::ompas::manager::acting::acting_var::ActingVarRef;
+use crate::ompas::manager::acting::ActingProcessId;
 use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::planning::planner::problem::ChronicleInstance;
-use crate::TOKIO_CHANNEL_SIZE;
-use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
-use ompas_middleware::ProcessInterface;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender};
 
-const PROBLEM_UPDATE_RUN: &str = "problem_update_run";
-
-pub enum ProblemUpdate {
-    Instanciation(Instanciation),
-    ExecutionProblem(ExecutionProblem),
-    UpdateState(UpdateState),
+pub enum PlannerUpdate {
+    Plan,
+    VarUpdate(VarUpdate),
+    ProblemUpdate(ActingProcessId),
+    StateUpdate(StateUpdate),
 }
 
 pub struct ExecutionProblem {
@@ -21,28 +18,30 @@ pub struct ExecutionProblem {
     pub(crate) chronicles: Vec<ChronicleInstance>,
 }
 
-pub struct Instanciation {}
-
-pub struct UpdateState {}
-
-pub enum ActingUpdateNotification {
-    Plan,
-    VarUpdate(ActingVarId),
-    NewProcess(ActingProcessId),
+#[derive(Debug, Clone)]
+pub struct VarUpdate {
+    pub var_ref: ActingVarRef,
+    pub value: Cst,
 }
 
-pub struct ProblemUpdateManager {
-    acting_manager: ActingManager,
-    notifier: mpsc::Receiver<ActingUpdateNotification>,
-    updater: mpsc::Sender<ProblemUpdate>,
+impl FormatWithSymTable for VarUpdate {
+    fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
+        format!(
+            "{{ var_id = {}, val = {}}}",
+            self.var_ref.var_id().format(st, sym_version),
+            self.value
+        )
+    }
 }
 
-impl ProblemUpdateManager {
+pub struct StateUpdate {}
+
+/*impl ProblemUpdateManager {
     pub fn new(
         acting_manager: ActingManager,
     ) -> (
         Self,
-        Receiver<ProblemUpdate>,
+        Receiver<PlannerUpdate>,
         Sender<ActingUpdateNotification>,
     ) {
         let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
@@ -67,25 +66,29 @@ impl ProblemUpdateManager {
             mut notifier,
             updater,
         } = self;
-
+        let mut index = 0;
         'main: loop {
             tokio::select! {
                 _ = process_interface.recv() => {
                     break 'main;
                 }
                 Some(notification) = notifier.recv() => {
+                    println!("Planning n°{index}");
                     let notification: ActingUpdateNotification = notification;
                     match notification {
-                        ActingUpdateNotification::VarUpdate(_) => {}
-                        ActingUpdateNotification::NewProcess(_) | ActingUpdateNotification::Plan => {
-                             let em: ExecutionProblem = acting_manager.get_execution_problem().await;
-                            /*for i in &em.chronicles {
-                                println!("{}", i.am.chronicle.as_ref().unwrap())
-                            }*/
-                            //exit(0);
-                            updater.send(ProblemUpdate::ExecutionProblem(em)).await.unwrap_or_else(|_| panic!(""));
+                        ActingUpdateNotification::VarUpdate(v) => {
+                            println!("Update of vars {:?}.", v);
+                        }
+                        ActingUpdateNotification::NewProcess(p) => {
+                            println!("Planning with new process {p}.");
+                        }
+                        ActingUpdateNotification::Plan => {
+                            println!("Requested replanning of tree.");
                         }
                     }
+                    let em: ExecutionProblem = acting_manager.get_execution_problem().await;
+                    updater.send(PlannerUpdate::ExecutionProblem(em)).await.unwrap_or_else(|_| panic!(""));
+                    index+=1;
 
 
                     //Construction of the instances
@@ -97,4 +100,4 @@ impl ProblemUpdateManager {
             }
         }
     }
-}
+}*/

@@ -1,4 +1,4 @@
-use crate::model::process_ref::ProcessRef;
+use crate::model::process_ref::{MethodId, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::ompas::manager::resource::WaiterPriority;
 use crate::planning::planner::problem::ChronicleInstance;
@@ -81,10 +81,18 @@ impl Display for ChoiceInner {
                 )
             }
             ChoiceInner::SubTask(s) => {
-                write!(f, "[{},{}] {:?}", s.start, s.end, s.name)
+                write!(f, "[{},{}]", s.start, s.end)?;
+                for arg in &s.name {
+                    write!(f, " {}", arg)?;
+                }
+                Ok(())
             }
             ChoiceInner::Refinement(r) => {
-                write!(f, "[{},{}]", r.start, r.end)
+                write!(f, "[{},{}] {}", r.start, r.end, r.method_id)?;
+                for arg in &r.name {
+                    write!(f, " {}", arg)?;
+                }
+                Ok(())
             }
         }
     }
@@ -113,56 +121,8 @@ pub struct ChoiceAcquire {
 
 #[derive(Debug)]
 pub struct ChoiceRefinement {
+    pub name: Vec<Cst>,
     pub start: Cst,
     pub end: Cst,
+    pub method_id: MethodId,
 }
-
-/*pub struct PlanUpdateManager {
-    acting_manager: ActingManager,
-    channel: mpsc::Receiver<ActingTreeUpdate>,
-}
-
-impl PlanUpdateManager {
-    pub fn new(acting_manager: ActingManager) -> (Self, mpsc::Sender<ActingTreeUpdate>) {
-        let (tx, rx) = mpsc::channel(BUFFER_SIZE);
-        (
-            Self {
-                acting_manager,
-                channel: rx,
-            },
-            tx,
-        )
-    }
-
-    pub async fn run(mut self) {
-        let mut process: ProcessInterface =
-            ProcessInterface::new(UPDATE_PLAN, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
-
-        let acting_manager = &self.acting_manager;
-
-        'main: loop {
-            tokio::select! {
-                _ = process.recv() => {
-                    break 'main
-                }
-                plan = self.channel.recv() =>  {
-                    if let Some(update) = plan {
-                        let ActingTreeUpdate {
-                            acting_models,
-                            choices,
-                        } = update;
-                        let mut locked = acting_manager.inner.write().await;
-                        locked.add_processes_from_chronicles(acting_models).await;
-                        locked.absorb_choices(choices).await;
-                        //locked.dump_trace(None)
-                        locked.notify_plan_update().await;
-                    }else {
-                        break 'main
-                    }
-                }
-
-            }
-        }
-    }
-}
-*/

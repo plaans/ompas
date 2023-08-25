@@ -218,7 +218,7 @@ async fn check_select_response(
                 };
 
                 acting_manager
-                    .new_refinement(task_id, debug, args, model, ProcessOrigin::Execution)
+                    .new_refinement(task_id, debug, args, model, ProcessOrigin::Execution, None)
                     .await
             }
         }

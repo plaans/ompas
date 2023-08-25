@@ -1,6 +1,6 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
-use crate::model::process_ref::{Label, ProcessRef};
+use crate::model::process_ref::{Label, MethodId, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::filter::ProcessFilter;
@@ -178,11 +178,12 @@ impl ActingManager {
         args: Vec<Option<Cst>>,
         model: ActingModel,
         origin: ProcessOrigin,
+        method_id: Option<MethodId>,
     ) -> ActingProcessId {
         self.inner
             .write()
             .await
-            .new_refinement(parent, debug, args, model, origin)
+            .new_refinement(parent, debug, args, model, origin, method_id)
             .await
     }
 

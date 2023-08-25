@@ -2,6 +2,7 @@ use crate::model::acting_domain::model::{ActingModel, ModelKind};
 use crate::model::acting_domain::parameters::Parameters;
 use crate::model::acting_domain::task::Task;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
+use crate::model::process_ref::MethodId;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::scheme::exec::ModExec;
@@ -180,10 +181,11 @@ pub async fn p_convert_task(
                 },
                 am: om,
                 pr: Default::default(),
+                method_id: Default::default(),
             });
         }
         None => {
-            for m_label in t.get_methods() {
+            for (i, m_label) in t.get_methods().iter().enumerate() {
                 methods.push(m_label.to_string());
                 let mut pc = pc.clone();
                 let method = context.domain.methods.get(m_label).unwrap();
@@ -215,6 +217,10 @@ pub async fn p_convert_task(
                     },
                     am: om,
                     pr: Default::default(),
+                    method_id: MethodId {
+                        refinement_id: 0,
+                        method_number: i,
+                    },
                 });
             }
         }

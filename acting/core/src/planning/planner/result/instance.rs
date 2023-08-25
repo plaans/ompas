@@ -36,6 +36,7 @@ pub async fn instantiate_chronicles(
             origin: instance.origin.clone(),
             am: om,
             pr: instance.pr.clone(),
+            method_id: instance.method_id,
         };
 
         instances.push(instance)

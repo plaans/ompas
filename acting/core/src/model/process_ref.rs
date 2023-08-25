@@ -69,10 +69,22 @@ impl From<ActingProcessId> for ProcessRef {
     }
 }
 
+#[derive(Default, Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub struct MethodId {
+    pub refinement_id: usize,
+    pub method_number: usize,
+}
+
+impl Display for MethodId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{{},{}}}", self.refinement_id, self.method_number)
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Label {
     AbstractModel,
-    Refinement(Option<usize>),
+    Refinement(MethodId),
     Action(usize),
     Acquire(usize),
     Arbitrary(usize),
@@ -81,14 +93,11 @@ pub enum Label {
 impl Display for Label {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Label::Refinement(m) => {
+            Label::Refinement(method_id) => {
                 write!(
                     f,
-                    "refinement{}",
-                    match m {
-                        None => "".to_string(),
-                        Some(m) => format!("({m})"),
-                    }
+                    "refinement({}, {})",
+                    method_id.refinement_id, method_id.method_number
                 )
             }
             Label::Action(id) => {

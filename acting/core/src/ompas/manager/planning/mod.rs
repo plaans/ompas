@@ -3,7 +3,7 @@ use crate::model::acting_domain::OMPASDomain;
 use crate::model::add_domain_symbols;
 use crate::model::chronicle::acting_binding::ActingBinding;
 use crate::model::chronicle::ChronicleKind;
-use crate::model::process_ref::{Label, ProcessRef};
+use crate::model::process_ref::{Label, MethodId, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
@@ -557,7 +557,7 @@ pub async fn populate_problem(
                     instances.push(instance)
                 }
                 None => {
-                    for (_, m_label) in task.get_methods().iter().enumerate() {
+                    for (i, m_label) in task.get_methods().iter().enumerate() {
                         //methods.insert(m_label.to_string());
                         let method = domain.get_methods().get(m_label).unwrap();
                         let method_lambda: LLambda = method.get_body().try_into().expect("");
@@ -581,7 +581,11 @@ pub async fn populate_problem(
                             ChronicleKind::Method,
                         )
                         .await?;
-                        instance.pr.push(Label::Refinement(None));
+                        let method_id = MethodId {
+                            refinement_id: 0,
+                            method_number: i,
+                        };
+                        instance.pr.push(Label::Refinement(method_id));
                         update_problem(&mut p_actions, &vec![], &instance, instances.len());
 
                         instances.push(instance);
@@ -701,12 +705,12 @@ pub fn extract_new_acting_models(
     pp.instances
         .drain(..)
         .filter(|c| c.generated)
-        .filter(|c| {
+        /*.filter(|c| {
             let presence = c.am.chronicle.as_ref().unwrap().get_presence();
             let cst = get_var_as_cst(table, ass, model, presence);
             //println!("{cst}");
             Cst::Bool(true) == cst
-        })
+        })*/
         .collect()
 }
 
@@ -747,7 +751,21 @@ pub fn extract_choices(
 
         let end = var_id_as_cst(st, &chronicle.interval.get_end());
 
-        choices.push(Choice::new(pr.clone(), ChoiceRefinement { start, end }));
+        let name: Vec<Cst> = chronicle
+            .get_name()
+            .iter()
+            .map(|var_id| var_id_as_cst(st, var_id))
+            .collect();
+
+        choices.push(Choice::new(
+            pr.clone(),
+            ChoiceRefinement {
+                name,
+                start,
+                end,
+                method_id: instance.method_id,
+            },
+        ));
 
         'choice: for (label, binding) in &chronicle.bindings.inner {
             let mut pr = pr.clone();

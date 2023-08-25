@@ -45,6 +45,10 @@ static OMPAS_PLAN_ENCODING_OPTIMIZATION_ON: EnvParam<bool> =
     EnvParam::new(OMPAS_PLAN_ENCODING_OPTIMIZATION, "true");
 static OMPAS_FREQUENCY: EnvParam<u64> =
     EnvParam::new(OMPAS_DELIBERATION_FREQUENCY, OMPAS_DEFAULT_FREQUENCY);
+static OMPAS_DEBUG_CONTINUOUS_PLANNING: EnvParam<bool> =
+    EnvParam::new("OMPAS_DEBUG_CONTINUOUS_PLANNING", "false");
+
+static OMPAS_PLANNER_OUTPUT: EnvParam<bool> = EnvParam::new("OMPAS_PLANNER_OUTPUT", "false");
 
 pub fn ompas_path() -> String {
     if let Ok(s) = std::env::var(OMPAS_PATH) {

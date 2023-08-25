@@ -26,12 +26,16 @@ use crate::planning::planner::encoding::{PlannerDomain, PlannerProblem};
 use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::{run_planner, PMetric};
-use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON, TOKIO_CHANNEL_SIZE};
+use crate::{
+    ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_DEBUG_CONTINUOUS_PLANNING,
+    OMPAS_PLAN_OUTPUT_ON, TOKIO_CHANNEL_SIZE,
+};
 use aries::collections::seq::Seq;
 use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries::model::lang::Variable;
 use aries::model::Model;
 use aries_planning::chronicles;
+use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId, VarLabel};
 use futures::future::abortable;
 use itertools::Itertools;
@@ -215,6 +219,12 @@ impl PlannerManager {
                         }
 
                         let (problem, table) = encode(&st, &pp).await.unwrap();
+                        if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                                for instance in &problem.chronicles {
+                                    Printer::print_chronicle(&instance.chronicle, &problem.context.model);
+                                }
+                            }
+
                         let PlannerInstance {
                             _updater: u,
                             interrupter: i,
@@ -245,7 +255,9 @@ impl PlannerInstance {
         opt: Option<PMetric>,
         explanation: String,
     ) -> Self {
-        println!("Planning for:\n{}", explanation);
+        if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
+            println!("Planning for:\n{}", explanation);
+        }
         let (_updater, _updated) = mpsc::channel(TOKIO_CHANNEL_SIZE);
         let (interrupter, interrupted) = oneshot::channel();
         let (plan_sender, plan_receiver) = oneshot::channel();
@@ -274,7 +286,9 @@ impl PlannerInstance {
                     choices,
                 })
             } else {
-                println!("No solution found for planner");
+                if OMPAS_PLAN_OUTPUT_ON.get() {
+                    println!("No solution found for planner");
+                }
                 None
             }
         }));
@@ -283,10 +297,14 @@ impl PlannerInstance {
             tokio::select! {
                 _ = interrupted => {
                     handle.abort();
-                    println!("Interrupted planning for: \n{}", explanation);
+                    if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
+                        println!("Interrupted planning for: \n{}", explanation);
+                    }
                 }
                 Ok(Ok(Some(pu))) = planner => {
-                    println!("Successfully planned for:\n{}", explanation);
+                    if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
+                        println!("Successfully planned for:\n{}", explanation);
+                    }
                     if plan_sender.send(pu).is_err() {
                         panic!("error sending plan update");
                     }

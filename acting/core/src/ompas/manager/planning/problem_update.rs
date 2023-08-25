@@ -1,7 +1,7 @@
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
-use crate::ompas::manager::acting::acting_var::ActingVarRef;
+use crate::ompas::manager::acting::acting_var::PlanVarRef;
 use crate::ompas::manager::acting::ActingProcessId;
 use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
 use crate::planning::planner::problem::ChronicleInstance;
@@ -20,7 +20,7 @@ pub struct ExecutionProblem {
 
 #[derive(Debug, Clone)]
 pub struct VarUpdate {
-    pub var_ref: ActingVarRef,
+    pub var_ref: PlanVarRef,
     pub value: Cst,
 }
 

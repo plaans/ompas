@@ -1,27 +1,19 @@
-use crate::ompas::manager::acting::acting_var::{ActingValUpdate, ActingVarId, ExecutionVar};
+use crate::ompas::manager::acting::acting_var::ActingVarRef;
 use crate::ompas::manager::acting::process::ActingProcessInner;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 
 pub struct ArbitraryProcess {
-    pub(crate) var: ExecutionVar<LValue>,
+    pub(crate) var: ActingVarRef<LValue>,
     pub(crate) set: Vec<LValue>,
 }
 
 impl ArbitraryProcess {
-    pub fn new(var: ExecutionVar<LValue>) -> Self {
+    pub fn new(var: ActingVarRef<LValue>) -> Self {
         Self { var, set: vec![] }
     }
     pub fn set_set(&mut self, set: Vec<LValue>) {
         self.set = set
-    }
-
-    pub fn set_var(&mut self, var: LValue) -> Option<ActingValUpdate> {
-        self.var.set_val(var)
-    }
-
-    pub fn get_plan_var_id(&self) -> &Option<ActingVarId> {
-        self.var.get_plan_var_id()
     }
 }
 

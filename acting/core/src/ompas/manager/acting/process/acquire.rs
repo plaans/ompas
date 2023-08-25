@@ -1,4 +1,4 @@
-use crate::ompas::manager::acting::acting_var::{ActingValUpdate, ExecutionVar};
+use crate::ompas::manager::acting::acting_var::ActingVarRef;
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::ActingProcessInner;
 use crate::ompas::manager::resource::WaitAcquire;
@@ -6,9 +6,9 @@ use std::fmt::{Display, Formatter};
 
 #[derive()]
 pub struct AcquireProcess {
-    pub(crate) resource: ExecutionVar<String>,
-    pub(crate) quantity: ExecutionVar<usize>,
-    pub(crate) s_acq: ExecutionVar<Timepoint>,
+    pub(crate) resource: ActingVarRef<String>,
+    pub(crate) quantity: ActingVarRef<usize>,
+    pub(crate) s_acq: ActingVarRef<Timepoint>,
     pub(crate) reservation: Option<WaitAcquire>,
     waiter_id: usize,
     resource_id: usize,
@@ -16,9 +16,9 @@ pub struct AcquireProcess {
 
 impl AcquireProcess {
     pub fn new(
-        resource: ExecutionVar<String>,
-        quantity: ExecutionVar<usize>,
-        s_acq: ExecutionVar<Timepoint>,
+        resource: ActingVarRef<String>,
+        quantity: ActingVarRef<usize>,
+        s_acq: ActingVarRef<Timepoint>,
     ) -> Self {
         Self {
             resource,
@@ -30,13 +30,6 @@ impl AcquireProcess {
         }
     }
 
-    pub fn set_resource(&mut self, resource: String) -> Option<ActingValUpdate> {
-        self.resource.set_val(resource)
-    }
-
-    pub fn set_quantity(&mut self, quantity: usize) -> Option<ActingValUpdate> {
-        self.quantity.set_val(quantity)
-    }
     pub fn set_acquire_id(&mut self, waiter: &WaitAcquire) {
         self.waiter_id = waiter.get_client_id();
         self.resource_id = waiter.get_resource_id();
@@ -50,10 +43,6 @@ impl AcquireProcess {
     pub fn move_reservation(&mut self) -> Option<WaitAcquire> {
         self.reservation.take()
         //mem::replace(&mut self.reservation, None)
-    }
-
-    pub fn set_s_acq(&mut self, val: Timepoint) -> Option<ActingValUpdate> {
-        self.s_acq.set_val(val)
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::planning::planner::result::PlanResult;
+use crate::OMPAS_PLANNER_OUTPUT;
 use anyhow::Result;
 use aries_planners::fmt::{format_hddl_plan, format_pddl_plan};
 use aries_planners::solver::Strat::ActivityNonTemporalFirst;
@@ -43,24 +44,29 @@ pub fn run_planner(
         |_, _| {},
         None,
     );
-
-    println!("  [{:.3}s] solved", start.elapsed().as_secs_f32());
+    if OMPAS_PLANNER_OUTPUT.get() {
+        println!("  [{:.3}s] solved", start.elapsed().as_secs_f32());
+    }
 
     result.map(|r| {
         if let SolverResult::Sol((fp, ass)) = r {
-            println!("  Solution found");
-            println!(
-                "\n**** Decomposition ****\n\n\
+            if OMPAS_PLANNER_OUTPUT.get() {
+                println!("  Solution found");
+                println!(
+                    "\n**** Decomposition ****\n\n\
                     {}\n\n\
                     **** Plan ****\n\n\
                     {}",
-                format_hddl_plan(&fp, &ass).unwrap(),
-                format_pddl_plan(&fp, &ass).unwrap()
-            );
+                    format_hddl_plan(&fp, &ass).unwrap(),
+                    format_pddl_plan(&fp, &ass).unwrap()
+                );
+            }
 
             Some(PlanResult { ass, fp })
         } else if let SolverResult::Unsat = r {
-            println!("No solution");
+            if OMPAS_PLANNER_OUTPUT.get() {
+                println!("No solution");
+            }
             None
         } else {
             None

@@ -1,5 +1,5 @@
 use crate::model::sym_domain::cst::Cst;
-use crate::ompas::manager::acting::acting_var::{ActingValUpdate, ExecutionVar};
+use crate::ompas::manager::acting::acting_var::ActingVarRef;
 use crate::ompas::manager::acting::process::ActingProcessInner;
 use crate::ompas::manager::acting::ActingProcessId;
 use std::fmt::{Display, Formatter};
@@ -7,12 +7,12 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone, Debug)]
 pub struct ActionProcess {
     pub abstract_model: Option<ActingProcessId>,
-    pub args: Vec<ExecutionVar<Cst>>,
+    pub args: Vec<ActingVarRef<Cst>>,
     pub refinements: Vec<ActingProcessId>,
 }
 
 impl ActionProcess {
-    pub fn new(args: Vec<ExecutionVar<Cst>>) -> Self {
+    pub fn new(args: Vec<ActingVarRef<Cst>>) -> Self {
         Self {
             abstract_model: None,
             args,
@@ -20,26 +20,8 @@ impl ActionProcess {
         }
     }
 
-    pub fn get_args(&self) -> Vec<Cst> {
-        let mut args = vec![];
-        for arg in &self.args {
-            if let Some(val) = &arg.get_val() {
-                args.push(val.clone())
-            } else {
-                panic!("ActionProcess::get_args: val is not a cst")
-            }
-        }
-        args
-    }
-
-    pub fn set_args(&mut self, args: Vec<Cst>) -> Vec<ActingValUpdate> {
-        let mut updates = vec![];
-        for (arg, value) in self.args.iter_mut().zip(args) {
-            if let Some(u) = arg.set_val(value) {
-                updates.push(u)
-            }
-        }
-        updates
+    pub fn get_args(&self) -> Vec<ActingVarRef<Cst>> {
+        self.args.clone()
     }
 
     pub fn add_abstract_model(&mut self, id: &ActingProcessId) {

@@ -408,8 +408,19 @@ fn convert_constraint(
                 }
 
                 match terms.len() {
-                    0 | 1 => {
-                        unreachable!()
+                    0 => aConstraint::eq(aAtom::from(cst), aAtom::from(cst)),
+                    1 => {
+                        let a = terms[0];
+                        let (a, b): (aAtom, aAtom) = if factor == 1 {
+                            let a = a.var().into();
+                            let b: aAtom = cst.into();
+                            (a, b)
+                        } else {
+                            let a = FAtom::new(a.var().into(), factor).into();
+                            let b = FAtom::new(IVar::ZERO + cst, factor).into();
+                            (a, b)
+                        };
+                        aConstraint::eq(a, b)
                     }
                     2 => {
                         let a = terms[0];

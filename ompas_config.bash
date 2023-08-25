@@ -8,7 +8,9 @@ export OMPAS_CHRONICLE_DEBUG=off
 export OMPAS_DELIBERATION_FREQUENCY=1000
 
 # print the plan formatted for the acting tree
-export OMPAS_PLAN_OUTPUT=true
+export OMPAS_PLAN_OUTPUT=false
+
+export OMPAS_DEBUG_CONTINUOUS_PLANNING=true
 
 # activate the debug of OMPAS
 export OMPAS_DEBUG=false

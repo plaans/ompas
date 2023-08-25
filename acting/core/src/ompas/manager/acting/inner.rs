@@ -7,7 +7,7 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::acting::acting_var::{
-    ActingVal, ActingValUpdate, ActingVarCollection, ActingVarId, ActingVarRef, AsCst, ExecutionVar,
+    ActingVal, ActingValUpdate, ActingVarCollection, ActingVarId, ActingVarRef, AsCst, PlanVarRef,
 };
 use crate::ompas::manager::acting::interval::{Interval, Timepoint};
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
@@ -32,8 +32,9 @@ use im::HashSet;
 use ompas_language::supervisor::*;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::any::Any;
 use std::env::set_current_dir;
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Debug, Display, Formatter, Write};
 use std::fs::{File, OpenOptions};
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
@@ -115,8 +116,8 @@ impl InnerActingManager {
     pub fn init(&mut self) {
         let model = ActingModel::root(&self.st);
         let chronicle = model.chronicle.as_ref().unwrap();
-        let start = self.new_acting_var(ActingVarRef::new(chronicle.interval.get_start(), 0));
-        let end = self.new_acting_var(ActingVarRef::new(chronicle.interval.get_end(), 0));
+        let start = self.new_acting_var_with_ref(&chronicle.interval.get_start(), &0);
+        let end = self.new_acting_var_with_ref(&chronicle.interval.get_end(), &0);
 
         let root = ActingProcess::new(
             0,
@@ -124,8 +125,8 @@ impl InnerActingManager {
             ProcessOrigin::Execution,
             0,
             Some(ROOT.to_string()),
-            ExecutionVar::new_with_ref(start),
-            ExecutionVar::new_with_ref(end),
+            start,
+            end,
             RootProcess::new(),
         );
         self.processes = vec![root];
@@ -169,16 +170,21 @@ impl InnerActingManager {
         self.models.len() - 1
     }
 
-    fn new_acting_var(&mut self, var_ref: ActingVarRef) -> ActingVarId {
-        self.acting_vars.new_acting_var(var_ref)
-    }
-
-    fn new_execution_var<T: Display + Clone + AsCst>(
+    fn new_acting_var_with_ref<
+        T: Clone + Any + Send + Sync + AsCst + Display + Debug + PartialEq,
+    >(
         &mut self,
         var_id: &VarId,
-        om_id: &AMId,
-    ) -> ExecutionVar<T> {
-        ExecutionVar::new_with_ref(self.new_acting_var(ActingVarRef::new(*var_id, *om_id)))
+        am_id: &AMId,
+    ) -> ActingVarRef<T> {
+        self.acting_vars
+            .new_acting_var_with_ref(PlanVarRef::new(*var_id, *am_id))
+    }
+
+    fn new_acting_var<T: Clone + Any + Send + Sync + AsCst + Display + Debug + PartialEq>(
+        &mut self,
+    ) -> ActingVarRef<T> {
+        self.acting_vars.new_acting_var()
     }
 
     pub fn get_id(&self, pr: impl Into<ProcessRef>) -> Option<ActingProcessId> {
@@ -267,11 +273,18 @@ impl InnerActingManager {
         self.processes[*id].am_id()
     }
 
-    async fn set_execution_val(&mut self, val: ActingValUpdate) {
-        let ActingValUpdate { plan_var_id, val } = val;
-        let var = &mut self.acting_vars.plan_vars[plan_var_id];
-        var.set_execution_val(val.clone());
-        for ActingVarRef { var_id, am_id } in var.refs().clone() {
+    async fn set_execution_val<
+        T: Any + Sync + Send + Clone + PartialEq + AsCst + Display + Debug,
+    >(
+        &mut self,
+        acting_var_ref: &ActingVarRef<T>,
+        val_t: T,
+    ) {
+        let cst = val_t.as_cst().unwrap();
+
+        for PlanVarRef { var_id, am_id } in
+            self.acting_vars.set_execution_val(&acting_var_ref, val_t)
+        {
             /*println!(
                 "set_execution_val: {} => {}",
                 var_id.format(&self.st, true),
@@ -279,42 +292,62 @@ impl InnerActingManager {
             );*/
             self.models[am_id]
                 .instantiations
-                .push(Instantiation::new(var_id, self.st.new_cst(val.clone())));
+                .push(Instantiation::new(var_id, self.st.new_cst(cst.clone())));
             self.notify_planner(PlannerUpdate::VarUpdate(VarUpdate {
-                var_ref: ActingVarRef { var_id, am_id },
-                value: val.clone(),
+                var_ref: PlanVarRef { var_id, am_id },
+                value: cst.clone(),
             }))
             .await;
         }
     }
 
-    async fn set_execution_vals(&mut self, vals: Vec<ActingValUpdate>) {
-        for val in vals {
-            self.set_execution_val(val).await;
-        }
-    }
-
     #[inline]
-    fn set_planner_val(&mut self, val: ActingValUpdate) {
-        self.acting_vars.plan_vars[val.plan_var_id].set_planned_val(val.val)
+    fn set_planned_val(&mut self, update: ActingValUpdate) {
+        self.acting_vars.set_planned_val(update)
     }
 
     fn set_planner_vals(&mut self, vals: Vec<ActingValUpdate>) {
         for val in vals {
-            self.set_planner_val(val);
+            self.set_planned_val(val);
         }
     }
 
-    fn get_plan_var_val(&self, plan_var_id: &ActingVarId) -> &ActingVal {
-        self.acting_vars.plan_vars[*plan_var_id].get_val()
+    fn add_new_plan_var_ref(&mut self, acting_var_id: &ActingVarId, plan_var_ref: PlanVarRef) {
+        self.acting_vars
+            .add_new_plan_var_ref(acting_var_id, plan_var_ref)
+    }
+
+    async fn set_val<T: Any + Sync + Send + Clone + PartialEq + AsCst + Display + Debug>(
+        &mut self,
+        acting_var_ref: &ActingVarRef<T>,
+        val: T,
+        origin: ProcessOrigin,
+    ) {
+        match origin {
+            ProcessOrigin::Planner => self.set_planned_val(ActingValUpdate {
+                acting_var_id: acting_var_ref.id,
+                val: val.as_cst().unwrap(),
+            }),
+            ProcessOrigin::Execution => self.set_execution_val(acting_var_ref, val).await,
+            _ => unreachable!(),
+        }
+    }
+
+    fn get_acting_var_acting_val(&self, acting_var_id: &ActingVarId) -> &ActingVal {
+        self.acting_vars.get_acting_val(acting_var_id)
+    }
+
+    fn get_acting_var_val<T: Any + Sync + Send + Clone + PartialEq + AsCst + Display + Debug>(
+        &self,
+        r: &ActingVarRef<T>,
+    ) -> Option<T> {
+        self.acting_vars.get_val(r)
     }
 
     pub async fn set_start(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
         let instant = t.unwrap_or(self.clock_manager.now().await);
-        let val = self.processes[*id].start.set_val(instant);
-        if let Some(val) = val {
-            self.set_execution_vals(vec![val]).await;
-        }
+        self.set_execution_val(&self.processes[*id].start.clone(), instant)
+            .await;
     }
 
     #[async_recursion]
@@ -325,10 +358,8 @@ impl InnerActingManager {
         status: ProcessStatus,
     ) {
         let instant = t.unwrap_or(self.clock_manager.now().await);
-        let val = self.processes[*id].end.set_val(instant);
-        if let Some(val) = val {
-            self.set_execution_vals(vec![val]).await;
-        }
+        let end = self.processes[*id].end.clone();
+        self.set_execution_val(&end, instant).await;
 
         if self.get_kind(id) == ProcessKind::Action {
             if let Some(refinement) = self.processes[*id]
@@ -346,13 +377,21 @@ impl InnerActingManager {
     }
 
     pub fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
-        self.processes[*id].inner.as_action().unwrap().get_args()
+        self.processes[*id]
+            .inner
+            .as_action()
+            .unwrap()
+            .get_args()
+            .iter()
+            .map(|r| self.get_acting_var_val(&r).unwrap())
+            .collect()
     }
 
     pub async fn set_action_args(&mut self, id: &ActingProcessId, args: Vec<Cst>) {
         let action = self.processes[*id].inner.as_mut_action().unwrap();
-        let updates = action.set_args(args);
-        self.set_execution_vals(updates).await
+        for (r, arg) in action.get_args().iter().zip(args) {
+            self.set_execution_val(r, arg).await
+        }
     }
 
     pub async fn set_moment(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
@@ -385,14 +424,14 @@ impl InnerActingManager {
             args: args.clone(),
         });
 
-        let start = self.new_execution_var(&task_ref.start, &0);
-        let end = self.new_execution_var(&task_ref.end, &0);
+        let start = self.new_acting_var_with_ref(&task_ref.start, &0);
+        let end = self.new_acting_var_with_ref(&task_ref.end, &0);
 
         let mut new_args = vec![];
 
         for (val, arg_id) in args.drain(..).zip(task_ref.name) {
-            let mut arg = self.new_execution_var(&arg_id, &0);
-            self.set_execution_val(arg.set_val(val).unwrap()).await;
+            let arg = self.new_acting_var_with_ref(&arg_id, &0);
+            self.set_execution_val(&arg, val).await;
             new_args.push(arg)
         }
 
@@ -437,37 +476,30 @@ impl InnerActingManager {
                 .unwrap()
                 .clone();
             let name = binding.name;
-            let start = self.new_execution_var(&binding.interval.get_start(), &om_id);
-            let end = self.new_execution_var(&binding.interval.get_end(), &om_id);
+            let start = self.new_acting_var_with_ref(&binding.interval.get_start(), &om_id);
+            let end = self.new_acting_var_with_ref(&binding.interval.get_end(), &om_id);
             let mut new_name = vec![];
 
             for (cst, var_id) in args.drain(..).zip(name) {
-                let mut exec = self.new_execution_var(&var_id, &om_id);
+                let arg = self.new_acting_var_with_ref(&var_id, &om_id);
                 if let Some(val) = cst {
-                    let update = exec.set_val(val).unwrap();
-                    if origin == ProcessOrigin::Planner {
-                        self.set_planner_val(update)
-                    } else {
-                        self.set_execution_val(update).await
-                    }
+                    self.set_val(&arg, val, origin).await;
                 }
-                new_name.push(exec)
+                new_name.push(arg)
             }
             (start, end, new_name)
         } else {
-            let start = ExecutionVar::new();
-            let end = ExecutionVar::new();
-            let name = args
-                .drain(..)
-                .map(|cst| {
-                    let mut exec = ExecutionVar::new();
-                    if let Some(val) = cst {
-                        exec.set_val(val);
-                    }
-                    exec
-                })
-                .collect();
-            (start, end, name)
+            let start = self.new_acting_var();
+            let end = self.new_acting_var();
+            let mut new_name = vec![];
+            for cst in args {
+                let arg = self.new_acting_var();
+                if let Some(val) = cst {
+                    self.set_val(&arg, val, origin).await;
+                }
+                new_name.push(arg)
+            }
+            (start, end, new_name)
         };
 
         self.processes.push(ActingProcess::new(
@@ -503,46 +535,51 @@ impl InnerActingManager {
         let id = self.processes.len();
         let am_id = self.new_model(model);
         let model = &self.models[am_id];
+        let chronicle = model.chronicle.as_ref().unwrap();
+        let parent_process = &self.processes[*parent];
+        let action = parent_process.inner.as_action().unwrap();
+        let chronicle_name = chronicle.get_name().clone();
 
-        let (start, end, args) = if let Some(chronicle) = &model.chronicle {
-            let name = chronicle.get_name().clone();
+        if chronicle_name.len() != args.len() {
+            panic!(
+                "no matching between chronicle_name:{:?} and args:{:?}",
+                chronicle_name, args
+            )
+        }
 
-            if name.len() != args.len() {
-                panic!(
-                    "no matching between chronicle_name:{:?} and args:{:?}",
-                    name, args
-                )
+        let interval = chronicle.interval;
+        let start = parent_process.start.clone();
+        let end = parent_process.end.clone();
+        let mut name = action.get_args().clone();
+
+        self.add_new_plan_var_ref(
+            &start.id,
+            PlanVarRef {
+                var_id: interval.get_start(),
+                am_id,
+            },
+        );
+        self.add_new_plan_var_ref(
+            &end.id,
+            PlanVarRef {
+                var_id: interval.get_end(),
+                am_id,
+            },
+        );
+
+        //let start = self.new_execution_var(&interval.get_start(), &am_id);
+        //let end = self.new_execution_var(&interval.get_end(), &am_id);
+
+        for ((cst, exec), var_id) in args.drain(..).zip(&mut name).zip(chronicle_name) {
+            self.add_new_plan_var_ref(&exec.id, PlanVarRef { var_id, am_id });
+            if let Some(val) = cst {
+                self.set_planned_val(ActingValUpdate {
+                    acting_var_id: exec.id,
+                    val,
+                });
             }
+        }
 
-            let interval = chronicle.interval;
-            let start = self.new_execution_var(&interval.get_start(), &am_id);
-            let end = self.new_execution_var(&interval.get_end(), &am_id);
-            let mut new_name = vec![];
-
-            for (cst, var_id) in args.drain(..).zip(name) {
-                let mut exec = self.new_execution_var(&var_id, &am_id);
-                if let Some(val) = cst {
-                    let update = exec.set_val(val).unwrap();
-                    self.set_planner_val(update)
-                }
-                new_name.push(exec)
-            }
-            (start, end, new_name)
-        } else {
-            let start = ExecutionVar::new();
-            let end = ExecutionVar::new();
-            let name = args
-                .drain(..)
-                .map(|cst| {
-                    let mut exec = ExecutionVar::new();
-                    if let Some(val) = cst {
-                        exec.set_val(val);
-                    }
-                    exec
-                })
-                .collect();
-            (start, end, name)
-        };
         self.processes.push(ActingProcess::new(
             id,
             *parent,
@@ -551,11 +588,14 @@ impl InnerActingManager {
             Some(debug),
             start,
             end,
-            ActingProcessInner::AbstractModel(RefinementProcess::new(args)),
+            ActingProcessInner::AbstractModel(RefinementProcess::new(name)),
         ));
 
-        let action: &mut ActionProcess = self.processes[*parent].inner.as_mut_action().unwrap();
-        action.add_abstract_model(&id);
+        self.processes[*parent]
+            .inner
+            .as_mut_action()
+            .unwrap()
+            .add_abstract_model(&id);
         id
     }
 
@@ -582,37 +622,30 @@ impl InnerActingManager {
             }
 
             let interval = chronicle.interval;
-            let start = self.new_execution_var(&interval.get_start(), &am_id);
-            let end = self.new_execution_var(&interval.get_end(), &am_id);
+            let start = self.new_acting_var_with_ref(&interval.get_start(), &am_id);
+            let end = self.new_acting_var_with_ref(&interval.get_end(), &am_id);
             let mut new_name = vec![];
 
             for (cst, var_id) in args.drain(..).zip(name) {
-                let mut exec = self.new_execution_var(&var_id, &am_id);
+                let exec = self.new_acting_var_with_ref(&var_id, &am_id);
                 if let Some(val) = cst {
-                    let update = exec.set_val(val).unwrap();
-                    if origin == ProcessOrigin::Planner {
-                        self.set_planner_val(update)
-                    } else {
-                        self.set_execution_val(update).await
-                    }
+                    self.set_val(&exec, val, origin).await;
                 }
                 new_name.push(exec)
             }
             (start, end, new_name)
         } else {
-            let start = ExecutionVar::new();
-            let end = ExecutionVar::new();
-            let name = args
-                .drain(..)
-                .map(|cst| {
-                    let mut exec = ExecutionVar::new();
-                    if let Some(val) = cst {
-                        exec.set_val(val);
-                    }
-                    exec
-                })
-                .collect();
-            (start, end, name)
+            let start = self.new_acting_var();
+            let end = self.new_acting_var();
+            let mut new_name = vec![];
+            for cst in args {
+                let exec = self.acting_vars.new_acting_var();
+                if let Some(val) = cst {
+                    self.set_val(&exec, val, origin).await;
+                }
+                new_name.push(exec);
+            }
+            (start, end, new_name)
         };
         self.processes.push(ActingProcess::new(
             id,
@@ -655,9 +688,10 @@ impl InnerActingManager {
                 let timepoint = binding.timepoint;
                 let var_id = binding.var_id;
 
-                let start: ExecutionVar<Timepoint> = self.new_execution_var(&timepoint, &om_id);
+                let start: ActingVarRef<Timepoint> =
+                    self.new_acting_var_with_ref(&timepoint, &om_id);
                 let end = start.clone();
-                let var = self.new_execution_var(&var_id, &om_id);
+                let var = self.new_acting_var_with_ref(&var_id, &om_id);
                 (start, end, var)
             }
             None => Default::default(),
@@ -704,11 +738,11 @@ impl InnerActingManager {
                     .as_acquire()
                     .unwrap();
 
-                let start = self.new_execution_var(&binding.request, &om_id);
-                let s_acq = self.new_execution_var(&binding.acquisition.get_start(), &om_id);
-                let end = self.new_execution_var(&binding.acquisition.get_end(), &om_id);
-                let resource = self.new_execution_var(&binding.resource, &om_id);
-                let quantity = self.new_execution_var(&binding.quantity, &om_id);
+                let start = self.new_acting_var_with_ref(&binding.request, &om_id);
+                let s_acq = self.new_acting_var_with_ref(&binding.acquisition.get_start(), &om_id);
+                let end = self.new_acting_var_with_ref(&binding.acquisition.get_end(), &om_id);
+                let resource = self.new_acting_var_with_ref(&binding.resource, &om_id);
+                let quantity = self.new_acting_var_with_ref(&binding.quantity, &om_id);
                 (start, end, s_acq, resource, quantity)
             }
             None => Default::default(),
@@ -821,11 +855,11 @@ impl InnerActingManager {
     }
 
     pub fn get_refinement_lv(&self, id: &ActingProcessId) -> LValue {
-        self.processes[*id]
-            .inner
-            .as_method()
-            .unwrap()
-            .get_name_as_lvalue()
+        let mut list = vec![];
+        for arg in &self.processes[*id].inner.as_method().unwrap().args {
+            list.push(self.get_acting_var_val(arg).unwrap())
+        }
+        list.into()
     }
 
     pub fn get_om(&self, id: &ActingProcessId) -> LValue {
@@ -859,14 +893,14 @@ impl InnerActingManager {
 
     pub async fn set_s_acq(&mut self, id: &ActingProcessId, instant: Option<Timepoint>) {
         let instant = instant.unwrap_or(self.clock_manager.now().await);
-        let val = self.processes[*id]
+        let var = self.processes[*id]
             .inner
-            .as_mut_acquire()
+            .as_acquire()
             .unwrap()
-            .set_s_acq(instant);
-        if let Some(val) = val {
-            self.set_execution_val(val).await;
-        }
+            .s_acq
+            .clone();
+
+        self.set_execution_val(&var, instant).await
     }
 
     pub async fn set_arbitrary_value(
@@ -875,34 +909,30 @@ impl InnerActingManager {
         set: Vec<LValue>,
         greedy: LValue,
     ) -> LValue {
-        let plan_var_id = self.processes[*id]
+        let acting_var_ref = self.processes[*id]
             .inner
             .as_arbitrary()
             .unwrap()
-            .get_plan_var_id();
-        let value = if let Some(plan_var_id) = plan_var_id {
-            match self.get_plan_var_val(plan_var_id) {
-                ActingVal::Planned(val) => {
-                    let value: LValue = val.clone().into();
-                    if set.contains(&value) {
-                        println!("{}.arb = {}", id, value);
-                        value
-                    } else {
-                        greedy
-                    }
+            .var
+            .clone();
+        let value = match self.get_acting_var_acting_val(&acting_var_ref.id) {
+            ActingVal::Planned(val) => {
+                let value: LValue = val.clone().into();
+                if set.contains(&value) {
+                    println!("{}.arb = {}", id, value);
+                    value
+                } else {
+                    greedy
                 }
-                ActingVal::None => greedy,
-                _ => unreachable!(),
             }
-        } else {
-            greedy
+            ActingVal::None => greedy,
+            _ => unreachable!(),
         };
 
         let arbitrary = self.processes[*id].inner.as_mut_arbitrary().unwrap();
         arbitrary.set_set(set);
-        if let Some(val) = arbitrary.set_var(value.clone()) {
-            self.set_execution_vals(vec![val]).await;
-        }
+        let var_ref = arbitrary.var.clone();
+        self.set_execution_val(&var_ref, value.clone()).await;
         self.executed(id);
         value
     }
@@ -914,18 +944,21 @@ impl InnerActingManager {
         quantity: Quantity,
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        let mut updates: Vec<ActingValUpdate> = vec![];
         self.executed(id);
-        let acquire = self.processes[*id].inner.as_mut_acquire().unwrap();
-        let r = match acquire.move_reservation() {
+        let reservation = self.processes[*id]
+            .inner
+            .as_mut_acquire()
+            .unwrap()
+            .move_reservation();
+        let r = match reservation {
             Some(reservation) => {
                 println!("{} reserved", resource);
                 Ok(reservation)
             }
             None => {
-                if let Some(val) = acquire.set_resource(resource.to_string()) {
-                    updates.push(val);
-                }
+                let acquire = self.processes[*id].inner.as_acquire().unwrap();
+                let ref_r = acquire.resource.clone();
+                let ref_q = acquire.quantity.clone();
                 let waiter: WaitAcquire = self
                     .resource_manager
                     .acquire(&resource, quantity, priority)
@@ -936,16 +969,17 @@ impl InnerActingManager {
                     .get_client_quantity(&waiter.get_resource_id(), &waiter.get_client_id())
                     .await;
 
-                if let Some(val) = acquire.set_quantity(quantity) {
-                    updates.push(val);
-                }
+                self.set_execution_val(&ref_r, resource.to_string()).await;
+                self.set_execution_val(&ref_q, quantity).await;
 
-                acquire.set_acquire_id(&waiter);
+                self.processes[*id]
+                    .inner
+                    .as_mut_acquire()
+                    .unwrap()
+                    .set_acquire_id(&waiter);
                 Ok(waiter)
             }
         };
-
-        self.set_execution_vals(updates).await;
 
         r
     }
@@ -1321,9 +1355,9 @@ impl InnerActingManager {
         let mut updates: Vec<ActingValUpdate> = vec![];
         let mut reservations: Vec<Reservation> = vec![];
 
-        let mut update = |plan_var_id: &Option<ActingVarId>, val: Cst| {
+        let mut update = |plan_var_id: ActingVarId, val: Cst| {
             updates.push(ActingValUpdate {
-                plan_var_id: plan_var_id.unwrap(),
+                acting_var_id: plan_var_id,
                 val,
             })
         };
@@ -1340,7 +1374,7 @@ impl InnerActingManager {
             match choice_inner {
                 ChoiceInner::Arbitrary(a) => {
                     let arb = process.inner.as_arbitrary().unwrap();
-                    update(arb.get_plan_var_id(), a.val);
+                    update(arb.var.id, a.val);
                 }
                 ChoiceInner::Acquire(a) => {
                     reservations.push(Reservation {
@@ -1350,19 +1384,19 @@ impl InnerActingManager {
                         priority: a.priority,
                     });
                     let acq = process.inner.as_acquire().unwrap();
-                    update(acq.resource.get_plan_var_id(), a.resource);
-                    update(acq.quantity.get_plan_var_id(), a.quantity);
-                    update(acq.s_acq.get_plan_var_id(), a.s_acq);
-                    update(process.start.get_plan_var_id(), a.request);
-                    update(process.end.get_plan_var_id(), a.e_acq);
+                    update(acq.resource.id, a.resource);
+                    update(acq.quantity.id, a.quantity);
+                    update(acq.s_acq.id, a.s_acq);
+                    update(process.start.id, a.request);
+                    update(process.end.id, a.e_acq);
                 }
                 ChoiceInner::SubTask(s) => {
-                    update(process.start.get_plan_var_id(), s.start);
-                    update(process.end.get_plan_var_id(), s.end);
+                    update(process.start.id, s.start);
+                    update(process.end.id, s.end);
                 }
                 ChoiceInner::Refinement(r) => {
-                    update(process.start.get_plan_var_id(), r.start);
-                    update(process.end.get_plan_var_id(), r.end);
+                    update(process.start.id, r.start);
+                    update(process.end.id, r.end);
                 }
             }
         }
@@ -1419,8 +1453,8 @@ impl InnerActingManager {
                     process.debug().clone().unwrap(),
                     process.status,
                     {
-                        let start = process.start.get_val().unwrap();
-                        let end = *process.end.get_val();
+                        let start = self.get_acting_var_val(&process.start).unwrap();
+                        let end = self.get_acting_var_val(&process.end);
                         let interval = Interval::new(start, end);
                         let duration = interval.duration();
                         if duration.is_finite() {
@@ -1447,8 +1481,8 @@ fn format_acting_process(
         "({}, {})[{},{}]",
         acting_process.id(),
         acting_process.status,
-        planner_manager.format_execution_var(&acting_process.start),
-        planner_manager.format_execution_var(&acting_process.end),
+        planner_manager.format_acting_var(&acting_process.start),
+        planner_manager.format_acting_var(&acting_process.end),
     )
     .unwrap();
     let debug = if let Some(debug) = acting_process.debug() {
@@ -1467,15 +1501,15 @@ fn format_acting_process(
             write!(f, "{}", debug).unwrap();
         }
         ActingProcessInner::Arbitrary(arb) => {
-            write!(f, "arb({})", planner_manager.format_execution_var(&arb.var)).unwrap();
+            write!(f, "arb({})", planner_manager.format_acting_var(&arb.var)).unwrap();
         }
         ActingProcessInner::Acquire(acq) => {
             write!(
                 f,
                 "{}: acq({},{})",
-                planner_manager.format_execution_var(&acq.s_acq),
-                planner_manager.format_execution_var(&acq.resource),
-                planner_manager.format_execution_var(&acq.quantity)
+                planner_manager.format_acting_var(&acq.s_acq),
+                planner_manager.format_acting_var(&acq.resource),
+                planner_manager.format_acting_var(&acq.quantity)
             )
             .unwrap();
         }

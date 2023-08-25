@@ -1,4 +1,4 @@
-use crate::ompas::manager::acting::acting_var::ExecutionVar;
+use crate::ompas::manager::acting::acting_var::{ActingVarCollection, ActingVarRef};
 use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
@@ -9,6 +9,7 @@ use crate::ompas::manager::acting::process::root_task::RootProcess;
 use crate::ompas::manager::acting::{AMId, ActingProcessId};
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::action_status::ProcessStatus::Pending;
+use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use tokio::sync::watch;
 
@@ -41,19 +42,24 @@ pub struct ActingProcess {
     debug: Option<String>,
     pub origin: ProcessOrigin,
     pub status: ProcessStatus,
-    pub start: ExecutionVar<Timepoint>,
-    pub end: ExecutionVar<Timepoint>,
+    pub start: ActingVarRef<Timepoint>,
+    pub end: ActingVarRef<Timepoint>,
     pub inner: ActingProcessInner,
     pub status_update: Option<watch::Sender<ProcessStatus>>,
 }
 
-impl Display for ActingProcess {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl ActingProcess {
+    fn format(&self, acting_vars: &ActingVarCollection) -> String {
+        let mut f = String::new();
         write!(
             f,
             "({}, {})[{},{}]",
-            self.id, self.status, self.start, self.end
-        )?;
+            self.id,
+            self.status,
+            acting_vars.format_acting_var(&self.start),
+            acting_vars.format_acting_var(&self.end)
+        )
+        .unwrap();
         let debug = if let Some(debug) = &self.debug {
             debug.to_string()
         } else {
@@ -61,20 +67,28 @@ impl Display for ActingProcess {
         };
         match &self.inner {
             ActingProcessInner::RootTask(_) => {
-                write!(f, "root")
+                write!(f, "root").unwrap();
             }
             ActingProcessInner::Method(_)
             | ActingProcessInner::AbstractModel(_)
             | ActingProcessInner::Action(_) => {
-                write!(f, "{}", debug)
+                write!(f, "{}", debug).unwrap();
             }
             ActingProcessInner::Arbitrary(arb) => {
-                write!(f, "arb({})", arb.var)
+                write!(f, "arb({})", acting_vars.format_acting_var(&arb.var)).unwrap();
             }
             ActingProcessInner::Acquire(acq) => {
-                write!(f, "{}: acq({},{})", acq.s_acq, acq.resource, acq.quantity)
+                write!(
+                    f,
+                    "{}: acq({},{})",
+                    acting_vars.format_acting_var(&acq.s_acq),
+                    acting_vars.format_acting_var(&acq.resource),
+                    acting_vars.format_acting_var(&acq.quantity)
+                )
+                .unwrap();
             }
         }
+        f
     }
 }
 
@@ -86,8 +100,8 @@ impl ActingProcess {
         origin: ProcessOrigin,
         om_id: AMId,
         debug: Option<String>,
-        start: ExecutionVar<Timepoint>,
-        end: ExecutionVar<Timepoint>,
+        start: ActingVarRef<Timepoint>,
+        end: ActingVarRef<Timepoint>,
         inner: impl Into<ActingProcessInner>,
     ) -> Self {
         Self {

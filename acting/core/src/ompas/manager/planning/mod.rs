@@ -15,12 +15,12 @@ use crate::ompas::manager::acting::RefInnerActingManager;
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::plan_update::*;
+use crate::ompas::manager::planning::problem_update::StateUpdate;
 use crate::ompas::manager::planning::problem_update::{ExecutionProblem, PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{ResourceManager, WaiterPriority};
-use crate::ompas::manager::state::partial_state::PartialState;
 use crate::ompas::manager::state::state_update_manager::StateRule;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
-use crate::ompas::manager::state::{StateManager, StateType};
+use crate::ompas::manager::state::StateManager;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::generate_instances;
@@ -44,7 +44,6 @@ use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId, VarLabel};
 use futures::future::abortable;
 use itertools::Itertools;
-use ompas_language::exec::state::INSTANCE;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::ProcessInterface;
 use planner_manager_interface::PlannerManagerInterface;
@@ -153,7 +152,7 @@ impl PlannerManager {
             }
         }
 
-        let state_update_subscriber = state_manager.new_subscriber(StateRule::All).await;
+        let mut state_update_subscriber = state_manager.new_subscriber(StateRule::All).await;
 
         let mut clock = clock_manager.subscribe_to_clock().await;
 
@@ -180,9 +179,9 @@ impl PlannerManager {
                         while let Ok(update) = rx_update.try_recv() {
                             updates.push(update)
                         }
-                        /*if state_update_subscriber.channel.try_recv().is_ok() {
+                        if state_update_subscriber.channel.try_recv().is_ok() {
                             updates.push(PlannerUpdate::StateUpdate(StateUpdate {}))
-                        }*/
+                        }
                         if !updates.is_empty() {
 
                         //Debug
@@ -224,7 +223,7 @@ impl PlannerManager {
                         state.absorb(resource_state);
                         */
                         let ep = ExecutionProblem {
-                            state: state.clone().unwrap(),
+                            state: state.unwrap(),
                             chronicles: acting_manager.read().await.get_current_chronicles(),
                         };
                         let mut env = env.clone();
@@ -314,7 +313,7 @@ impl PlannerInstance {
                 })
             } else {
                 if OMPAS_PLAN_OUTPUT_ON.get() {
-                    println!("No solution found for planner");
+                    println!("No solution found by planner");
                 }
                 None
             }
@@ -591,16 +590,47 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
 
     let mut effects = vec![];
 
+    struct ActiveEffect {
+        sv: String,
+        start: f64,
+        end: Option<f64>,
+    }
+
+    // List of sv that are currently modified in the model
+    let mut active_effects: Vec<ActiveEffect> = vec![];
+
+    for chronicle in pp
+        .instances
+        .iter()
+        .map(|i| i.am.chronicle.as_ref().unwrap())
+    {
+        for e in chronicle.get_effects() {
+            let start_domain = st.get_domain_of_var(&e.get_start());
+            if start_domain.is_constant() {
+                active_effects.push(ActiveEffect {
+                    sv: e.sv.format(&st, true),
+                    start: start_domain.as_cst().unwrap().as_float().unwrap(),
+                    end: st
+                        .get_domain_of_var(&e.get_end())
+                        .as_cst()
+                        .map(|c| c.as_float().unwrap()),
+                })
+            }
+        }
+    }
+
     /*
     Initialisation of static state variables
      */
+    println!("state: ");
     //We suppose for the moment that all args of state variable are objects
-    'loop_static: for (key, fact) in &state.get_state(Some(StateType::Static)).inner.union(
-        state
-            .get_state(Some(StateType::Dynamic))
-            .inner
-            .union(PartialState::from(state.instance.clone()).inner),
-    ) {
+    'loop_fact: for (key, fact) in state.get_state(None).inner {
+        println!(
+            " - [{}]{} <- {}",
+            fact.date.map(|t| t.to_string()).unwrap_or("0".to_string()),
+            key,
+            fact.value
+        );
         let sv: Vec<VarId> = match key {
             LValueS::List(vec) => {
                 let sf = vec[0].to_string();
@@ -609,14 +639,14 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
                         .map(|lv| st.new_cst(lv.as_cst().unwrap()))
                         .collect()
                 } else {
-                    continue 'loop_static;
+                    continue 'loop_fact;
                 }
             }
             LValueS::Symbol(sf) => {
                 if present_sf.contains(&sf.as_str()) {
                     vec![st.new_symbol(sf)]
                 } else {
-                    continue 'loop_static;
+                    continue 'loop_fact;
                 }
             }
             _ => panic!("state variable is either a symbol or a list of symbols"),
@@ -635,7 +665,27 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
 
     let init_ch = pp.instances[0].am.chronicle.as_mut().unwrap();
 
-    for effect in effects {
+    'loop_effect: for effect in effects {
+        let effect_date = st
+            .get_domain_of_var(&effect.get_start())
+            .as_cst()
+            .unwrap()
+            .as_float()
+            .unwrap();
+        let sv = effect.sv.format(&st, true);
+        for ae in &active_effects {
+            if sv == ae.sv {
+                if effect_date >= ae.start {
+                    if match &ae.end {
+                        None => true,
+                        Some(end) => &effect_date <= end,
+                    } {
+                        continue 'loop_effect;
+                    }
+                }
+            }
+        }
+
         init_ch.add_effect(effect)
     }
 }

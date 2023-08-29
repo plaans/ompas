@@ -2,7 +2,6 @@ use crate::model::acting_domain::model::{Event, Goal, NewTask};
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::add_domain_symbols;
 use crate::model::sym_domain::cst;
-use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::interval::Interval;
@@ -237,7 +236,7 @@ pub async fn __plan(
     Ok(())
 }
 
-fn read_slice(slice: &[LValue]) -> Result<Vec<cst::Cst>, LRuntimeError> {
+pub fn read_slice(slice: &[LValue]) -> Result<Vec<cst::Cst>, LRuntimeError> {
     let mut args = vec![];
     for arg in slice {
         args.push(read_value(arg).map_err(|e| e.chain("read_slice"))?)
@@ -245,7 +244,7 @@ fn read_slice(slice: &[LValue]) -> Result<Vec<cst::Cst>, LRuntimeError> {
     Ok(args)
 }
 
-fn read_value(lv: &LValue) -> Result<cst::Cst, LRuntimeError> {
+pub fn read_value(lv: &LValue) -> Result<cst::Cst, LRuntimeError> {
     lv.as_cst().ok_or(LRuntimeError::wrong_type(
         "read_value",
         lv,
@@ -253,7 +252,7 @@ fn read_value(lv: &LValue) -> Result<cst::Cst, LRuntimeError> {
     ))
 }
 
-fn read_moment(moment: &LValue) -> Result<Interval, LRuntimeError> {
+pub fn read_moment(moment: &LValue) -> Result<Interval, LRuntimeError> {
     Ok(if let LValue::List(list) = &moment {
         if list.len() != 2 {
             return Err(LRuntimeError::wrong_number_of_args(
@@ -318,21 +317,19 @@ pub async fn new_goal_task(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
 }
 
 #[async_scheme_fn]
-pub async fn new_event(
-    env: &LEnv,
-    sv: LValue,
-    value: LValue,
-    moment: LValue,
-) -> Result<(), LRuntimeError> {
-    let sv: Vec<cst::Cst> = if let LValue::List(list) = sv {
-        read_slice(list.as_slice()).map_err(|e| e.chain(NEW_EVENT))?
-    } else {
-        vec![read_value(&sv).map_err(|e| e.chain(NEW_EVENT))?]
-    };
+pub async fn new_event(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    if args.len() < 3 {
+        return Err(LRuntimeError::wrong_number_of_args(
+            NEW_EVENT,
+            args,
+            3..std::usize::MAX,
+        ));
+    }
 
-    let value: Cst = read_value(&value).map_err(|e| e.chain(NEW_EVENT))?;
+    let interval = read_moment(&args[0])?;
+    let sv = read_slice(&args[1..args.len() - 1])?;
 
-    let interval = read_moment(&moment).map_err(|e| e.chain(NEW_EVENT))?;
+    let value = read_value(args.last().unwrap())?;
 
     let event = Event {
         interval,

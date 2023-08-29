@@ -3,6 +3,7 @@ use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingProcessId;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
+use crate::ompas::manager::state::partial_state::Fact;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::model::ModModel;
@@ -14,7 +15,7 @@ use ompas_language::monitor::model::MOD_MODEL;
 use sompas_macros::async_scheme_fn;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
-use sompas_structs::lruntimeerror::LResult;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use tokio::sync::broadcast;
 
@@ -132,7 +133,34 @@ pub async fn set_end(env: &LEnv, id: ActingProcessId, instant: f64) -> LResult {
 pub async fn set_status(env: &LEnv, id: ActingProcessId, status: String) {}*/
 
 #[async_scheme_fn]
-pub async fn new_event(env: &LEnv, _args: &[LValue]) -> LResult {
+pub async fn new_event(env: &LEnv, args: &[LValue]) -> LResult {
+    if args.len() < 3 {
+        return Err(LRuntimeError::wrong_number_of_args(
+            NEW_EVENT,
+            args,
+            3..std::usize::MAX,
+        ));
+    }
+
+    let moment: f64 = args[0].clone().try_into()?;
+    let mut key = args[1..args.len() - 1].to_vec();
+    let key = if key.len() == 1 {
+        key.remove(0).try_into()?
+    } else {
+        LValue::from(key).try_into()?
+    };
+
+    let value = args.last().unwrap().try_into()?;
+
+    let state = env
+        .get_context::<ModControl>(MOD_CONTROL)?
+        .acting_manager
+        .state
+        .clone();
+    println!("[Debug CP] New-event [{}] {} <- {}", moment, key, value);
+    state
+        .add_fact(key, Fact::new(value, Some(moment.into())))
+        .await;
     wait_on_planner(env).await?;
     Ok(LValue::Nil)
 }

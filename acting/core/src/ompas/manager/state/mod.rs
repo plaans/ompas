@@ -232,12 +232,13 @@ impl StateManager {
     }
 
     pub async fn add_fact(&self, key: LValueS, fact: Fact) {
-        self.inner_dynamic.write().await.insert(key, fact)
+        self.inner_dynamic.write().await.insert(key.clone(), fact);
+        self.trigger_state_update(vec![key]).await;
     }
 
     pub async fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
         let old_value = self.inner_dynamic.read().await.get(&key).cloned();
-        match old_value {
+        let v = match old_value {
             None => Err(lruntimeerror!(
                 "RAEState::retract_fact",
                 "key is not in state"
@@ -253,6 +254,8 @@ impl StateManager {
                     ))
                 }
             }
-        }
+        };
+        self.trigger_state_update(vec![key]).await;
+        v
     }
 }

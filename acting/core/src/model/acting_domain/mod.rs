@@ -1,15 +1,23 @@
 use crate::model::acting_domain::command::Command;
 use crate::model::acting_domain::method::Method;
 use crate::model::acting_domain::model::ModelKind;
+use crate::model::acting_domain::parameters::{ParameterType, Parameters};
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
+use crate::model::sym_domain::basic_type::{TYPE_ID_INT, TYPE_INT};
+use crate::model::sym_domain::Domain;
+use crate::model::sym_table::r#ref::RefSymTable;
 use im::HashMap;
+use ompas_language::exec::resource::{MAX_Q, QUANTITY};
+use ompas_language::exec::state::INSTANCE;
+use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE};
 use ompas_language::*;
 use sompas_structs::lenv::LEnvSymbols;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 pub mod command;
 pub mod method;
@@ -30,6 +38,118 @@ pub struct OMPASDomain {
 }
 
 impl OMPASDomain {
+    pub fn init(&mut self, st: &RefSymTable) {
+        /*{
+            let sym = symbol_table
+                .id(INSTANCE)
+                .ok_or_else(|| anyhow!("{} undefined", INSTANCE))?;
+            let mut args = Vec::with_capacity(2);
+            args.push(aType::Sym(
+                symbol_table
+                    .types
+                    .id_of(TYPE_OBJECT)
+                    .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
+            ));
+            args.push(aType::Sym(
+                symbol_table
+                    .types
+                    .id_of(TYPE_OBJECT_TYPE)
+                    .ok_or_else(|| anyhow!("{} undefined", TYPE_OBJECT_TYPE))?,
+            ));
+            state_functions.push(StateFun { sym, tpe: args })
+                }
+
+        /*
+         * Add state function for type.
+         * quantity(?<resource>) -> float
+         */
+        {
+            let sym = symbol_table
+                .id(QUANTITY)
+                .ok_or_else(|| anyhow!("{} undefined", QUANTITY))?;
+            let mut args = Vec::with_capacity(2);
+            args.push(aType::Sym(
+                symbol_table
+                    .types
+                    .id_of(TYPE_OBJECT_TYPE)
+                    .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
+            ));
+            args.push(aType::Int);
+            state_functions.push(StateFun { sym, tpe: args })
+        }
+
+        /*
+         * Add state function for type.
+         * quantity(?<resource>) -> float
+         */
+        {
+            let sym = symbol_table
+                .id(MAX_Q)
+                .ok_or_else(|| anyhow!("{} undefined", QUANTITY))?;
+            let mut args = Vec::with_capacity(2);
+            args.push(aType::Sym(
+                symbol_table
+                    .types
+                    .id_of(TYPE_OBJECT_TYPE)
+                    .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
+            ));
+            args.push(aType::Int);
+            state_functions.push(StateFun { sym, tpe: args })
+        }*/
+
+        self.add_state_function(
+            QUANTITY.to_string(),
+            StateFunction::new(
+                QUANTITY.to_string(),
+                Parameters::new(vec![(
+                    Arc::new("?o".to_string()),
+                    ParameterType::new(
+                        TYPE_OBJECT.into(),
+                        st.get_type_as_domain(TYPE_OBJECT).unwrap(),
+                    ),
+                )]),
+                Domain::Simple(TYPE_ID_INT),
+                TYPE_INT.to_string(),
+                None,
+            ),
+        )
+        .unwrap();
+        self.add_state_function(
+            MAX_Q.to_string(),
+            StateFunction::new(
+                MAX_Q.to_string(),
+                Parameters::new(vec![(
+                    Arc::new("?o".to_string()),
+                    ParameterType::new(
+                        TYPE_OBJECT.into(),
+                        st.get_type_as_domain(TYPE_OBJECT).unwrap(),
+                    ),
+                )]),
+                Domain::Simple(TYPE_ID_INT),
+                TYPE_INT.to_string(),
+                None,
+            ),
+        )
+        .unwrap();
+        self.add_state_function(
+            INSTANCE.to_string(),
+            StateFunction::new(
+                INSTANCE.to_string(),
+                Parameters::new(vec![(
+                    Arc::new("?o".to_string()),
+                    ParameterType::new(
+                        TYPE_OBJECT.into(),
+                        st.get_type_as_domain(TYPE_OBJECT).unwrap(),
+                    ),
+                )]),
+                st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap(),
+                TYPE_OBJECT_TYPE.to_string(),
+                None,
+            ),
+        )
+        .unwrap();
+    }
+
     pub fn get_element_description(&self, label: &str) -> String {
         match self.map_symbol_type.get(label) {
             None => format!("Keyword {} is not defined in the domain.", label),
@@ -271,8 +391,10 @@ impl OMPASDomain {
         }
 
         //Add all state functions to env:
-        for (label, state_function) in self.get_state_functions() {
-            env.insert(label.clone(), state_function.body.clone());
+        for (label, sf) in self.get_state_functions() {
+            if let Some(body) = sf.get_body() {
+                env.insert(label.clone(), body.clone())
+            };
         }
 
         //Add all lambdas to env:
@@ -305,8 +427,10 @@ impl OMPASDomain {
         }
 
         //Add all state functions to env:
-        for (label, state_function) in self.get_state_functions() {
-            env.insert(label.clone(), state_function.body.clone());
+        for (label, sf) in self.get_state_functions() {
+            if let Some(body) = sf.get_body() {
+                env.insert(label.clone(), body.clone());
+            }
         }
 
         //Add all lambdas to env:

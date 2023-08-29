@@ -1,5 +1,6 @@
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::state::state_update_manager::StateUpdateSubscriber;
 use ompas_language::process::*;
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::{LogLevel, ProcessInterface};
@@ -8,7 +9,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex};
 
 #[derive(Clone)]
 pub struct MonitorManager {
@@ -46,7 +47,7 @@ impl MonitorManager {
         //println!("new waiter: {}", lambda);
         let w = WaitFor {
             lambda,
-            date: self.clock_manager.now().await,
+            date: self.clock_manager.now(),
             channel: tx,
         };
         let id = inner.new_id();
@@ -70,6 +71,8 @@ impl MonitorManager {
                     if let LValue::True = lv {
                         let waiter = waiters.map.remove(id).unwrap();
                         waiter.channel.send(true).expect("");
+                        log.debug(format!("{} became true", waiter.lambda.to_string()))
+                            .await;
                     }
                 }
                 Err(e) => {
@@ -126,7 +129,7 @@ impl WaitForReceiver {
 }
 
 pub async fn task_check_wait_for(
-    mut update: broadcast::Receiver<bool>,
+    mut update: StateUpdateSubscriber,
     monitors: MonitorManager,
     env: LEnv,
 ) {
@@ -136,10 +139,9 @@ pub async fn task_check_wait_for(
     //println!("wait for working");
     loop {
         tokio::select! {
-            _ = update.recv() => {
+            _ = update.channel.recv() => {
                 let n_wait_on = monitors.inner.lock().await.map.len();
                 if n_wait_on != 0 {
-                    //println!("updating wait for");
                     monitors.check_wait_for(env.clone(), process.get_log_client()).await;
                 }
             }

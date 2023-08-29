@@ -196,6 +196,12 @@ impl From<f64> for LValueS {
     }
 }
 
+impl From<usize> for LValueS {
+    fn from(value: usize) -> Self {
+        LValueS::Int(value as i64)
+    }
+}
+
 impl From<bool> for LValueS {
     fn from(b: bool) -> Self {
         LValueS::Bool(b)

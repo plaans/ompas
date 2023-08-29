@@ -1,6 +1,8 @@
+use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::resource::WaiterPriority::{Execution, Planner};
-use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::state_manager::{StateType, WorldStateSnapshot};
+use crate::ompas::manager::state::partial_state::{Fact, PartialState};
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
+use crate::ompas::manager::state::StateType;
 use im::HashSet;
 use itertools::Itertools;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
@@ -176,8 +178,8 @@ impl Resource {
         quantity: Quantity,
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        let r = self.new_ticket(quantity, priority, TicketKind::Reservation)?;
-        self.update_queue().await;
+        let r = self.new_ticket(quantity, priority, TicketKind::Direct)?;
+        self.check_queue().await;
         Ok(r)
     }
 
@@ -208,12 +210,12 @@ impl Resource {
             .collect();
     }
 
-    pub async fn update_queue(&mut self) {
+    pub async fn check_queue(&mut self) {
         let mut queue = mem::take(&mut self.queue);
 
         while let Some(ticket_id) = queue.pop() {
             let waiter = self.clients.get(&ticket_id).unwrap();
-            if waiter.quantity <= self.capacity {
+            if waiter.kind == TicketKind::Direct && waiter.quantity <= self.capacity {
                 let acquire: ResourceHandler = self.add_acquire(&ticket_id);
                 let waiter = self.clients.get(&ticket_id).unwrap();
                 match waiter.tx.send(acquire).await {
@@ -246,6 +248,11 @@ impl Resource {
         self.queue.retain(|c_id| c_id != id)
     }
 
+    pub async fn _acquire_reservation(&mut self, id: &ClientId) {
+        self.clients.get_mut(&id).unwrap().kind = TicketKind::Direct;
+        self.check_queue().await;
+    }
+
     pub fn remove_in_service(&mut self, ticket_id: &ClientId) {
         self.in_service.remove(ticket_id);
         self._remove_client(ticket_id);
@@ -264,7 +271,7 @@ impl Resource {
 
     pub fn add_client(
         &mut self,
-        id: ClientId,
+        client_id: ClientId,
         _kind: TicketKind,
         quantity: Quantity,
         priority: WaiterPriority,
@@ -273,35 +280,35 @@ impl Resource {
         let quantity = self.quantity_as_usize(&quantity);
 
         self.clients.insert(
-            id,
+            client_id,
             Client {
-                _kind,
+                kind: _kind,
                 quantity,
                 priority,
                 tx,
             },
         );
 
-        self.queue.push(id);
+        self.queue.push(client_id);
 
         self.update_waiter_queue();
 
         Ok(WaitAcquire {
             rx,
-            ticket_id: id,
+            client_id,
             resource_id: self.id,
         })
     }
 
     pub async fn remove_client(&mut self, mut wa: WaitAcquire) {
-        match self.clients.remove(&wa.ticket_id) {
+        match self.clients.remove(&wa.client_id) {
             None => {
                 let rh: ResourceHandler = wa.rx.recv().await.unwrap();
                 self._remove_client(&rh.client_id);
             }
             Some(_) => {}
         }
-        self.remove_ticket(&wa.ticket_id);
+        self.remove_ticket(&wa.client_id);
     }
 
     pub fn update_priority(&mut self, client_id: &ClientId, priority: WaiterPriority) {
@@ -316,13 +323,14 @@ impl Resource {
     }
 }
 
+#[derive(PartialEq, Eq)]
 pub enum TicketKind {
     Direct,
     Reservation,
 }
 
 pub struct Client {
-    _kind: TicketKind,
+    kind: TicketKind,
     quantity: usize,
     priority: WaiterPriority,
     tx: Sender<ResourceHandler>,
@@ -343,7 +351,7 @@ pub enum AcquireResponse {
 
 pub struct WaitAcquire {
     rx: Receiver<ResourceHandler>,
-    ticket_id: usize,
+    client_id: usize,
     resource_id: usize,
 }
 
@@ -353,7 +361,7 @@ impl WaitAcquire {
     }
 
     pub(crate) fn get_client_id(&self) -> usize {
-        self.ticket_id
+        self.client_id
     }
 
     pub(crate) fn get_resource_id(&self) -> usize {
@@ -450,7 +458,7 @@ impl ResourceManager {
             .await
             .get_mut(&id)
             .unwrap()
-            .update_queue()
+            .check_queue()
             .await;
         Ok(())
     }
@@ -474,7 +482,7 @@ impl ResourceManager {
         let resource: &mut Resource = map.get_mut(&rh.resource_id).unwrap();
         resource.remove_in_service(&rh.client_id);
         resource.update_remaining_capacity()?;
-        resource.update_queue().await;
+        resource.check_queue().await;
         Ok(())
     }
 
@@ -482,6 +490,12 @@ impl ResourceManager {
         let mut map = self.inner.lock().await;
         let resource: &mut Resource = map.get_mut(&wa.resource_id).unwrap();
         resource.remove_client(wa).await;
+    }
+
+    pub async fn acquire_reservation(&self, resource_id: &ResourceId, client_id: &ClientId) {
+        let mut map = self.inner.lock().await;
+        let resource: &mut Resource = map.get_mut(&resource_id).unwrap();
+        resource._acquire_reservation(client_id).await;
     }
 
     pub async fn update_priority(
@@ -548,21 +562,21 @@ impl ResourceManager {
         str
     }
 
-    pub async fn get_snapshot(&self) -> WorldStateSnapshot {
-        let mut r#static: im::HashMap<LValueS, LValueS> = Default::default();
-        let mut r#dynamic: im::HashMap<LValueS, LValueS> = Default::default();
+    pub async fn get_snapshot(&self, now: Option<Timepoint>) -> WorldStateSnapshot {
+        let mut r#static: im::HashMap<LValueS, Fact> = Default::default();
+        let mut r#dynamic: im::HashMap<LValueS, Fact> = Default::default();
         for (_, resource) in self.inner.lock().await.iter() {
             r#static.insert(
                 list![MAX_Q.into(), resource.label.clone().into()]
                     .try_into()
                     .unwrap(),
-                LValue::from(resource.max_capacity).try_into().unwrap(),
+                (&LValueS::from(resource.max_capacity)).into(),
             );
             r#dynamic.insert(
                 list![QUANTITY.into(), resource.label.clone().into()]
                     .try_into()
                     .unwrap(),
-                LValue::from(resource.capacity).try_into().unwrap(),
+                Fact::new(LValueS::from(resource.capacity), now),
             );
         }
 
@@ -570,11 +584,11 @@ impl ResourceManager {
             r#static: Default::default(),
             dynamic: Default::default(),
             inner_static: PartialState {
-                inner: r#static,
+                inner: r#static.into(),
                 _type: Some(StateType::InnerStatic),
             },
             inner_dynamic: PartialState {
-                inner: r#dynamic,
+                inner: r#dynamic.into(),
                 _type: Some(StateType::InnerDynamic),
             },
             instance: Default::default(),

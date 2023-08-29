@@ -1,10 +1,8 @@
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::state_manager::StateType;
-use ompas_language::exec::state::INSTANCE;
+use crate::ompas::manager::state::partial_state::{Fact, PartialState};
+use crate::ompas::manager::state::StateType;
+use ompas_language::exec::state::{INSTANCE, INSTANCES};
 use ompas_language::sym_table::TYPE_OBJECT;
-use sompas_structs::list;
-use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
 
@@ -43,7 +41,17 @@ impl From<InstanceCollection> for PartialState {
         };
         for (t, set) in i.inner {
             let v: LValueS = set.iter().cloned().collect::<Vec<_>>().into();
-            p.insert(list![INSTANCE.into(), t.into()].try_into().unwrap(), v);
+            p.insert(
+                LValueS::List(vec![INSTANCES.into(), t.to_string().into()]),
+                (&v).into(),
+            );
+
+            for o in set {
+                p.insert(
+                    LValueS::List(vec![INSTANCE.into(), o.into()]),
+                    Fact::new(t.to_string().into(), None),
+                );
+            }
         }
         p
     }

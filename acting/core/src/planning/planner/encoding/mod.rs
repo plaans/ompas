@@ -7,7 +7,7 @@ use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
-use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::generate_instances;
 use crate::planning::planner::problem::ChronicleInstance;
@@ -35,6 +35,7 @@ pub mod problem_generation;
 /// Resolution of ms
 
 pub struct PlannerProblem {
+    pub st: RefSymTable,
     pub instances: Vec<ChronicleInstance>,
     pub templates: Vec<ActingModel>,
     pub domain: PlannerDomain,
@@ -182,7 +183,7 @@ pub fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
     }
 }
 
-#[allow(dead_code)]
+//#[allow(dead_code)]
 pub fn var_id_into_atom(
     a: &VarId,
     st: &RefSymTable,

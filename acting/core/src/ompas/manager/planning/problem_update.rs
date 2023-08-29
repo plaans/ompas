@@ -3,7 +3,7 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::ompas::manager::acting::acting_var::PlanVarRef;
 use crate::ompas::manager::acting::ActingProcessId;
-use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::planning::planner::problem::ChronicleInstance;
 
 pub enum PlannerUpdate {

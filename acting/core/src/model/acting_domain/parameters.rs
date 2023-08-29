@@ -15,27 +15,11 @@ pub struct Parameters {
     inner: Vec<(Arc<Sym>, ParameterType)>,
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct ParameterType {
-    debug: LValue,
-    domain: Domain,
-}
-
-impl ParameterType {
-    pub fn new(debug: LValue, domain: Domain) -> Self {
-        Self { debug, domain }
-    }
-
-    pub fn get_domain(&self) -> &Domain {
-        &self.domain
-    }
-
-    pub fn get_debug(&self) -> &LValue {
-        &self.debug
-    }
-}
-
 impl Parameters {
+    pub fn new(inner: Vec<(Arc<Sym>, ParameterType)>) -> Self {
+        Self { inner }
+    }
+
     pub fn inner(&self) -> &Vec<(Arc<Sym>, ParameterType)> {
         &self.inner
     }
@@ -88,42 +72,7 @@ impl Parameters {
 
         Ok(Self { inner: vec })
     }
-}
 
-#[named]
-#[async_recursion]
-pub async fn try_domain_from_lvalue(
-    st: &RefSymTable,
-    lv: &LValue,
-) -> Result<Domain, LRuntimeError> {
-    let domain: Domain = match lv {
-        LValue::List(list) => {
-            let t = st.get_type_id(list[0].to_string()).unwrap();
-            let mut composition = vec![];
-            for t in &list[1..] {
-                composition.push(try_domain_from_lvalue(st, t).await?)
-            }
-            Domain::Composed(t, composition)
-        }
-        LValue::Symbol(t) => {
-            let t = match t.to_string().to_ascii_lowercase().as_str() {
-                "object" => TYPE_OBJECT,
-                _ => t,
-            };
-            Domain::Simple(st.get_type_id(t).ok_or_else(|| {
-                LRuntimeError::new(
-                    function_name!(),
-                    format!("type {} has not been declared", t),
-                )
-            })?)
-        }
-        _ => Default::default(),
-    };
-
-    Ok(domain)
-}
-
-impl Parameters {
     pub fn get_labels(&self) -> Vec<Arc<Sym>> {
         self.inner.iter().map(|tuple| tuple.0.clone()).collect()
     }
@@ -170,4 +119,57 @@ impl Display for Parameters {
 
         write!(f, "{}", str)
     }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ParameterType {
+    debug: LValue,
+    domain: Domain,
+}
+
+impl ParameterType {
+    pub fn new(debug: LValue, domain: Domain) -> Self {
+        Self { debug, domain }
+    }
+
+    pub fn get_domain(&self) -> &Domain {
+        &self.domain
+    }
+
+    pub fn get_debug(&self) -> &LValue {
+        &self.debug
+    }
+}
+
+#[named]
+#[async_recursion]
+pub async fn try_domain_from_lvalue(
+    st: &RefSymTable,
+    lv: &LValue,
+) -> Result<Domain, LRuntimeError> {
+    let domain: Domain = match lv {
+        LValue::List(list) => {
+            let t = st.get_type_id(list[0].to_string()).unwrap();
+            let mut composition = vec![];
+            for t in &list[1..] {
+                composition.push(try_domain_from_lvalue(st, t).await?)
+            }
+            Domain::Composed(t, composition)
+        }
+        LValue::Symbol(t) => {
+            let t = match t.to_string().to_ascii_lowercase().as_str() {
+                "object" => TYPE_OBJECT,
+                _ => t,
+            };
+            Domain::Simple(st.get_type_id(t).ok_or_else(|| {
+                LRuntimeError::new(
+                    function_name!(),
+                    format!("type {} has not been declared", t),
+                )
+            })?)
+        }
+        _ => Default::default(),
+    };
+
+    Ok(domain)
 }

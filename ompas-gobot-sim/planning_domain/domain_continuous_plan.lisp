@@ -15,6 +15,5 @@
     ;adds a new task to address
     (cp.new-task t_jobshop)
     ;replan with the same structure
-    ;(cp.plan)
-
+    (cp.plan)
 )

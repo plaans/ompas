@@ -392,9 +392,9 @@ fn post_process_state_2(
 
     match r#type {
         StateVariableType::Static => {
-            if let Some(v) = state.get(&LValueS::from(vec!["globals.robot_standard_velocity"])) {
+            if let Some(f) = state.get(&LValueS::from(vec!["globals.robot_standard_velocity"])) {
                 //println!("ok");
-                global.def_velocity = Some(v.try_into().unwrap())
+                global.def_velocity = Some((&f.value).try_into().unwrap())
             }
             //Store velocity
         }
@@ -404,7 +404,7 @@ fn post_process_state_2(
     }
 
     let mut state_variables = vec![];
-    for (k, v) in &state.inner {
+    for (k, f) in &state.inner {
         match k {
             LValueS::List(list) => {
                 let mut sv = list.clone();
@@ -418,7 +418,7 @@ fn post_process_state_2(
                 if state_function.contains(".instance") {
                     let obj_label = parameters[0].to_string();
                     let instance = Instance {
-                        r#type: v.to_string(),
+                        r#type: f.value.to_string(),
                         object: obj_label.to_string(),
                     };
 
@@ -433,14 +433,14 @@ fn post_process_state_2(
                     //Creation of a unary resource corresponding to the instance.
                     updates.push(resource.into());
 
-                    if v.to_string() == "belt" || v.to_string() == "parking_area" {
+                    if f.value.to_string() == "belt" || f.value.to_string() == "parking_area" {
                         let cells = state
                             .get(&LValueS::from(vec![
-                                format!("{}.cells", v).into(),
+                                format!("{}.cells", f.value).into(),
                                 list[1].clone(),
                             ]))
                             .unwrap();
-                        let mut cells: Vec<LValueS> = cells.try_into().unwrap();
+                        let mut cells: Vec<LValueS> = (&cells.value).try_into().unwrap();
                         let tiles: Vec<Tile> = cells
                             .drain(..)
                             .map(|val| {
@@ -460,7 +460,7 @@ fn post_process_state_2(
                     r#type: r#type.into(),
                     state_function,
                     parameters,
-                    value: Some(v.clone().try_into().unwrap()),
+                    value: Some(f.value.clone().try_into().unwrap()),
                 });
             }
             _ => {

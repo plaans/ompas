@@ -2,6 +2,7 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingProcessId;
 use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::model::ModModel;
@@ -41,7 +42,7 @@ impl From<ModContinuousPlanning> for LModule {
         m.add_async_fn(NEW_EVENT, new_event, DOC_NEW_EVENT, false);
 
         m.add_async_fn(SET_START, set_start, DOC_SET_START, false);
-
+        m.add_async_fn(SET_END, set_end, DOC_SET_END, false);
         m
     }
 }
@@ -108,12 +109,27 @@ pub async fn set_start(env: &LEnv, id: ActingProcessId, instant: f64) -> LResult
         .get_context::<ModControl>(MOD_CONTROL)?
         .acting_manager
         .clone();
-    println!("set start of {} to {}", id, instant);
+    println!("[Debug CP] Set start of {} to {}", id, instant);
     acting_manager.set_start(&id, Some(instant.into())).await;
-    //panic!("");
     wait_on_planner(env).await?;
     Ok(LValue::Nil)
 }
+
+#[async_scheme_fn]
+pub async fn set_end(env: &LEnv, id: ActingProcessId, instant: f64) -> LResult {
+    let acting_manager = env
+        .get_context::<ModControl>(MOD_CONTROL)?
+        .acting_manager
+        .clone();
+    println!("[Debug CP] Set end of {} to {}", id, instant);
+    acting_manager
+        .set_end(&id, Some(instant.into()), ProcessStatus::Success)
+        .await;
+    Ok(LValue::Nil)
+}
+
+/*#[async_scheme_fn]
+pub async fn set_status(env: &LEnv, id: ActingProcessId, status: String) {}*/
 
 #[async_scheme_fn]
 pub async fn new_event(env: &LEnv, _args: &[LValue]) -> LResult {

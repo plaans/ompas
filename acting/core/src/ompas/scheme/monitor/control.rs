@@ -10,7 +10,8 @@ use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::platform_config::PlatformConfig;
 use crate::ompas::manager::platform::PlatformManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::state_manager::StateType;
+use crate::ompas::manager::state::state_update_manager::StateRule;
+use crate::ompas::manager::state::StateType;
 use crate::ompas::scheme::exec::ModExec;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::ompas::scheme::monitor::ModMonitor;
@@ -208,7 +209,7 @@ impl From<ModControl> for LModule {
 pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let acting_manager = ctx.acting_manager.clone();
-    acting_manager.clock_manager.reset().await;
+    //acting_manager.clock_manager.reset().await;
     let mut tasks_to_execute: Vec<Job> = vec![];
     mem::swap(
         &mut *ctx.tasks_to_execute.write().await,
@@ -224,7 +225,7 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let env = ctx.get_exec_env().await;
     let log = ctx.log.clone();
 
-    let receiver_event_update_state = acting_manager.state.subscribe_on_update().await;
+    let receiver_event_update_state = acting_manager.state.new_subscriber(StateRule::All).await;
     let env_clone = env.clone();
     let monitors = acting_manager.monitor_manager.clone();
     tokio::spawn(async move {
@@ -274,7 +275,7 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
     let env = ctx.get_exec_env().await;
     let log = ctx.log.clone();
 
-    let receiver_event_update_state = acting_manager.state.subscribe_on_update().await;
+    let receiver_event_update_state = acting_manager.state.new_subscriber(StateRule::All).await;
     let env_clone = env.clone();
     let monitors = acting_manager.monitor_manager.clone();
     tokio::spawn(async move {

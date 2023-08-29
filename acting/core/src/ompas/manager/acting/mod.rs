@@ -1,4 +1,5 @@
 use crate::model::acting_domain::model::ActingModel;
+use crate::model::acting_domain::OMPASDomain;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::process_ref::{Label, MethodId, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
@@ -15,7 +16,7 @@ use crate::ompas::manager::planning::problem_update::ExecutionProblem;
 use crate::ompas::manager::planning::PlannerManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::state_manager::StateManager;
+use crate::ompas::manager::state::StateManager;
 use crate::planning::conversion::_convert;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::p_eval;
@@ -63,12 +64,15 @@ impl ActingManager {
     pub fn new(st: RefSymTable) -> Self {
         let clock_manager = ClockManager::default();
         let resource_manager = ResourceManager::default();
+        let mut ompas_domain = OMPASDomain::default();
+        ompas_domain.init(&st);
+        let domain = ompas_domain.into();
         Self {
             st: st.clone(),
             resource_manager: resource_manager.clone(),
             monitor_manager: MonitorManager::from(clock_manager.clone()),
-            domain: Default::default(),
-            state: StateManager::new(st.clone()),
+            domain,
+            state: StateManager::new(clock_manager.clone(), st.clone()),
             inner: Arc::new(RwLock::new(InnerActingManager::new(
                 resource_manager,
                 clock_manager.clone(),
@@ -388,7 +392,7 @@ impl ActingManager {
 
     pub async fn get_execution_problem(&self) -> ExecutionProblem {
         let mut state = self.state.get_snapshot().await;
-        let resource_state = self.resource_manager.get_snapshot().await;
+        let resource_state = self.resource_manager.get_snapshot(None).await;
         state.absorb(resource_state);
         ExecutionProblem {
             state,

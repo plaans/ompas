@@ -512,6 +512,12 @@ pub mod monitor {
         pub const SET_START: &str = "cp.set-start";
         pub const DOC_SET_START: &str = "Simulates the instantiation of the start of a task.";
 
+        pub const SET_END: &str = "cp.set-end";
+        pub const DOC_SET_END: &str = "Simulates the instantiation of the end of a task";
+
+        pub const SET_STATUS: &str = "cp.set-status";
+        pub const DOC_SET_STATUS: &str = "Simulates the instantiation of the status of a process";
+
         pub const NEW_EVENT: &str = "cp.new-event";
         pub const DOC_NEW_EVENT: &str = "Simulates the occurrence of a new event.";
     }

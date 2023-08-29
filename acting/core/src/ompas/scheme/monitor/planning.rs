@@ -10,7 +10,7 @@ use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::problem_update::ExecutionProblem;
 use crate::ompas::manager::planning::{encode, extract_choices, populate_problem};
-use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::model::ModModel;
@@ -188,7 +188,7 @@ pub async fn __plan(
     add_domain_symbols(&st, &domain);
 
     let mut state = acting_manager.state.get_snapshot().await;
-    let resource_state = acting_manager.resource_manager.get_snapshot().await;
+    let resource_state = acting_manager.resource_manager.get_snapshot(None).await;
     state.absorb(resource_state);
     let ep: ExecutionProblem = ExecutionProblem {
         state,
@@ -207,7 +207,7 @@ pub async fn __plan(
     }
 
     let (aries_problem, table): (chronicles::Problem, ActingVarRefTable) =
-        encode(&st, &pp).await.unwrap();
+        encode(&pp).await.unwrap();
     if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
         for instance in &aries_problem.chronicles {
             Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);

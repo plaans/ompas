@@ -1,6 +1,8 @@
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::monitor::MonitorManager;
-use crate::ompas::manager::state::state_manager::{StateManager, StateType, WorldStateSnapshot};
+use crate::ompas::manager::state::partial_state::Fact;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
+use crate::ompas::manager::state::{StateManager, StateType};
 use crate::ompas::scheme::exec::resource::resources;
 use crate::ompas::scheme::exec::ModExec;
 use futures::FutureExt;
@@ -103,7 +105,7 @@ async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let value = args.last().unwrap();
     state
         .state
-        .add_fact(key.try_into()?, value.try_into()?)
+        .add_fact(key.try_into()?, Fact::from(&value.try_into()?))
         .await;
     Ok(())
 }
@@ -127,9 +129,12 @@ async fn transitive_assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
     .try_into()?;
 
     let value: LValueS = args.last().unwrap().try_into()?;
-    state.state.add_fact(key.clone(), UNKNOWN.into()).await;
+    state
+        .state
+        .add_fact(key.clone(), Fact::from(&LValueS::from(UNKNOWN)))
+        .await;
     tokio::time::sleep(Duration::from_micros((duration * 1_000_000.0) as u64)).await;
-    state.state.add_fact(key, value).await;
+    state.state.add_fact(key, (&value).into()).await;
     Ok(())
 }
 

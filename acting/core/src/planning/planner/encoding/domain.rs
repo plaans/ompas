@@ -19,13 +19,10 @@ use crate::planning::planner::encoding::{
     atom_from_cst, get_type, var_id_into_atom, PlannerDomain,
 };
 use crate::OMPAS_PLAN_ENCODING_OPTIMIZATION_ON;
-use anyhow::anyhow;
 use aries::core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
 use aries::model::lang::linear::{LinearSum, LinearTerm};
-use aries::model::lang::{
-    Atom as aAtom, Atom, ConversionError, FAtom, IAtom, IVar, Type as aType, Variable,
-};
+use aries::model::lang::{Atom as aAtom, Atom, ConversionError, FAtom, IAtom, IVar, Variable};
 use aries::model::symbols::SymbolTable;
 use aries::model::types::TypeHierarchy;
 use aries::utils::input::Sym;
@@ -39,8 +36,6 @@ use aries_planning::chronicles::{
 use aries_planning::parsing::pddl::TypedSymbol;
 use function_name::named;
 use num_integer::Integer;
-use ompas_language::exec::resource::{MAX_Q, QUANTITY};
-use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::*;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -87,11 +82,6 @@ pub fn encode_ctx(
         symbols.push(TypedSymbol::new(sym, TYPE_OBJECT_TYPE));
     }
 
-    /*for t in &problem.types {
-        types.push((t.into(), Some(OBJECT_TYPE.into())));
-        symbols.push(TypedSymbol::new(t, TYPE_TYPE));
-    }*/
-
     let th = TypeHierarchy::new(types).unwrap_or_else(|e| panic!("{e}"));
 
     for (t, instances) in &instance.inner {
@@ -100,11 +90,6 @@ pub fn encode_ctx(
         }
     }
 
-    //Adding custom state functions
-    symbols.push(TypedSymbol::new(INSTANCE, TYPE_STATE_FUNCTION));
-    symbols.push(TypedSymbol::new(QUANTITY, TYPE_STATE_FUNCTION));
-    symbols.push(TypedSymbol::new(MAX_Q, TYPE_STATE_FUNCTION));
-    //symbols.push(TypedSymbol::new(NIL_OBJECT, OBJECT_TYPE));
     for sf in &domain.sf {
         symbols.push(TypedSymbol::new(sf.get_label(), TYPE_STATE_FUNCTION));
     }
@@ -125,68 +110,11 @@ pub fn encode_ctx(
     let symbol_table = SymbolTable::new(th, symbols).unwrap_or_else(|e| panic!("{e}"));
 
     //We have 4 synthetic state functions.
-    let mut state_functions = Vec::with_capacity(domain.sf.len() + 3);
+    let mut state_functions = Vec::with_capacity(domain.sf.len());
     /*
      * Add state function for type.
      * instance(?<object>) -> type
      */
-    {
-        let sym = symbol_table
-            .id(INSTANCE)
-            .ok_or_else(|| anyhow!("{} undefined", INSTANCE))?;
-        let mut args = Vec::with_capacity(2);
-        args.push(aType::Sym(
-            symbol_table
-                .types
-                .id_of(TYPE_OBJECT)
-                .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-        ));
-        args.push(aType::Sym(
-            symbol_table
-                .types
-                .id_of(TYPE_OBJECT_TYPE)
-                .ok_or_else(|| anyhow!("{} undefined", TYPE_OBJECT_TYPE))?,
-        ));
-        state_functions.push(StateFun { sym, tpe: args })
-    }
-
-    /*
-     * Add state function for type.
-     * quantity(?<resource>) -> float
-     */
-    {
-        let sym = symbol_table
-            .id(QUANTITY)
-            .ok_or_else(|| anyhow!("{} undefined", QUANTITY))?;
-        let mut args = Vec::with_capacity(2);
-        args.push(aType::Sym(
-            symbol_table
-                .types
-                .id_of(TYPE_OBJECT_TYPE)
-                .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-        ));
-        args.push(aType::Int);
-        state_functions.push(StateFun { sym, tpe: args })
-    }
-
-    /*
-     * Add state function for type.
-     * quantity(?<resource>) -> float
-     */
-    {
-        let sym = symbol_table
-            .id(MAX_Q)
-            .ok_or_else(|| anyhow!("{} undefined", QUANTITY))?;
-        let mut args = Vec::with_capacity(2);
-        args.push(aType::Sym(
-            symbol_table
-                .types
-                .id_of(TYPE_OBJECT_TYPE)
-                .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-        ));
-        args.push(aType::Int);
-        state_functions.push(StateFun { sym, tpe: args })
-    }
 
     for sf in &domain.sf {
         let sym = symbol_table.id(sf.get_label()).ok_or_else(|| {

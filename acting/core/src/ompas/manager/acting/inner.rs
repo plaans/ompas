@@ -114,10 +114,17 @@ impl InnerActingManager {
     }
 
     pub fn init(&mut self) {
-        let model = ActingModel::root(&self.st);
+        let mut model = ActingModel::root(&self.st);
         let chronicle = model.chronicle.as_ref().unwrap();
         let start = self.new_acting_var_with_ref(&chronicle.interval.get_start(), &0);
         let end = self.new_acting_var_with_ref(&chronicle.interval.get_end(), &0);
+        let now = self.clock_manager.now();
+        let cst = now.as_cst().unwrap();
+        model.instantiations.push(Instantiation::new(
+            chronicle.interval.get_start(),
+            self.st.new_cst(cst.clone()),
+        ));
+        self.acting_vars.set_execution_val(&start, now);
 
         let root = ActingProcess::new(
             0,
@@ -137,13 +144,6 @@ impl InnerActingManager {
         if let Some(planner) = &self.planner_manager_interface {
             planner.send_update(pu).await;
         }
-        /*if let Some(notifier) = &self.planner_manager {
-            notifier
-                .update_notifier
-                .send(notification)
-                .await
-                .unwrap_or_else(|_| panic!());
-        }*/
     }
 
     pub async fn plan(&mut self) {
@@ -336,7 +336,7 @@ impl InnerActingManager {
     }
 
     pub async fn set_start(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
-        let instant = t.unwrap_or(self.clock_manager.now().await);
+        let instant = t.unwrap_or(self.clock_manager.now());
         self.set_execution_val(&self.processes[*id].start.clone(), instant)
             .await;
     }
@@ -348,7 +348,7 @@ impl InnerActingManager {
         t: Option<Timepoint>,
         status: ProcessStatus,
     ) {
-        let instant = t.unwrap_or(self.clock_manager.now().await);
+        let instant = t.unwrap_or(self.clock_manager.now());
         let end = self.processes[*id].end.clone();
         self.set_execution_val(&end, instant).await;
 
@@ -387,7 +387,7 @@ impl InnerActingManager {
     }
 
     pub async fn set_moment(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
-        let instant = t.unwrap_or(self.clock_manager.now().await);
+        let instant = t.unwrap_or(self.clock_manager.now());
         self.set_start(id, Some(instant)).await;
         self.set_end(id, Some(instant), self.get_status(id)).await;
     }
@@ -648,17 +648,28 @@ impl InnerActingManager {
         };
 
         let action: &mut ActionProcess = self.processes[*parent].inner.as_mut_action().unwrap();
+
         let method_id = if let Some(MethodId {
             refinement_id,
             method_number,
         }) = method_id
         {
-            if action.get_refinement(refinement_id).is_none() {
-                action.new_refinement(Some(refinement_id));
-            }
+            let refinement_id = if action.get_refinement(refinement_id).is_none() {
+                action.new_refinement(Some(refinement_id))
+            } else {
+                action.refinements.len() - 1
+            };
+
             action.add_method_to_refinement(refinement_id, Some(method_number), id)
         } else {
-            action.add_method_to_refinement(action.refinements.len(), None, id)
+            let refinenement_id = if action.refinements.is_empty() {
+                action.new_refinement(None)
+            } else {
+                action.refinements.len() - 1
+            };
+            let id = action.add_method_to_refinement(refinenement_id, None, id);
+            action.set_chosen(&id);
+            id
         };
         self.processes.push(ActingProcess::new(
             id,
@@ -704,7 +715,11 @@ impl InnerActingManager {
                 let var = self.new_acting_var_with_ref(&var_id, &om_id);
                 (start, end, var)
             }
-            None => Default::default(),
+            None => (
+                self.new_acting_var::<Timepoint>(),
+                self.new_acting_var::<Timepoint>(),
+                self.new_acting_var::<LValue>(),
+            ),
         };
 
         self.processes.push(ActingProcess::new(
@@ -755,7 +770,13 @@ impl InnerActingManager {
                 let quantity = self.new_acting_var_with_ref(&binding.quantity, &om_id);
                 (start, end, s_acq, resource, quantity)
             }
-            None => Default::default(),
+            None => (
+                self.new_acting_var(),
+                self.new_acting_var(),
+                self.new_acting_var(),
+                self.new_acting_var(),
+                self.new_acting_var(),
+            ),
         };
 
         self.processes.push(ActingProcess::new(
@@ -814,7 +835,7 @@ impl InnerActingManager {
                 let origin = self.get_origin(method);
                 //println!("{id}.origin = {:?}", origin);
                 if origin == ProcessOrigin::Planner {
-                    Some(*id)
+                    Some(*method)
                 } else {
                     None
                 }
@@ -869,7 +890,7 @@ impl InnerActingManager {
     pub fn get_refinement_lv(&self, id: &ActingProcessId) -> LValue {
         let mut list = vec![];
         for arg in &self.processes[*id].inner.as_method().unwrap().args {
-            list.push(self.get_acting_var_val(arg).unwrap())
+            list.push(self.get_acting_var_acting_val(&arg.id).as_cst().unwrap())
         }
         list.into()
     }
@@ -904,7 +925,7 @@ impl InnerActingManager {
     }
 
     pub async fn set_s_acq(&mut self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        let instant = instant.unwrap_or(self.clock_manager.now().await);
+        let instant = instant.unwrap_or(self.clock_manager.now());
         let var = self.processes[*id]
             .inner
             .as_acquire()
@@ -965,6 +986,12 @@ impl InnerActingManager {
         let r = match reservation {
             Some(reservation) => {
                 println!("{} reserved", resource);
+                self.resource_manager
+                    .acquire_reservation(
+                        &reservation.get_resource_id(),
+                        &reservation.get_client_id(),
+                    )
+                    .await;
                 Ok(reservation)
             }
             None => {
@@ -1347,7 +1374,9 @@ impl InnerActingManager {
                             .iter()
                             .map(|var_id| st.var_as_cst(var_id))
                             .collect();
-                        let Label::Refinement(method_id) = label else {todo!()};
+                        let Label::Refinement(method_id) = label else {
+                            todo!()
+                        };
                         let parent = self
                             .new_refinement(
                                 &parent,

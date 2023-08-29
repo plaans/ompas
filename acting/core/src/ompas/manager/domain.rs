@@ -15,6 +15,14 @@ pub struct DomainManager {
     inner: Arc<RwLock<OMPASDomain>>,
 }
 
+impl From<OMPASDomain> for DomainManager {
+    fn from(value: OMPASDomain) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(value)),
+        }
+    }
+}
+
 impl DomainManager {
     pub async fn get_inner(&self) -> OMPASDomain {
         self.inner.read().await.clone()

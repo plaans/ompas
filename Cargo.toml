@@ -1,5 +1,5 @@
 [workspace]
-
+resolver = "1"
 
 members = [
     "craft-bots/ompas-craft-bots",

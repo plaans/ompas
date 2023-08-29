@@ -1,8 +1,8 @@
 use aries_planning::parsing::sexpr::SExpr;
 use ompas_core::ompas::manager::state::action_status::ProcessStatus;
 use ompas_core::ompas::manager::state::action_status::ProcessStatus::Rejected;
-use ompas_core::ompas::manager::state::partial_state::PartialState;
-use ompas_core::ompas::manager::state::state_manager::StateType;
+use ompas_core::ompas::manager::state::partial_state::{Fact, PartialState};
+use ompas_core::ompas::manager::state::StateType;
 use serde::{Deserialize, Serialize, Serializer};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -160,7 +160,7 @@ impl TryFrom<GodotMessageSerde> for PartialState {
                     LValueS::List(list) => {
                         state.insert(
                             LValueS::List(list[0..list.len() - 1].to_vec()),
-                            list.last().unwrap().clone(),
+                            Fact::from(list.last().unwrap().clone()),
                         );
                     }
                     _ => panic!("there should be a list"),

@@ -5,7 +5,7 @@ use crate::model::acting_domain::task::Task;
 use crate::model::process_ref::{MethodId, ProcessRef};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
-use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use aries_planning::chronicles::{Chronicle, ChronicleOrigin};
 use aries_planning::parsing::pddl::Method;
 use sompas_structs::lvalues::LValueS;

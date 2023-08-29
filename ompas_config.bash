@@ -5,7 +5,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # print the generates chronicles
 export OMPAS_CHRONICLE_DEBUG=on
 
-export OMPAS_DELIBERATION_FREQUENCY=1000
+export OMPAS_DELIBERATION_FREQUENCY=1
 
 # print the plan formatted for the acting tree
 export OMPAS_PLAN_OUTPUT=true

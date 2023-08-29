@@ -9,7 +9,7 @@ pub struct StateFunction {
     pub parameters: Parameters,
     pub result: Domain,
     pub result_debug: String,
-    pub body: LValue,
+    pub body: Option<LValue>,
 }
 
 impl StateFunction {
@@ -18,7 +18,7 @@ impl StateFunction {
         parameters: Parameters,
         result: Domain,
         result_debug: String,
-        body: LValue,
+        body: Option<LValue>,
     ) -> Self {
         Self {
             label,
@@ -37,7 +37,10 @@ impl Display for StateFunction {
             "parameter(s) : {}\nresult: {}\nbody: {}",
             self.parameters,
             self.result_debug,
-            self.body.format("body: ".len()),
+            match &self.body {
+                Some(body) => body.format("body: ".len()),
+                None => "".to_string(),
+            },
         )
     }
 }
@@ -47,7 +50,7 @@ impl StateFunction {
         &self.parameters
     }
 
-    pub fn get_body(&self) -> &LValue {
+    pub fn get_body(&self) -> &Option<LValue> {
         &self.body
     }
 

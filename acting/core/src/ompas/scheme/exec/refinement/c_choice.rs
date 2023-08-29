@@ -3,7 +3,7 @@ use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::select_mode::{CChoiceConfig, Planner, SelectMode};
 use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
 use crate::ompas::manager::domain::DomainManager;
-use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::refinement::greedy_select;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::exec::ModExec;
@@ -333,8 +333,7 @@ pub async fn c_choice_select(
         .unwrap()
         .acting_manager
         .clock_manager
-        .now()
-        .await;
+        .now();
     greedy.method_value = method;
     greedy.interval.set_end(now);
 

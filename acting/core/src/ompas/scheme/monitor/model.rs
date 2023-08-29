@@ -9,8 +9,9 @@ use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::resource::{Capacity, ResourceManager};
-use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::state_manager::{StateManager, StateType, WorldStateSnapshot};
+use crate::ompas::manager::state::partial_state::{Fact, PartialState};
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
+use crate::ompas::manager::state::{StateManager, StateType};
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::planning::conversion::context::ConversionContext;
 use ompas_language::monitor::model::*;
@@ -29,6 +30,7 @@ use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
+
 pub struct ModModel {
     state: StateManager,
     st: RefSymTable,
@@ -70,7 +72,7 @@ impl ModModel {
 
     pub async fn get_plan_state(&self) -> WorldStateSnapshot {
         let mut state = self.state.get_snapshot().await;
-        let snap_resource: WorldStateSnapshot = self.resource_manager.get_snapshot().await;
+        let snap_resource: WorldStateSnapshot = self.resource_manager.get_snapshot(None).await;
         state.absorb(snap_resource);
         state
     }
@@ -307,7 +309,8 @@ pub async fn add_state_function(
     );
     let body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
     let result_debug = st.format_domain(&result);
-    let state_function = StateFunction::new(label.to_string(), params, result, result_debug, body);
+    let state_function =
+        StateFunction::new(label.to_string(), params, result, result_debug, Some(body));
     ctx.domain
         .add_state_function(label.to_string(), state_function)
         .await?;
@@ -356,7 +359,8 @@ pub async fn add_function(
     );
     let body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
     let result_debug = st.format_domain(&result);
-    let state_function = StateFunction::new(label.to_string(), params, result, result_debug, body);
+    let state_function =
+        StateFunction::new(label.to_string(), params, result, result_debug, Some(body));
     ctx.domain
         .add_state_function(label.to_string(), state_function)
         .await?;
@@ -780,7 +784,7 @@ pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
     };
 
     for (k, v) in &map {
-        inner_dynamic.insert(k.try_into()?, v.try_into()?);
+        inner_dynamic.insert(k.try_into()?, Fact::from(&v.try_into()?));
     }
 
     state.update_state(inner_dynamic).await;
@@ -802,7 +806,7 @@ pub async fn add_static_facts(
     };
 
     for (k, v) in &map {
-        inner_static.insert(k.try_into()?, v.try_into()?);
+        inner_static.insert(k.try_into()?, Fact::from(&v.try_into()?));
     }
 
     state.update_state(inner_static).await;

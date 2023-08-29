@@ -49,6 +49,7 @@ pub struct ActingProcess {
 }
 
 impl ActingProcess {
+    #[allow(unused)]
     fn format(&self, acting_vars: &ActingVarCollection) -> String {
         let mut f = String::new();
         write!(
@@ -98,7 +99,7 @@ impl ActingProcess {
         id: ActingProcessId,
         parent: ActingProcessId,
         origin: ProcessOrigin,
-        om_id: AMId,
+        am_id: AMId,
         debug: Option<String>,
         start: ActingVarRef<Timepoint>,
         end: ActingVarRef<Timepoint>,
@@ -107,7 +108,7 @@ impl ActingProcess {
         Self {
             id,
             parent,
-            am_id: om_id,
+            am_id,
             debug,
             origin,
             status: Pending,

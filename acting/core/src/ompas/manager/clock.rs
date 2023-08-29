@@ -9,27 +9,27 @@ use tokio::time::Instant;
 
 #[derive(Clone)]
 pub struct ClockManager {
-    instant: Arc<RwLock<Instant>>,
+    instant: Arc<Instant>,
     clock_subscriber: Arc<RwLock<Option<watch::Receiver<u64>>>>,
 }
 
 impl Default for ClockManager {
     fn default() -> Self {
         Self {
-            instant: Arc::new(RwLock::new(Instant::now())),
+            instant: Arc::new(Instant::now()),
             clock_subscriber: Arc::new(RwLock::new(None)),
         }
     }
 }
 
 impl ClockManager {
-    pub async fn now(&self) -> Timepoint {
-        self.instant.read().await.elapsed().as_millis().into()
+    pub fn now(&self) -> Timepoint {
+        self.instant.elapsed().as_millis().into()
     }
 
-    pub async fn reset(&self) {
+    /*pub async fn reset(&self) {
         *self.instant.write().await = Instant::now()
-    }
+    }*/
 
     pub async fn start_global_clock(&self) {
         let period = 1_000_000 / OMPAS_FREQUENCY.get();

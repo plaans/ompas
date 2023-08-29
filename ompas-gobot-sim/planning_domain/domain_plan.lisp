@@ -5,4 +5,8 @@
     (read planning_domain/plan_model.lisp)
     (read planning_domain/problems/j02.lisp)
 
+    (start-with-planner false)
+    ;(start)
+    (activate_log log-ompas)
+    (trigger-task t_jobshop)
 )

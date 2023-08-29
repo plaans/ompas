@@ -4,7 +4,7 @@ use crate::ompas::interface::select_mode::{Planner, RAEPlanConfig, SelectMode};
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
 use crate::ompas::manager::domain::DomainManager;
-use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::refinement::c_choice::Cost;
 use crate::ompas::scheme::exec::refinement::greedy_select;
 use crate::ompas::scheme::exec::state::ModState;

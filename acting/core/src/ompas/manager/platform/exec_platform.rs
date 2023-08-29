@@ -8,8 +8,9 @@ use crate::ompas::manager::platform::platform_config::PlatformConfig;
 use crate::ompas::manager::platform::PlatformDescriptor;
 use crate::ompas::manager::resource::Capacity;
 use crate::ompas::manager::state::action_status::ProcessStatus;
+use crate::ompas::manager::state::partial_state::Fact;
 use crate::ompas::manager::state::partial_state::PartialState;
-use crate::ompas::manager::state::state_manager::StateType;
+use crate::ompas::manager::state::StateType;
 use crate::ompas::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use ompas_interface::platform_interface::command_request::Request;
@@ -147,6 +148,7 @@ impl ExecPlatform {
                             if let Some(update) =  msg.update {
                                 match update {
                                     Update::State(state) => {
+
                                         let mut r#static =  PartialState {
                                             inner: Default::default(),
                                             _type: Some(StateType::Static)
@@ -171,10 +173,10 @@ impl ExecPlatform {
 
                                             match StateVariableType::from_i32(sv.r#type).unwrap() {
                                                 StateVariableType::Static => {
-                                                    r#static.insert(key.clone(), sv.value.unwrap().borrow().try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)))
+                                                    r#static.insert(key.clone(), Fact::new((&sv.value.unwrap()).try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)), None))
                                                 }
                                                 StateVariableType::Dynamic => {
-                                                    dynamic.insert(key.clone(), sv.value.unwrap().borrow().try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)))
+                                                    dynamic.insert(key.clone(), Fact::new((&sv.value.unwrap()).try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)), None))
                                                 }
                                             }
                                         }

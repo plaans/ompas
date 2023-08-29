@@ -16,7 +16,7 @@ use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
 use crate::ompas::scheme::exec::refinement::aries::aries_select;
 use crate::ompas::scheme::exec::refinement::c_choice::c_choice_select;
@@ -497,7 +497,7 @@ pub async fn greedy_select(
         let chosen = methods.get(0).cloned().unwrap_or(LValue::Nil);
         (methods, chosen)
     };
-    let interval = Interval::new(start, Some(ctx.clock_manager.now().await));
+    let interval = Interval::new(start, Some(ctx.clock_manager.now()));
     Ok(RefinementInner {
         task_value: task.into(),
         method_value: chosen,

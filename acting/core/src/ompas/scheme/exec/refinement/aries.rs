@@ -1,7 +1,7 @@
 use crate::ompas::manager::acting::process::task::RefinementInner;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::manager::domain::DomainManager;
-use crate::ompas::manager::state::state_manager::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::planner::problem::PlanningDomain;
 use ompas_middleware::logger::LogClient;

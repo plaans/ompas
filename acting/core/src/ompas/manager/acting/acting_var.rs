@@ -5,6 +5,7 @@ use crate::ompas::manager::acting::AMId;
 use sompas_structs::contextcollection::AsyncLTrait;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
+use sompas_structs::lvalues::LValueS;
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
@@ -92,7 +93,8 @@ impl ActingVar {
                 self.val_t = Some(Box::new(val));
             }
             Some(v) => {
-                assert_eq!(v.downcast_ref::<T>().unwrap(), &val)
+                let v: T = v.downcast_ref::<T>().cloned().unwrap();
+                assert_eq!(v, val)
             }
         }
 
@@ -123,6 +125,16 @@ pub enum ActingVal {
     None,
 }
 
+impl AsCst for ActingVal {
+    fn as_cst(&self) -> Option<Cst> {
+        match self {
+            ActingVal::Execution(c) => Some(c.clone()),
+            ActingVal::Planned(c) => Some(c.clone()),
+            ActingVal::None => None,
+        }
+    }
+}
+
 pub struct ActingValUpdate {
     pub(crate) acting_var_id: ActingVarId,
     pub(crate) val: Cst,
@@ -144,57 +156,6 @@ impl AsCst for Cst {
     }
 }
 
-/*impl<T: Display + Clone + AsCst + PartialEq + std::fmt::Debug> ActingVarRef<T> {
-    pub fn new() -> Self {
-        Self {
-            plan_var_id: None,
-            val: None,
-        }
-    }
-    pub fn new_with_ref(plan_var_id: ActingVarId) -> Self {
-        Self {
-            plan_var_id: Some(plan_var_id),
-            val: None,
-        }
-    }
-
-    pub fn get_plan_var_id(&self) -> &Option<ActingVarId> {
-        &self.plan_var_id
-    }
-
-    pub fn set_val(&mut self, val: T) -> Option<ActingValUpdate> {
-        match &self.val {
-            None => {
-                let cst = val.as_cst().unwrap();
-                self.val = Some(val);
-                self.plan_var_id
-                    .as_ref()
-                    .map(|&plan_var_id| ActingValUpdate {
-                        plan_var_id,
-                        val: cst.clone(),
-                    })
-            }
-            Some(v) => {
-                assert_eq!(&val, v);
-                None
-            }
-        }
-    }
-
-    pub fn get_val(&self) -> &Option<T> {
-        &self.val
-    }
-}*/
-
-/*impl<T: Display + Clone + AsCst + PartialEq + std::fmt::Debug> Display for ActingVarRef<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self.val {
-            Some(val) => write!(f, "{}", val),
-            None => write!(f, ""),
-        }
-    }
-}*/
-
 impl AsCst for LValue {
     fn as_cst(&self) -> Option<Cst> {
         Some(match self {
@@ -206,6 +167,18 @@ impl AsCst for LValue {
             LValue::True => Cst::Bool(true),
             LValue::Nil => Cst::Bool(false),
             lv => panic!("{} cannot be converted as cst", lv),
+        })
+    }
+}
+
+impl AsCst for LValueS {
+    fn as_cst(&self) -> Option<Cst> {
+        Some(match self {
+            LValueS::Symbol(s) => Cst::Symbol(s.to_string()),
+            LValueS::Int(i) => Cst::Int(*i),
+            LValueS::Float(f) => Cst::Float(*f),
+            LValueS::Bool(b) => Cst::Bool(*b),
+            lvs => panic!("{} cannot be converted as cst", lvs),
         })
     }
 }

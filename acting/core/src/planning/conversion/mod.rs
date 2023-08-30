@@ -2,7 +2,7 @@ use crate::model::acting_domain::model::{ActingModel, ModelKind};
 use crate::model::acting_domain::parameters::Parameters;
 use crate::model::acting_domain::task::Task;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
-use crate::model::process_ref::MethodId;
+use crate::model::process_ref::{MethodLabel, RefinementLabel};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::scheme::exec::ModExec;
@@ -181,7 +181,10 @@ pub async fn p_convert_task(
                 },
                 am: om,
                 pr: Default::default(),
-                method_id: Default::default(),
+                refinement_label: RefinementLabel {
+                    refinement_id: 0,
+                    method_label: MethodLabel::Possibility(0),
+                },
             });
         }
         None => {
@@ -217,9 +220,9 @@ pub async fn p_convert_task(
                     },
                     am: om,
                     pr: Default::default(),
-                    method_id: MethodId {
+                    refinement_label: RefinementLabel {
                         refinement_id: 0,
-                        method_number: i,
+                        method_label: MethodLabel::Possibility(i),
                     },
                 });
             }

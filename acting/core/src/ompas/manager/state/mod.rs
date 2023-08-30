@@ -3,7 +3,7 @@ use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::state::instance::InstanceCollection;
 use crate::ompas::manager::state::partial_state::{Fact, PartialState};
 use crate::ompas::manager::state::state_update_manager::{
-    StateRule, StateUpdateManager, StateUpdateSubscriber, SubscriberId, Updated,
+    StateRule, StateUpdate, StateUpdateManager, StateUpdateSubscriber, SubscriberId,
 };
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use sompas_structs::lruntimeerror;
@@ -113,12 +113,14 @@ impl StateManager {
             .set_rule(subscriber_id, rule)
     }
 
-    async fn trigger_state_update(&self, updated: Updated) {
-        self.state_update_manager
-            .read()
-            .await
-            .check_updates_and_send_notifications(updated)
-            .await;
+    async fn trigger_state_update(&self, updated: StateUpdate) {
+        if !updated.is_empty() {
+            self.state_update_manager
+                .read()
+                .await
+                .check_updates_and_send_notifications(updated)
+                .await;
+        }
     }
 
     pub async fn get_state(&self, _type: Option<StateType>) -> PartialState {
@@ -153,7 +155,7 @@ impl StateManager {
     }
 
     pub async fn update_state(&self, state: PartialState) {
-        let updated = state.inner.keys().cloned().collect();
+        let mut updated = vec![];
         let time = self.clock_manager.now();
 
         match &state._type {
@@ -164,7 +166,12 @@ impl StateManager {
                     let r#static = &mut r#static.inner;
                     for (k, mut v) in state.inner {
                         v.date = Some(time);
-                        r#static.insert(k, v);
+                        let value = v.value.clone();
+                        if let Some(old) = r#static.insert(k.clone(), v) {
+                            if old.value != value {
+                                updated.push(k.clone())
+                            }
+                        };
                     }
                 }
                 StateType::Dynamic => {
@@ -172,7 +179,12 @@ impl StateManager {
                     let dynamic = &mut dynamic.inner;
                     for (k, mut v) in state.inner {
                         v.date = Some(time);
-                        dynamic.insert(k, v);
+                        let value = v.value.clone();
+                        if let Some(old) = dynamic.insert(k.clone(), v) {
+                            if old.value != value {
+                                updated.push(k.clone())
+                            }
+                        };
                     }
                 }
                 StateType::InnerStatic => {
@@ -180,7 +192,12 @@ impl StateManager {
                     let inner_world = &mut inner_world.inner;
                     for (k, mut v) in state.inner {
                         v.date = Some(time);
-                        inner_world.insert(k, v);
+                        let value = v.value.clone();
+                        if let Some(old) = inner_world.insert(k.clone(), v) {
+                            if old.value != value {
+                                updated.push(k.clone())
+                            }
+                        };
                     }
                 }
                 StateType::InnerDynamic => {
@@ -188,7 +205,12 @@ impl StateManager {
                     let inner_world = &mut inner_world.inner;
                     for (k, mut v) in state.inner {
                         v.date = Some(time);
-                        inner_world.insert(k, v);
+                        let value = v.value.clone();
+                        if let Some(old) = inner_world.insert(k.clone(), v) {
+                            if old.value != value {
+                                updated.push(k.clone())
+                            }
+                        };
                     }
                 }
                 StateType::Instance => {
@@ -224,7 +246,6 @@ impl StateManager {
                 }
                 StateType::Instance => {
                     panic!()
-                    //self.instance.write().await.inner.inner = state.inner;
                 }
             },
         }

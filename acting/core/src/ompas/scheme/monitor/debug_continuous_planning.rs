@@ -126,6 +126,7 @@ pub async fn set_end(env: &LEnv, id: ActingProcessId, instant: f64) -> LResult {
     acting_manager
         .set_end(&id, Some(instant.into()), ProcessStatus::Success)
         .await;
+    wait_on_planner(env).await?;
     Ok(LValue::Nil)
 }
 

@@ -1,23 +1,52 @@
-use crate::model::process_ref::MethodId;
+use crate::model::process_ref::{MethodLabel, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
 use crate::ompas::manager::acting::acting_var::ActingVarRef;
 use crate::ompas::manager::acting::process::ActingProcessInner;
 use crate::ompas::manager::acting::ActingProcessId;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 #[derive(Default, Clone, Debug)]
 pub struct Refinement {
-    pub(crate) possibilities: Vec<ActingProcessId>,
-    pub(crate) chosen: ActingProcessId,
+    pub(crate) methods: HashMap<MethodLabel, ActingProcessId>,
 }
 
 impl Refinement {
-    pub fn get_method(&self, method_id: &usize) -> &ActingProcessId {
-        &self.possibilities[*method_id]
+    pub fn get_method(&self, label: &MethodLabel) -> Option<&ActingProcessId> {
+        self.methods.get(label)
     }
 
-    pub fn get_chosen(&self) -> &ActingProcessId {
-        &self.chosen
+    pub fn get_suggested(&self) -> Option<&ActingProcessId> {
+        self.methods.get(&MethodLabel::Suggested)
+    }
+
+    pub fn get_executed(&self) -> Option<&ActingProcessId> {
+        self.methods.get(&MethodLabel::Executed)
+    }
+
+    pub fn get_possibilities(&self) -> Vec<&ActingProcessId> {
+        self.methods
+            .iter()
+            .filter_map(|(k, v)| {
+                if let MethodLabel::Possibility(_) = k {
+                    Some(v)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn set_suggested(&mut self, method: &ActingProcessId) {
+        self.methods.insert(MethodLabel::Suggested, *method);
+    }
+
+    pub fn set_executed(&mut self, method: &ActingProcessId) {
+        self.methods.insert(MethodLabel::Executed, *method);
+    }
+
+    pub fn add_method(&mut self, label: MethodLabel, method: &ActingProcessId) {
+        self.methods.insert(label, *method);
     }
 }
 
@@ -53,42 +82,30 @@ impl ActionProcess {
         self.refinements.get(refinement_id)
     }
 
-    pub fn new_refinement(&mut self, refinement_id: Option<usize>) -> usize {
+    pub fn new_refinement(&mut self) -> usize {
         let id = self.refinements.len();
-        self.refinements.push(Refinement::default());
-        if let Some(refinement_id) = refinement_id {
-            assert_eq!(id, refinement_id);
-        } else {
-        }
+        self.refinements.push(Default::default());
         id
     }
 
-    pub fn add_method_to_refinement(
-        &mut self,
-        refinement_id: usize,
-        method_id: Option<usize>,
-        method: ActingProcessId,
-    ) -> MethodId {
-        let possibilities = &mut self.refinements[refinement_id].possibilities;
-        let id = possibilities.len();
-        if let Some(method_id) = method_id {
-            assert_eq!(id, method_id);
-        }
-        possibilities.push(method);
-        MethodId {
-            refinement_id,
-            method_number: id,
-        }
+    pub fn add_method(&mut self, refinement_label: RefinementLabel, method: &ActingProcessId) {
+        self.refinements[refinement_label.refinement_id]
+            .add_method(refinement_label.method_label, method)
     }
 
-    pub fn set_chosen(&mut self, method_id: &MethodId) {
-        let refinement = &mut self.refinements[method_id.refinement_id];
-        refinement.chosen = refinement.possibilities[method_id.method_number];
+    pub fn set_suggested(&mut self, refinement_id: usize, method: &ActingProcessId) {
+        self.refinements
+            .get_mut(refinement_id)
+            .unwrap()
+            .set_suggested(method)
     }
 
-    /*pub fn update_last_refinement(&mut self, refinement: ActingProcessId) {
-        *self.refinements.last_mut().unwrap() = refinement;
-    }*/
+    pub fn set_executed(&mut self, refinement_id: usize, method: &ActingProcessId) {
+        self.refinements
+            .get_mut(refinement_id)
+            .unwrap()
+            .set_executed(method);
+    }
 
     pub fn get_refinements(&self) -> &Vec<Refinement> {
         &self.refinements

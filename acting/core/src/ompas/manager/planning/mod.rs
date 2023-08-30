@@ -5,7 +5,7 @@ use crate::model::chronicle::acting_binding::ActingBinding;
 use crate::model::chronicle::effect::Effect;
 use crate::model::chronicle::interval::Interval;
 use crate::model::chronicle::ChronicleKind;
-use crate::model::process_ref::{Label, MethodId, ProcessRef};
+use crate::model::process_ref::{Label, MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
@@ -15,7 +15,6 @@ use crate::ompas::manager::acting::RefInnerActingManager;
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::plan_update::*;
-use crate::ompas::manager::planning::problem_update::StateUpdate;
 use crate::ompas::manager::planning::problem_update::{ExecutionProblem, PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{ResourceManager, WaiterPriority};
 use crate::ompas::manager::state::state_update_manager::StateRule;
@@ -158,7 +157,7 @@ impl PlannerManager {
 
         //TODO: Remove
         let mut state: Option<WorldStateSnapshot>;
-
+        let mut first = true;
         'main: loop {
             tokio::select! {
                 Some(pu) = wait_plan(&mut plan_receiver) => {
@@ -179,11 +178,11 @@ impl PlannerManager {
                         while let Ok(update) = rx_update.try_recv() {
                             updates.push(update)
                         }
-                        if state_update_subscriber.channel.try_recv().is_ok() {
-                            updates.push(PlannerUpdate::StateUpdate(StateUpdate {}))
+                        if let Ok(state_update) = state_update_subscriber.channel.try_recv() {
+                            updates.push(PlannerUpdate::StateUpdate(state_update))
                         }
-                        if !updates.is_empty() {
-
+                        if first && !updates.is_empty() {
+                        first= false;
                         //Debug
                         let explanation = {
 
@@ -197,8 +196,11 @@ impl PlannerManager {
                                     PlannerUpdate::ProblemUpdate(a) => {
                                         writeln!(explanation, "- Planning with new process {a}.").unwrap();
                                     }
-                                    PlannerUpdate::StateUpdate(_s) => {
-                                        writeln!(explanation, "- State Update").unwrap();
+                                    PlannerUpdate::StateUpdate(s) => {
+                                        writeln!(explanation, "- State Update:").unwrap();
+                                        for u in s {
+                                            writeln!(explanation, "\t - {}", u).unwrap();
+                                        }
                                     }
                                     PlannerUpdate::Plan => {
                                         writeln!(explanation, "- Requested replanning of tree.").unwrap();
@@ -211,17 +213,12 @@ impl PlannerManager {
                             interrupt(&mut interrupter);
                         }
 
-                        //if state.is_none() {
                             let mut new_state = state_manager.get_snapshot().await;
                             let resource_state = resource_manager.get_snapshot(Some(now)).await;
                             new_state.absorb(resource_state);
                             state = Some(new_state);
                         //}
 
-                        /*let mut state = state_manager.get_snapshot().await;
-                        let resource_state = resource_manager.get_snapshot().await;
-                        state.absorb(resource_state);
-                        */
                         let ep = ExecutionProblem {
                             state: state.unwrap(),
                             chronicles: acting_manager.read().await.get_current_chronicles(),
@@ -492,9 +489,9 @@ pub async fn populate_problem(
                             ChronicleKind::Method,
                         )
                         .await?;
-                        let method_id = MethodId {
+                        let method_id = RefinementLabel {
                             refinement_id: 0,
-                            method_number: i,
+                            method_label: MethodLabel::Possibility(i),
                         };
                         instance.pr.push(Label::Refinement(method_id));
                         update_problem(&mut p_actions, &vec![], &instance, instances.len());
@@ -622,15 +619,15 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
     /*
     Initialisation of static state variables
      */
-    println!("state: ");
+    //println!("state: ");
     //We suppose for the moment that all args of state variable are objects
     'loop_fact: for (key, fact) in state.get_state(None).inner {
-        println!(
+        /*println!(
             " - [{}]{} <- {}",
             fact.date.map(|t| t.to_string()).unwrap_or("0".to_string()),
             key,
             fact.value
-        );
+        );*/
         let sv: Vec<VarId> = match key {
             LValueS::List(vec) => {
                 let sf = vec[0].to_string();
@@ -777,7 +774,7 @@ pub fn extract_choices(
                 name,
                 start,
                 end,
-                method_id: instance.method_id,
+                refinement_label: instance.refinement_label,
             },
         ));
 

@@ -14,9 +14,12 @@
     (def-command move (:params (?from room) (?to room)))
     (def-command-om-model move
       (:params (?from room) (?to room))
-      (:pre-conditions (= (at-robby) ?from) (!= ?from ?to))
+      ;(:pre-conditions (= (at-robby) ?from) (!= ?from ?to))
       (:body
-            (transitive-assert 10 'at-robby ?to)))
+            (do
+                (check (= (at-robby) ?from))
+                (check (!= ?from ?to))
+                (transitive-assert 10 'at-robby ?to))))
 
     (def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))
     (def-command-pddl-model pick

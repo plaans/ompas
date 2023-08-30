@@ -1,7 +1,7 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::parameters::Parameters;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
-use crate::model::process_ref::ProcessRef;
+use crate::model::process_ref::{MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::planning::conversion::convert;
@@ -130,6 +130,9 @@ pub async fn convert_into_chronicle_instance(
         origin: p_action.origin,
         am: om,
         pr: p_action.pr,
-        method_id: Default::default(),
+        refinement_label: RefinementLabel {
+            refinement_id: 0,
+            method_label: MethodLabel::Possibility(0),
+        },
     })
 }

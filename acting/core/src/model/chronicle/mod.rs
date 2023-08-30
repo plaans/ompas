@@ -1,4 +1,4 @@
-use crate::model::chronicle::acting_binding::ActingBindingCollection;
+use crate::model::chronicle::acting_binding::{ActingBinding, ActingBindingCollection};
 use crate::model::chronicle::condition::Condition;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::effect::Effect;
@@ -7,7 +7,6 @@ use crate::model::chronicle::lit::Lit;
 use crate::model::chronicle::subtask::SubTask;
 use crate::model::chronicle::task_template::TaskTemplate;
 use crate::model::sym_domain::basic_type::BasicType;
-use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, GetVariables, Replace};
@@ -208,27 +207,53 @@ impl Chronicle {
         }
     }
 
-    pub fn rm_constraint(&mut self, index: usize) {
+    pub fn remove_constraint(&mut self, index: usize) {
         self.constraints.remove(index);
     }
 
-    pub fn rm_condition(&mut self, index: usize) {
+    pub fn remove_condition(&mut self, index: usize) {
         self.conditions.remove(index);
     }
 
-    pub fn rm_set_constraint(&mut self, mut indexes: Vec<usize>) {
+    pub fn remove_effect(&mut self, index: usize) {
+        self.effects.remove(index);
+    }
+
+    pub fn remove_subtask(&mut self, index: usize) {
+        self.subtasks.remove(index);
+    }
+
+    pub fn remove_constraints(&mut self, mut indexes: Vec<usize>) {
         indexes.sort_unstable();
         indexes.reverse();
         for index in indexes {
-            self.rm_constraint(index);
+            self.remove_constraint(index);
         }
     }
 
-    pub fn rm_set_conditions(&mut self, mut indexes: Vec<usize>) {
+    pub fn remove_conditions(&mut self, mut indexes: Vec<usize>) {
         indexes.sort_unstable();
         indexes.reverse();
         for index in indexes {
-            self.rm_condition(index);
+            self.remove_condition(index);
+        }
+    }
+
+    pub fn remove_effects(&mut self, mut indexes: Vec<usize>) {
+        indexes.sort_unstable();
+        indexes.reverse();
+        for index in indexes {
+            self.remove_effect(index)
+        }
+    }
+
+    pub fn remove_subtasks(&mut self, mut indexes: Vec<usize>) {
+        indexes.sort_unstable();
+        indexes.reverse();
+        for index in indexes {
+            self.remove_subtask(index);
+            let label = self.bindings.get_action_label(index).unwrap();
+            self.bindings.remove_action(&label);
         }
     }
 
@@ -429,6 +454,110 @@ impl Chronicle {
 
         new
     }
+
+    pub fn remove_instantiated_elements(&mut self) {
+        let st = self.st.clone();
+        let mut free_variables: HashSet<VarId> = Default::default();
+        for var in &self.variables {
+            if !st.get_domain_of_var(var).is_constant() {
+                free_variables.insert(*var);
+            }
+        }
+
+        // Remove instantiated constraints
+        {
+            let mut to_remove = vec![];
+
+            'loop_constraint: for (i, constraint) in self.constraints.iter().enumerate() {
+                let variables = constraint.get_variables();
+                for var in &variables {
+                    if free_variables.contains(var) {
+                        continue 'loop_constraint;
+                    }
+                }
+                to_remove.push(i)
+            }
+            self.remove_constraints(to_remove);
+        }
+
+        // Remove instantiated condition
+        {
+            let mut to_remove = vec![];
+
+            'loop_condition: for (i, condition) in self.conditions.iter().enumerate() {
+                let variables = condition.get_variables();
+                for var in &variables {
+                    if free_variables.contains(var) {
+                        continue 'loop_condition;
+                    }
+                }
+                to_remove.push(i)
+            }
+            self.remove_conditions(to_remove)
+        }
+
+        // Remove instantiated effects
+        {
+            let mut to_remove = vec![];
+
+            'loop_condition: for (i, effect) in self.effects.iter().enumerate() {
+                let variables = effect.get_variables();
+                for var in &variables {
+                    if free_variables.contains(var) {
+                        continue 'loop_condition;
+                    }
+                }
+                to_remove.push(i)
+            }
+            self.remove_effects(to_remove)
+        }
+
+        // Remove instantiated tasks
+        {
+            let mut to_remove = vec![];
+            'loop_condition: for (i, subtask) in self.subtasks.iter().enumerate() {
+                let variables = subtask.get_variables();
+                for var in &variables {
+                    if free_variables.contains(var) {
+                        continue 'loop_condition;
+                    }
+                }
+                to_remove.push(i)
+            }
+
+            self.remove_subtasks(to_remove)
+        }
+
+        // Remove bindings
+        {
+            let mut to_remove = vec![];
+            'loop_binding: for (label, binding) in &self.bindings.inner {
+                match binding {
+                    ActingBinding::Acquire(acq) => {
+                        if free_variables.contains(&acq.request)
+                            && free_variables.contains(&acq.acquisition.get_start())
+                        {
+                            to_remove.push(*label)
+                        }
+                    }
+                    ActingBinding::Action(_) => {}
+                    _ => {
+                        let variables = binding.get_variables();
+                        for var in &variables {
+                            if free_variables.contains(var) {
+                                continue 'loop_binding;
+                            }
+                        }
+                        to_remove.push(*label)
+                    }
+                }
+            }
+
+            for label in to_remove {
+                self.bindings.remove_binding(&label);
+            }
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -446,14 +575,6 @@ impl Instantiation {
 impl GetVariables for Chronicle {
     fn get_variables(&self) -> HashSet<VarId> {
         self.variables.clone()
-    }
-
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
-        self.variables
-            .iter()
-            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
-            .cloned()
-            .collect()
     }
 }
 

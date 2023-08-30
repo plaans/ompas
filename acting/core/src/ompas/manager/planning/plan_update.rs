@@ -1,4 +1,4 @@
-use crate::model::process_ref::{MethodId, ProcessRef};
+use crate::model::process_ref::{ProcessRef, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
 use crate::ompas::manager::resource::WaiterPriority;
 use crate::planning::planner::problem::ChronicleInstance;
@@ -88,7 +88,7 @@ impl Display for ChoiceInner {
                 Ok(())
             }
             ChoiceInner::Refinement(r) => {
-                write!(f, "[{},{}] {}", r.start, r.end, r.method_id)?;
+                write!(f, "[{},{}] {}", r.start, r.end, r.refinement_label)?;
                 for arg in &r.name {
                     write!(f, " {}", arg)?;
                 }
@@ -124,5 +124,5 @@ pub struct ChoiceRefinement {
     pub name: Vec<Cst>,
     pub start: Cst,
     pub end: Cst,
-    pub method_id: MethodId,
+    pub refinement_label: RefinementLabel,
 }

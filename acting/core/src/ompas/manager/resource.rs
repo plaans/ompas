@@ -156,15 +156,15 @@ impl Resource {
         self.n_acquisition += 1;
         if match quantity {
             Quantity::All => true,
-            Quantity::Some(u) => u <= self.capacity,
+            Quantity::Some(u) => u <= self.max_capacity,
         } {
             self.add_client(acquisition_id, kind, quantity, priority)
         } else {
-            Err(LRuntimeError::new("acquire", "acquisition illegal"))
+            Err(LRuntimeError::new("new_ticket", "acquisition illegal"))
         }
     }
 
-    pub fn _reserve(
+    pub async fn _reserve(
         &mut self,
         quantity: Quantity,
         priority: WaiterPriority,
@@ -248,9 +248,24 @@ impl Resource {
         self.queue.retain(|c_id| c_id != id)
     }
 
-    pub async fn _acquire_reservation(&mut self, id: &ClientId) {
+    pub async fn _acquire_reservation(
+        &mut self,
+        id: &ClientId,
+        quantity: Capacity,
+    ) -> Result<(), LRuntimeError> {
+        let client = self.clients.get_mut(&id).unwrap();
+        if client.quantity != quantity {
+            return Err(LRuntimeError::new(
+                "_acquire_reservation",
+                format!(
+                    "quantity of reservation ({}) is different from acquired quantity ({})",
+                    client.quantity, quantity
+                ),
+            ));
+        }
         self.clients.get_mut(&id).unwrap().kind = TicketKind::Direct;
         self.check_queue().await;
+        Ok(())
     }
 
     pub fn remove_in_service(&mut self, ticket_id: &ClientId) {
@@ -446,7 +461,7 @@ impl ResourceManager {
         })?;
         let mut map = self.inner.lock().await;
         let resource: &mut Resource = map.get_mut(&id).unwrap();
-        resource._reserve(quantity, priority)
+        resource._reserve(quantity, priority).await
     }
 
     pub async fn update_queue(&self, resource: &str) -> Result<(), LRuntimeError> {
@@ -492,10 +507,34 @@ impl ResourceManager {
         resource.remove_client(wa).await;
     }
 
-    pub async fn acquire_reservation(&self, resource_id: &ResourceId, client_id: &ClientId) {
+    pub async fn acquire_reservation(
+        &self,
+        label: &String,
+        quantity: &Quantity,
+        resource_id: &ResourceId,
+        client_id: &ClientId,
+    ) -> Result<(), LRuntimeError> {
         let mut map = self.inner.lock().await;
         let resource: &mut Resource = map.get_mut(&resource_id).unwrap();
-        resource._acquire_reservation(client_id).await;
+        if &resource.label != label {
+            return Err(LRuntimeError::new(
+                "resource_manager.acquire_reservation",
+                format!(
+                    "reserved resource ({}) is different from the acquired resource ({})",
+                    resource.label, label
+                ),
+            ));
+        }
+
+        let quantity = match quantity {
+            Quantity::All => resource.max_capacity,
+            Quantity::Some(u) => *u,
+        };
+
+        resource
+            ._acquire_reservation(client_id, quantity)
+            .await
+            .map_err(|e| e.chain("resource_manager.acquire_reservation"))
     }
 
     pub async fn update_priority(

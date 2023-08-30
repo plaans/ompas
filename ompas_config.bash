@@ -3,7 +3,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # print the generates chronicles
-export OMPAS_CHRONICLE_DEBUG=on
+export OMPAS_CHRONICLE_DEBUG=off
 
 export OMPAS_DELIBERATION_FREQUENCY=1
 

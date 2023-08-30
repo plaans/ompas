@@ -1,4 +1,4 @@
-use crate::model::process_ref::{Label, MethodId};
+use crate::model::process_ref::{Label, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
 use crate::ompas::manager::acting::acting_var::ActingVarRef;
 use crate::ompas::manager::acting::process::ActingProcessInner;
@@ -7,15 +7,15 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 pub struct RefinementProcess {
-    pub method_id: MethodId,
+    pub label: RefinementLabel,
     pub args: Vec<ActingVarRef<Cst>>,
     pub childs: HashMap<Label, ActingProcessId>,
 }
 
 impl RefinementProcess {
-    pub fn new(method_id: MethodId, args: Vec<ActingVarRef<Cst>>) -> Self {
+    pub fn new(label: RefinementLabel, args: Vec<ActingVarRef<Cst>>) -> Self {
         Self {
-            method_id,
+            label,
             args,
             childs: Default::default(),
         }

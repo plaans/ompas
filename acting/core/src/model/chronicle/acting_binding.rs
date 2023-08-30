@@ -1,8 +1,9 @@
 use crate::model::chronicle::interval::Interval;
 use crate::model::process_ref::Label;
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, Replace};
+use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
+use im::HashSet;
 use std::collections::HashMap;
 use std::fmt::Write;
 
@@ -13,8 +14,25 @@ pub struct ActingBindingCollection {
 
 impl ActingBindingCollection {
     pub fn add_binding(&mut self, label: Label, binding: impl Into<ActingBinding>) {
-        if self.inner.insert(label, binding.into()).is_some() {
+        let binding = binding.into();
+        if self.inner.insert(label, binding).is_some() {
             panic!()
+        }
+    }
+
+    pub fn remove_action(&mut self, label: &Label) {
+        let binding = self.inner.remove(label).unwrap();
+        let binding = binding.as_action().unwrap();
+        for action in self.inner.values_mut().filter_map(|b| {
+            if let ActingBinding::Action(a) = b {
+                Some(a)
+            } else {
+                None
+            }
+        }) {
+            if action.task_id > binding.task_id {
+                action.task_id -= 1;
+            }
         }
     }
 
@@ -59,6 +77,31 @@ impl ActingBindingCollection {
 
     pub fn get_binding(&self, label: &Label) -> Option<&ActingBinding> {
         self.inner.get(label)
+    }
+
+    pub fn get_action_label(&self, task_id: usize) -> Option<Label> {
+        self.inner
+            .iter()
+            .find(|(_, binding)| {
+                if let Some(a) = binding.as_action() {
+                    if a.task_id == task_id {
+                        return true;
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            })
+            .map(|(k, _)| *k)
+    }
+
+    pub fn remove_binding(&mut self, label: &Label) {
+        if let Label::Action(_) = &label {
+            self.remove_action(label)
+        } else {
+            self.inner.remove(label);
+        }
     }
 }
 
@@ -118,6 +161,27 @@ pub enum ActingBinding {
     Arbitrary(ArbitraryBinding),
     Action(ActionBinding),
     Acquire(AcquireBinding),
+}
+
+impl GetVariables for ActingBinding {
+    fn get_variables(&self) -> HashSet<VarId> {
+        match self {
+            ActingBinding::Arbitrary(a) => {
+                im::hashset! {a.var_id, a.timepoint}
+            }
+            ActingBinding::Action(a) => {
+                let set = a.interval.get_variables();
+                set.union(a.name.clone().drain(..).collect())
+            }
+            ActingBinding::Acquire(acq) => {
+                let mut set = acq.acquisition.get_variables();
+                set.insert(acq.request);
+                set.insert(acq.resource);
+                set.insert(acq.quantity);
+                set
+            }
+        }
+    }
 }
 
 impl ActingBinding {

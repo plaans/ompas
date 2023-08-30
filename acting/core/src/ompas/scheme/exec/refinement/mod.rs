@@ -43,6 +43,8 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror};
 use std::borrow::Borrow;
 use std::convert::TryInto;
+use std::time::Duration;
+use tokio::time::sleep;
 
 pub struct ModRefinement {
     pub domain: DomainManager,
@@ -218,7 +220,7 @@ async fn check_select_response(
                 };
 
                 acting_manager
-                    .new_refinement(task_id, debug, args, model, ProcessOrigin::Execution, None)
+                    .new_executed_method(task_id, debug, args, model, ProcessOrigin::Execution)
                     .await
             }
         }
@@ -228,6 +230,9 @@ async fn check_select_response(
         .set_status(task_id, ProcessStatus::Running(None))
         .await;
     acting_manager.set_start(&method_id, None).await;
+    acting_manager
+        .set_executed_refinement(task_id, &method_id)
+        .await;
     acting_manager
         .set_status(&method_id, ProcessStatus::Running(None))
         .await;
@@ -250,10 +255,10 @@ pub async fn set_success(env: &LEnv) -> LResult {
         .as_id()
         .unwrap();
 
-    let supervisor = &env
+    let acting_manager = &env
         .get_context::<ModRefinement>(MOD_REFINEMENT)?
         .acting_manager;
-    supervisor
+    acting_manager
         .set_end(&task_id, None, ProcessStatus::Success)
         .await;
 
@@ -261,29 +266,34 @@ pub async fn set_success(env: &LEnv) -> LResult {
 }
 
 #[async_scheme_fn]
-pub async fn _retry(env: &LEnv) -> LResult {
+pub async fn _retry(env: &LEnv, err: LValue) -> LResult {
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
-    let supervisor = &env.get_context::<ModExec>(MOD_EXEC)?.acting_manager;
+    let acting_manager = &env.get_context::<ModExec>(MOD_EXEC)?.acting_manager;
     let task_id = env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref
         .as_id()
         .unwrap();
+    let debug = acting_manager.get_debug(&task_id).await.unwrap();
     let log = ctx.log.clone();
-    let refinement_id: ActingProcessId = supervisor
-        .get_last_executed_refinement(&task_id)
-        .await
-        .unwrap();
-    supervisor
-        .set_end(&refinement_id, None, ProcessStatus::Failure)
+    log.error(format!("Failed {debug}({task_id}):{}", err))
         .await;
-    let debug = supervisor.get_debug(&task_id).await.unwrap();
+    sleep(Duration::from_secs(1)).await;
+    if let Some(refinement_id) = acting_manager.get_last_executed_refinement(&task_id).await {
+        acting_manager.set_failed_method(&refinement_id).await;
+        let debug = acting_manager.get_debug(&task_id).await.unwrap();
+        let sr: SelectResponse = select(task_id, env).await?;
 
-    log.error(format!("Retrying task {debug}({task_id})")).await;
-
-    let sr: SelectResponse = select(task_id, env).await?;
-
-    check_select_response(env, ctx, &task_id, sr).await
+        check_select_response(env, ctx, &task_id, sr).await
+    } else {
+        println!(
+            "Attempt retry when there were no previous refinement for {}",
+            task_id
+        );
+        acting_manager.dump_trace(None).await;
+        sleep(Duration::from_secs(1)).await;
+        std::process::exit(0)
+    }
 }
 
 /*const LAMBDA_SELECT: &str = "
@@ -303,39 +313,39 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
      */
     let mod_refinement = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let log = mod_refinement.log.clone();
-    let supervisor = &mod_refinement.acting_manager;
-    let task: Vec<LValue> = supervisor
+    let acting_manager = &mod_refinement.acting_manager;
+    let task: Vec<LValue> = acting_manager
         .get_task_args(&task_id)
         .await
         .iter()
         .map(|cst| LValue::from(cst.clone()))
         .collect();
-    let debug: String = supervisor.get_debug(&task_id).await.unwrap();
+    let debug: String = acting_manager.get_debug(&task_id).await.unwrap();
     let state: WorldStateSnapshot = mod_refinement.acting_manager.state.get_snapshot().await;
     let select_mode: SelectMode = mod_refinement.options.get_select_mode().await;
 
-    let tried: Vec<LValue> = supervisor.get_tried(&task_id).await;
+    let tried: Vec<LValue> = acting_manager.get_tried(&task_id).await;
 
     let greedy_refinement: RefinementInner = greedy_select(&state, &tried, &task, env)
         .await
         .map_err(|e| e.chain("greedy_select"))?;
 
     let planned_refinement: Option<ActingProcessId> =
-        supervisor.get_last_planned_refinement(&task_id).await;
+        acting_manager.get_last_planned_refinement(&task_id).await;
 
     match planned_refinement {
         Some(refinement) => {
-            let lv: LValue = supervisor.get_refinement_lv(&refinement).await;
+            let lv: LValue = acting_manager.get_refinement_lv(&refinement).await;
             let possibilities = &greedy_refinement.possibilities;
-            println!(
+            /*println!(
                 "{}.refinement = planned({}) = {}\napplicable = {}",
                 task_id,
                 refinement,
                 lv,
                 LValue::from(possibilities.clone())
-            );
+            );*/
             if possibilities.contains(&lv) {
-                println!("selecting planned refinement!");
+                //println!("selecting planned refinement!");
                 Ok(SelectResponse::Planned(refinement))
             } else {
                 Ok(SelectResponse::Generated(greedy_refinement))

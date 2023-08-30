@@ -281,20 +281,22 @@ pub mod exec {
                       (_id_ (second _r_)))
                     (begin
                         (def_process_id _id_)
-                        (if (err? (eval _m_))
-                            (retry)
+                        (define r (eval _m_))
+                        (if (err? r)
+                            (retry r)
                             (set-success-for-task)))))))";
 
         pub const RETRY: &str = "retry";
         pub const DOC_RETRY: &str = "Retry a given task.";
-        pub const LAMBDA_RETRY: &str = "(lambda nil
+        pub const LAMBDA_RETRY: &str = "(lambda (r)
         (begin
-            (define __result__ (_retry))
+            (define __result__ (_retry r))
             (if (err? __result__)
                 __result__
                 (begin
-                    (if (err? (enr __result__))
-                        (retry)
+                    (define r (enr __result__))
+                    (if (err? r)
+                        (retry r)
                         (success))))))";
 
         pub const __GET_PRECONDITIONS__: &str = "__get_preconditions__";

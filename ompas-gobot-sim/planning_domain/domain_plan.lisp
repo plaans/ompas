@@ -7,6 +7,6 @@
 
     (start-with-planner false)
     ;(start)
-    (activate_log log-ompas)
+    ;(activate_log log-ompas)
     (trigger-task t_jobshop)
 )

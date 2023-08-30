@@ -81,7 +81,13 @@ pub trait GetVariables {
         &self,
         sym_table: &RefSymTable,
         domain: &Domain,
-    ) -> im::HashSet<VarId>;
+    ) -> im::HashSet<VarId> {
+        self.get_variables()
+            .iter()
+            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
+            .cloned()
+            .collect()
+    }
 }
 
 pub trait FlatBindings {

@@ -59,9 +59,11 @@ pub struct ActingModel {
 
 impl ActingModel {
     pub fn get_instantiated_chronicle(&self) -> Option<Chronicle> {
-        self.chronicle
-            .as_ref()
-            .map(|c| c.instantiate(self.instantiations.clone()))
+        self.chronicle.as_ref().map(|c| {
+            let mut i = c.instantiate(self.instantiations.clone());
+            i.remove_instantiated_elements();
+            i
+        })
     }
 }
 #[derive(Clone)]

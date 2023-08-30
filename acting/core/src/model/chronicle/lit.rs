@@ -1,6 +1,5 @@
 use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::constraint::Constraint;
-use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
@@ -372,14 +371,6 @@ impl GetVariables for Lit {
             }
         }
     }
-
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
-        self.get_variables()
-            .iter()
-            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
-            .cloned()
-            .collect()
-    }
 }
 
 impl Replace for Lit {
@@ -445,14 +436,6 @@ impl GetVariables for LitSet {
                 hashset![*d]
             }
         }
-    }
-
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
-        self.get_variables()
-            .iter()
-            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
-            .cloned()
-            .collect()
     }
 }
 

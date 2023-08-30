@@ -2,7 +2,7 @@ use crate::model::acting_domain::command::Command;
 use crate::model::acting_domain::model::{ActingModel, Event, Goal, NewTask};
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
-use crate::model::process_ref::{MethodId, ProcessRef};
+use crate::model::process_ref::{MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
@@ -28,7 +28,7 @@ pub struct ChronicleInstance {
     pub origin: ChronicleOrigin,
     pub am: ActingModel,
     pub pr: ProcessRef,
-    pub method_id: MethodId,
+    pub refinement_label: RefinementLabel,
 }
 
 pub fn new_problem_chronicle_instance(
@@ -53,9 +53,9 @@ pub fn new_problem_chronicle_instance(
         origin: ChronicleOrigin::Original,
         am,
         pr: ProcessRef::Id(0),
-        method_id: MethodId {
+        refinement_label: RefinementLabel {
             refinement_id: 0,
-            method_number: 0,
+            method_label: MethodLabel::Possibility(0),
         },
     }
 }

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 /// List of facts that have been updated
-pub type Updated = Vec<LValueS>;
+pub type StateUpdate = Vec<LValueS>;
 
 pub enum StateRule {
     All,
@@ -15,12 +15,12 @@ pub enum StateRule {
 }
 
 struct StateUpdateSubscriberInterface {
-    channel: mpsc::Sender<bool>,
+    channel: mpsc::Sender<StateUpdate>,
     rule: StateRule,
 }
 
 pub struct StateUpdateSubscriber {
-    pub channel: mpsc::Receiver<bool>,
+    pub channel: mpsc::Receiver<StateUpdate>,
     pub id: SubscriberId,
 }
 
@@ -33,21 +33,26 @@ pub struct StateUpdateManager {
 }
 
 impl StateUpdateManager {
-    pub async fn check_updates_and_send_notifications(&self, mut updated: Updated) {
+    pub async fn check_updates_and_send_notifications(&self, updated: StateUpdate) {
         for subscriber in self.inner.values() {
             match &subscriber.rule {
                 StateRule::All => {
-                    let _ = subscriber.channel.send(true).await;
+                    let _ = subscriber.channel.send(updated.clone()).await;
                 }
                 StateRule::Specific(rules) => {
-                    let updated: Vec<String> = updated.drain(..).map(|u| u.to_string()).collect();
-                    'rule: for rule in rules {
+                    let string_updated: Vec<String> =
+                        updated.iter().map(|u| u.to_string()).collect();
+                    for rule in rules {
                         let rule_str = rule.to_string();
-                        for update in &updated {
+                        let mut concerned = vec![];
+                        for (i, update) in string_updated.iter().enumerate() {
                             if update.contains(&rule_str) {
-                                let _ = subscriber.channel.send(true).await;
-                                break 'rule;
+                                concerned.push(updated[i].clone());
                             }
+                        }
+
+                        if !concerned.is_empty() {
+                            let _ = subscriber.channel.send(concerned).await;
                         }
                     }
                 }

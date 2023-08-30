@@ -1,7 +1,7 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
-use crate::model::process_ref::{Label, MethodId, ProcessRef};
+use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::filter::ProcessFilter;
@@ -175,21 +175,44 @@ impl ActingManager {
             .await
     }
 
-    pub async fn new_refinement(
+    pub async fn new_refinement(&self, parent: &ActingProcessId) -> usize {
+        self.inner.write().await.new_refinement(parent)
+    }
+
+    pub async fn set_failed_method(&self, method: &ActingProcessId) {
+        self.inner.write().await.set_failed_method(method).await
+    }
+
+    pub async fn new_executed_method(
         &self,
         parent: &ActingProcessId,
         debug: String,
         args: Vec<Option<Cst>>,
         model: ActingModel,
         origin: ProcessOrigin,
-        method_id: Option<MethodId>,
     ) -> ActingProcessId {
         self.inner
             .write()
             .await
-            .new_refinement(parent, debug, args, model, origin, method_id)
+            .new_executed_method(parent, debug, args, model, origin)
             .await
     }
+
+    /*async fn new_method(
+        &self,
+        label:
+        parent: &ActingProcessId,
+        debug: String,
+        args: Vec<Option<Cst>>,
+        model: ActingModel,
+        origin: ProcessOrigin,
+    ) -> ActingProcessId {
+        self.inner
+            .write()
+            .await
+            .new_method(label, parent, debug, args, model, origin)
+            .await
+    }*/
 
     pub async fn new_arbitrary(
         &self,
@@ -243,6 +266,18 @@ impl ActingManager {
 
     pub async fn set_moment(&self, id: &ActingProcessId, instant: Option<Timepoint>) {
         self.inner.write().await.set_moment(id, instant).await
+    }
+
+    pub async fn set_executed_refinement(
+        &self,
+        action: &ActingProcessId,
+        method: &ActingProcessId,
+    ) {
+        self.inner
+            .write()
+            .await
+            .set_executed_refinement(action, method)
+            .await
     }
 
     pub async fn get_last_planned_refinement(

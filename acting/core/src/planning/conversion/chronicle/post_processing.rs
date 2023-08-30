@@ -99,7 +99,7 @@ pub fn simplify_timepoints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
         }
     }
 
-    c.rm_set_constraint(index_temporal_constraints);
+    c.remove_constraints(index_temporal_constraints);
 
     let timepoints: HashSet<VarId> = c
         .get_variables()
@@ -209,7 +209,7 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
         }
         vec.drain(..).for_each(|(i, cons)| c.constraints[i] = cons);
 
-        c.rm_set_constraint(to_remove);
+        c.remove_constraints(to_remove);
     }
 
     Ok(())
@@ -247,7 +247,7 @@ pub fn simplify_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
         }
     }
 
-    c.rm_set_conditions(vec);
+    c.remove_conditions(vec);
     Ok(())
 }
 
@@ -271,7 +271,7 @@ pub fn merge_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
 
     vec.sort_unstable();
     vec.reverse();
-    vec.iter().for_each(|i| c.rm_condition(*i));
+    vec.iter().for_each(|i| c.remove_condition(*i));
 
     c.st.flat_bindings();
     c.flat_bindings();
@@ -329,7 +329,7 @@ pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntim
     let mut vec: Vec<usize> = c_to_remove.to_vec();
 
     vec.reverse();
-    vec.iter().for_each(|i| c.rm_constraint(*i));
+    vec.iter().for_each(|i| c.remove_constraint(*i));
 
     c.st.flat_bindings();
     c.flat_bindings();

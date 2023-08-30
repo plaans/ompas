@@ -1,7 +1,7 @@
 use crate::model::acting_domain::model::{ActingModel, NewTask, ROOT};
 use crate::model::chronicle::acting_binding::ActingBinding;
-use crate::model::chronicle::{ChronicleKind, Instantiation};
-use crate::model::process_ref::{Label, MethodId, ProcessRef};
+use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation};
+use crate::model::process_ref::{Label, MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
@@ -41,9 +41,10 @@ use std::path::PathBuf;
 use std::{env, fs};
 use tokio::sync::{broadcast, watch};
 
-const COLOR_PLANNING: &str = "red";
-const COLOR_EXECUTION: &str = "blue";
-const COLOR_DEFAULT: &str = "black";
+const COLOR_PLANNING: &str = "grey";
+const COLOR_PLANNING_SUGGESTED: &str = "blue";
+const COLOR_EXECUTION: &str = "red";
+//const COLOR_DEFAULT: &str = "black";
 
 const TASK_NAME: &str = "task_name";
 const TASK_STATUS: &str = "task_status";
@@ -216,12 +217,18 @@ impl InnerActingManager {
                                 }
                             }
                         }
-                        Label::Refinement(method_id) => {
+                        Label::Refinement(refinement_label) => {
                             let action = obj.inner.as_action().unwrap();
                             id = if let Some(refinement) =
-                                action.refinements.get(method_id.refinement_id)
+                                action.refinements.get(refinement_label.refinement_id)
                             {
-                                *refinement.get_method(&method_id.method_number)
+                                if let Some(id) =
+                                    refinement.get_method(&refinement_label.method_label)
+                                {
+                                    *id
+                                } else {
+                                    return None;
+                                }
                             } else {
                                 return None;
                             }
@@ -361,8 +368,9 @@ impl InnerActingManager {
                 .last()
                 .cloned()
             {
-                self.set_end(&refinement.get_chosen(), Some(instant), status)
-                    .await;
+                if let Some(chosen) = refinement.get_executed() {
+                    self.set_end(chosen, Some(instant), status).await;
+                }
             }
         }
         self.set_status(id, status)
@@ -403,7 +411,9 @@ impl InnerActingManager {
                 .last()
                 .cloned()
             {
-                self.set_status(&refinement.get_chosen(), status);
+                if let Some(chosen) = refinement.get_executed() {
+                    self.set_status(chosen, status)
+                };
             }
         }
     }
@@ -581,9 +591,9 @@ impl InnerActingManager {
             start,
             end,
             ActingProcessInner::AbstractModel(RefinementProcess::new(
-                MethodId {
+                RefinementLabel {
                     refinement_id: 0,
-                    method_number: 0,
+                    method_label: MethodLabel::Possibility(0),
                 },
                 name,
             )),
@@ -597,14 +607,67 @@ impl InnerActingManager {
         id
     }
 
-    pub async fn new_refinement(
+    pub fn new_refinement(&mut self, action: &ActingProcessId) -> usize {
+        let action = self.processes[*action].inner.as_mut_action().unwrap();
+        action.new_refinement();
+        action.get_refinements().len()
+    }
+
+    pub async fn set_failed_method(&mut self, method: &ActingProcessId) {
+        self.set_end(method, None, ProcessStatus::Failure).await;
+        let parent = self.processes[*method].parent();
+        self.new_refinement(&parent);
+    }
+
+    pub async fn set_executed_refinement(
         &mut self,
+        action: &ActingProcessId,
+        method: &ActingProcessId,
+    ) {
+        let refinement_label = self.processes[*method].inner.as_method().unwrap().label;
+        self.processes[*action]
+            .inner
+            .as_mut_action()
+            .unwrap()
+            .set_executed(refinement_label.refinement_id, method);
+    }
+
+    pub async fn new_executed_method(
+        &mut self,
+        parent: &ActingProcessId,
+        debug: String,
+        args: Vec<Option<Cst>>,
+        model: ActingModel,
+        origin: ProcessOrigin,
+    ) -> ActingProcessId {
+        let action = self.processes[*parent].inner.as_mut_action().unwrap();
+        if action.refinements.is_empty() {
+            action.refinements.push(Default::default())
+        }
+        let refinement_id = action.refinements.len() - 1;
+
+        self.new_method(
+            RefinementLabel {
+                refinement_id,
+                method_label: MethodLabel::Executed,
+            },
+            parent,
+            debug,
+            args,
+            model,
+            origin,
+        )
+        .await
+    }
+
+    pub async fn new_method(
+        &mut self,
+        label: RefinementLabel,
         parent: &ActingProcessId,
         debug: String,
         mut args: Vec<Option<Cst>>,
         model: ActingModel,
         origin: ProcessOrigin,
-        method_id: Option<MethodId>,
     ) -> ActingProcessId {
         let id = self.processes.len();
         let am_id = self.new_model(model);
@@ -649,28 +712,7 @@ impl InnerActingManager {
 
         let action: &mut ActionProcess = self.processes[*parent].inner.as_mut_action().unwrap();
 
-        let method_id = if let Some(MethodId {
-            refinement_id,
-            method_number,
-        }) = method_id
-        {
-            let refinement_id = if action.get_refinement(refinement_id).is_none() {
-                action.new_refinement(Some(refinement_id))
-            } else {
-                action.refinements.len() - 1
-            };
-
-            action.add_method_to_refinement(refinement_id, Some(method_number), id)
-        } else {
-            let refinenement_id = if action.refinements.is_empty() {
-                action.new_refinement(None)
-            } else {
-                action.refinements.len() - 1
-            };
-            let id = action.add_method_to_refinement(refinenement_id, None, id);
-            action.set_chosen(&id);
-            id
-        };
+        action.add_method(label, &id);
         self.processes.push(ActingProcess::new(
             id,
             *parent,
@@ -679,12 +721,8 @@ impl InnerActingManager {
             Some(debug),
             start,
             end,
-            RefinementProcess::new(method_id, args),
+            RefinementProcess::new(label, args),
         ));
-        if origin != ProcessOrigin::Planner {
-            /*self.notify_planner(ActingUpdateNotification::NewProcess(id))
-            .await;*/
-        }
         id
     }
 
@@ -828,18 +866,8 @@ impl InnerActingManager {
 
     pub fn get_last_planned_refinement(&self, id: &ActingProcessId) -> Option<ActingProcessId> {
         let refinements = &self.processes[*id].inner.as_action().unwrap().refinements;
-        //println!("{}.refinements = {:?}", id, refinements);
         match refinements.last() {
-            Some(refinement) => {
-                let method = refinement.get_chosen();
-                let origin = self.get_origin(method);
-                //println!("{id}.origin = {:?}", origin);
-                if origin == ProcessOrigin::Planner {
-                    Some(*method)
-                } else {
-                    None
-                }
-            }
+            Some(refinement) => refinement.get_suggested().cloned(),
             None => None,
         }
     }
@@ -852,14 +880,7 @@ impl InnerActingManager {
             .refinements
             .last()
         {
-            Some(refinement) => {
-                let id = refinement.get_chosen();
-                if self.get_origin(id) == ProcessOrigin::Execution {
-                    Some(*id)
-                } else {
-                    None
-                }
-            }
+            Some(refinement) => refinement.get_executed().cloned(),
             None => None,
         }
     }
@@ -914,11 +935,14 @@ impl InnerActingManager {
         refinements
             .iter()
             .filter_map(|refinement| {
-                if self.processes[*refinement.get_chosen()].origin.is_exec() {
+                refinement
+                    .get_executed()
+                    .map(|id| self.processes[*id].am_id())
+                /*if self.processes[*refinement.get_chosen()].origin.is_exec() {
                     Some(self.processes[*refinement.get_chosen()].am_id())
                 } else {
                     None
-                }
+                }*/
             })
             .map(|id| self.models[id].lv.clone())
             .collect()
@@ -978,49 +1002,66 @@ impl InnerActingManager {
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
         self.executed(id);
+
+        let acquire = self.processes[*id].inner.as_acquire().unwrap();
+        let ref_r = acquire.resource.clone();
+        let ref_q = acquire.quantity.clone();
+
         let reservation = self.processes[*id]
             .inner
             .as_mut_acquire()
             .unwrap()
             .move_reservation();
-        let r = match reservation {
-            Some(reservation) => {
-                println!("{} reserved", resource);
-                self.resource_manager
-                    .acquire_reservation(
-                        &reservation.get_resource_id(),
-                        &reservation.get_client_id(),
-                    )
-                    .await;
-                Ok(reservation)
+
+        let r = if let Some(reservation) = reservation {
+            println!("{} reserved", resource);
+            if self
+                .resource_manager
+                .acquire_reservation(
+                    &resource,
+                    &quantity,
+                    &reservation.get_resource_id(),
+                    &reservation.get_client_id(),
+                )
+                .await
+                .is_ok()
+            {
+                Some(reservation)
+            } else {
+                self.resource_manager.remove_waiter(reservation).await;
+                None
             }
+        } else {
+            None
+        };
+
+        let waiter = match r {
+            Some(r) => r,
             None => {
-                let acquire = self.processes[*id].inner.as_acquire().unwrap();
-                let ref_r = acquire.resource.clone();
-                let ref_q = acquire.quantity.clone();
                 let waiter: WaitAcquire = self
                     .resource_manager
                     .acquire(&resource, quantity, priority)
                     .await?;
-
-                let quantity = self
-                    .resource_manager
-                    .get_client_quantity(&waiter.get_resource_id(), &waiter.get_client_id())
-                    .await;
-
-                self.set_execution_val(&ref_r, resource.to_string()).await;
-                self.set_execution_val(&ref_q, quantity).await;
 
                 self.processes[*id]
                     .inner
                     .as_mut_acquire()
                     .unwrap()
                     .set_acquire_id(&waiter);
-                Ok(waiter)
+                waiter
             }
         };
 
-        r
+        let capacity = self
+            .resource_manager
+            .get_client_quantity(&waiter.get_resource_id(), &waiter.get_client_id())
+            .await;
+
+        self.set_execution_val(&ref_r, resource.to_string()).await;
+        self.set_execution_val(&ref_q, capacity).await;
+        self.set_status(id, ProcessStatus::Running(None));
+
+        Ok(waiter)
     }
 
     async fn reserve(
@@ -1032,12 +1073,33 @@ impl InnerActingManager {
             priority,
         }: Reservation,
     ) -> Result<(), LRuntimeError> {
-        let acquire = self.processes[id].inner.as_mut_acquire().unwrap();
-        acquire.set_reservation(
-            self.resource_manager
-                .reserve(&resource, quantity, priority)
-                .await?,
-        );
+        let process = &mut self.processes[id];
+        let status = process.status.clone();
+        let acquire = process.inner.as_mut_acquire().unwrap();
+
+        match status {
+            ProcessStatus::Pending => {
+                if let Some(wa) = acquire.move_reservation() {
+                    self.resource_manager.remove_waiter(wa).await
+                }
+                acquire.set_reservation(
+                    self.resource_manager
+                        .reserve(&resource, quantity, priority)
+                        .await?,
+                );
+            }
+            ProcessStatus::Running(_) => {
+                self.resource_manager
+                    .update_priority(
+                        &acquire.get_resource_id().unwrap(),
+                        &acquire.get_client_id().unwrap(),
+                        priority,
+                    )
+                    .await
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 
@@ -1064,13 +1126,65 @@ impl InnerActingManager {
         }];
 
         let mut chronicles = vec![];
+
+        let mut add_chronicle =
+            |exec_chronicles: &mut Vec<ExecChronicle>,
+             action_id: ActingProcessId,
+             origin: ChronicleOrigin,
+             chronicle: Chronicle,
+             refinement_label: RefinementLabel| {
+                let instance_id = chronicles.len();
+
+                for (label, action) in chronicle.bindings.inner.iter().filter_map(|(k, v)| {
+                    if let ActingBinding::Action(a) = v {
+                        Some((k, a))
+                    } else {
+                        None
+                    }
+                }) {
+                    if let Some(subtask_id) =
+                        self.get_id(ProcessRef::Relative(action_id, vec![*label]))
+                    {
+                        exec_chronicles.insert(
+                            0,
+                            ExecChronicle {
+                                id: subtask_id,
+                                origin: ChronicleOrigin::Refinement {
+                                    refined: vec![TaskId {
+                                        instance_id,
+                                        task_id: action.task_id,
+                                    }],
+                                    template_id: 0,
+                                },
+                            },
+                        );
+                    }
+                }
+
+                chronicles.push(ChronicleInstance {
+                    generated: false,
+                    origin,
+                    am: ActingModel {
+                        lv: LValue::Nil,
+                        lv_om: LValue::Nil,
+                        lv_expanded: Some(LValue::Nil),
+                        instantiations: vec![],
+                        chronicle: Some(chronicle),
+                    },
+                    pr: ProcessRef::Id(action_id),
+                    refinement_label,
+                });
+            };
+
         'main: while let Some(ExecChronicle { mut id, origin }) = exec_chronicles.pop() {
-            let instance_id = chronicles.len();
-            let method_id: MethodId = Default::default();
+            let refinement_label: RefinementLabel = RefinementLabel {
+                refinement_id: 0,
+                method_label: MethodLabel::Possibility(0),
+            };
             let process = &self.processes[id];
             match &process.inner {
-                ActingProcessInner::RootTask(root) => {
-                    for (task_id, task) in root.tasks.iter().enumerate() {
+                ActingProcessInner::RootTask(_) => {
+                    /*for (task_id, task) in root.tasks.iter().enumerate() {
                         exec_chronicles.insert(
                             0,
                             ExecChronicle {
@@ -1084,11 +1198,20 @@ impl InnerActingManager {
                                 },
                             },
                         );
-                    }
+                    }*/
                     let chronicle = self.models[process.am_id()]
                         .get_instantiated_chronicle()
                         .unwrap();
-                    chronicles.push(ChronicleInstance {
+
+                    add_chronicle(
+                        &mut exec_chronicles,
+                        id,
+                        origin,
+                        chronicle,
+                        refinement_label,
+                    );
+
+                    /*chronicles.push(ChronicleInstance {
                         generated: false,
                         origin,
                         am: ActingModel {
@@ -1100,7 +1223,7 @@ impl InnerActingManager {
                         },
                         pr: ProcessRef::Id(id),
                         method_id,
-                    })
+                    });*/
                 }
                 ActingProcessInner::Action(a) => {
                     //Verify if we take the model of the action or the refinement
@@ -1112,7 +1235,16 @@ impl InnerActingManager {
                         let chronicle = self.models[abstract_process.get_am_id()]
                             .get_instantiated_chronicle()
                             .unwrap();
-                        chronicles.push(ChronicleInstance {
+
+                        add_chronicle(
+                            &mut exec_chronicles,
+                            id,
+                            origin,
+                            chronicle,
+                            refinement_label,
+                        );
+
+                        /*chronicles.push(ChronicleInstance {
                             generated: false,
                             origin,
                             am: ActingModel {
@@ -1124,17 +1256,30 @@ impl InnerActingManager {
                             },
                             pr: ProcessRef::Id(id),
                             method_id,
-                        })
+                        })*/
                     }
                     //Otherwise we check if there is a refinement
                     else if let Some(refinement) = a.refinements.last() {
-                        for refinement_id in &refinement.possibilities {
-                            let instance_id = chronicles.len();
+                        let methods = if let Some(chosen) = refinement.get_executed() {
+                            vec![chosen]
+                        } else {
+                            refinement.get_possibilities()
+                        };
+                        for refinement_id in methods {
                             let method_process = &self.processes[*refinement_id];
                             let chronicle = self.models[method_process.get_am_id()]
                                 .get_instantiated_chronicle()
                                 .unwrap();
-                            let method = method_process.inner.as_method().unwrap();
+                            let refinement_label = method_process.inner.as_method().unwrap().label;
+                            add_chronicle(
+                                &mut exec_chronicles,
+                                *refinement_id,
+                                origin.clone(),
+                                chronicle,
+                                refinement_label,
+                            )
+
+                            /*let method = method_process.inner.as_method().unwrap();
                             for (label, id) in &method.childs {
                                 if matches!(label, Label::Action(_)) {
                                     let action_binding = chronicle
@@ -1170,7 +1315,7 @@ impl InnerActingManager {
                                 },
                                 pr: ProcessRef::Id(*refinement_id),
                                 method_id: method.method_id,
-                            });
+                            });*/
                         }
                     } else {
                         continue 'main;
@@ -1186,36 +1331,44 @@ impl InnerActingManager {
 
     pub fn export_trace_dot_graph(&self) -> Dot {
         let mut dot: Dot = "digraph {\n".to_string();
-        let mut queue = vec![0];
+        let mut queue = vec![(0, COLOR_EXECUTION)];
 
-        while let Some(id) = queue.pop() {
+        while let Some((id, color)) = queue.pop() {
             let ap = &self.processes[id];
             let label = format_acting_process(&self.acting_vars, ap);
-            let color = match ap.origin {
-                ProcessOrigin::Planner => COLOR_EXECUTION,
-                ProcessOrigin::Execution => COLOR_PLANNING,
-                _ => COLOR_DEFAULT,
-            };
 
             writeln!(dot, "P{id} [label = \"{label}\", color = {color}];").unwrap();
             match &ap.inner {
                 ActingProcessInner::RootTask(rt) => {
                     for st in &rt.tasks {
                         writeln!(dot, "P{id} -> P{st};").unwrap();
-                        queue.push(*st)
+                        queue.push((*st, color))
                     }
                 }
                 ActingProcessInner::Action(t) => {
-                    for r in &t.refinements {
-                        let id = r.get_chosen();
-                        writeln!(dot, "P{id} -> P{};", id).unwrap();
-                        queue.push(*id)
+                    if let Some(r) = t.refinements.last() {
+                        if let Some(executed) = r.get_executed() {
+                            writeln!(dot, "P{id} -> P{};", executed).unwrap();
+                            queue.push((*executed, color))
+                        } else {
+                            let mut possibilites = r.get_possibilities();
+                            if let Some(s) = r.get_suggested() {
+                                possibilites.retain(|&p| p != s);
+                                writeln!(dot, "P{id} -> P{};", s).unwrap();
+                                queue.push((*s, COLOR_PLANNING_SUGGESTED));
+                            }
+
+                            for p in possibilites {
+                                writeln!(dot, "P{id} -> P{};", p).unwrap();
+                                queue.push((*p, COLOR_PLANNING))
+                            }
+                        }
                     }
                 }
                 ActingProcessInner::Method(m) | ActingProcessInner::AbstractModel(m) => {
                     for sub in m.childs.values() {
                         writeln!(dot, "P{id} -> P{sub};").unwrap();
-                        queue.push(*sub)
+                        queue.push((*sub, color))
                     }
                 }
                 ActingProcessInner::Arbitrary(_) => {}
@@ -1374,17 +1527,25 @@ impl InnerActingManager {
                             .iter()
                             .map(|var_id| st.var_as_cst(var_id))
                             .collect();
-                        let Label::Refinement(method_id) = label else {
+                        let Label::Refinement(refinement_label) = label else {
                             todo!()
                         };
-                        let parent = self
-                            .new_refinement(
+
+                        let action = self.processes[parent].inner.as_mut_action().unwrap();
+                        if action.refinements.len() == refinement_label.refinement_id {
+                            action.new_refinement();
+                        } else {
+                            panic!()
+                        }
+
+                        let method = self
+                            .new_method(
+                                refinement_label,
                                 &parent,
                                 debug,
                                 args,
                                 instance.am,
                                 ProcessOrigin::Planner,
-                                Some(method_id),
                             )
                             .await;
 
@@ -1392,7 +1553,7 @@ impl InnerActingManager {
                             match binding {
                                 ActingBinding::Arbitrary(_arbitrary) => {
                                     let _id = self
-                                        .new_arbitrary(label, &parent, ProcessOrigin::Planner)
+                                        .new_arbitrary(label, &method, ProcessOrigin::Planner)
                                         .await;
                                 }
                                 ActingBinding::Action(action_binding) => {
@@ -1403,7 +1564,7 @@ impl InnerActingManager {
                                     let _id = self
                                         .new_action(
                                             label,
-                                            &parent,
+                                            &method,
                                             args,
                                             debug,
                                             ProcessOrigin::Planner,
@@ -1412,7 +1573,7 @@ impl InnerActingManager {
                                 }
                                 ActingBinding::Acquire(_acq) => {
                                     let _id = self
-                                        .new_acquire(label, &parent, ProcessOrigin::Planner)
+                                        .new_acquire(label, &method, ProcessOrigin::Planner)
                                         .await;
                                 }
                             }
@@ -1483,7 +1644,7 @@ impl InnerActingManager {
                             .inner
                             .as_mut_action()
                             .unwrap()
-                            .set_chosen(&r.method_id);
+                            .set_suggested(r.refinement_label.refinement_id, &id);
                     }
                 }
             }

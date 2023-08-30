@@ -69,22 +69,38 @@ impl From<ActingProcessId> for ProcessRef {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone, Eq, Hash, PartialEq)]
-pub struct MethodId {
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub struct RefinementLabel {
     pub refinement_id: usize,
-    pub method_number: usize,
+    pub method_label: MethodLabel,
 }
 
-impl Display for MethodId {
+impl Display for RefinementLabel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{{},{}}}", self.refinement_id, self.method_number)
+        write!(
+            f,
+            "refinement({},{})",
+            self.refinement_id,
+            match self.method_label {
+                MethodLabel::Executed => "executed".to_string(),
+                MethodLabel::Possibility(u) => format!("possibility({})", u),
+                MethodLabel::Suggested => "suggested".to_string(),
+            }
+        )
     }
+}
+
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub enum MethodLabel {
+    Executed,
+    Suggested,
+    Possibility(usize),
 }
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Label {
     AbstractModel,
-    Refinement(MethodId),
+    Refinement(RefinementLabel),
     Action(usize),
     Acquire(usize),
     Arbitrary(usize),
@@ -93,12 +109,8 @@ pub enum Label {
 impl Display for Label {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Label::Refinement(method_id) => {
-                write!(
-                    f,
-                    "refinement({}, {})",
-                    method_id.refinement_id, method_id.method_number
-                )
+            Label::Refinement(refinement_label) => {
+                write!(f, "{}", refinement_label)
             }
             Label::Action(id) => {
                 write!(f, "action({id})")

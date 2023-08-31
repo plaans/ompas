@@ -119,8 +119,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
         log.info(format!(
             "Exec command {command_id}: {}.",
             LValue::from(command_slice)
-        ))
-        .await;
+        ));
 
         let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
 
@@ -141,7 +140,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                     }
                 }
 
-                log.info(format!("Waiting on command {command_id}.")).await;
+                log.info(format!("Waiting on command {command_id}."));
 
                 let f = async {
                     while rx.changed().await.is_ok() {
@@ -149,8 +148,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                         let action_status = *rx.borrow();
                         match action_status {
                             ProcessStatus::Rejected => {
-                                log.error(format!("Command {command_id} is a rejected."))
-                                    .await;
+                                log.error(format!("Command {command_id} is a rejected."));
                                 mod_platform
                                     .acting_manager
                                     .set_end(&command_id, None, action_status)
@@ -165,8 +163,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                                 //println!("running");
                             }
                             ProcessStatus::Failure => {
-                                log.error(format!("Command {command_id} is a failure."))
-                                    .await;
+                                log.error(format!("Command {command_id} is a failure."));
                                 mod_platform
                                     .acting_manager
                                     .set_end(&command_id, None, action_status)
@@ -174,8 +171,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                                 return Ok(RaeExecError::ActionFailure.into());
                             }
                             ProcessStatus::Success => {
-                                log.info(format!("Command {command_id} is a success."))
-                                    .await;
+                                log.info(format!("Command {command_id} is a success."));
                                 mod_platform
                                     .acting_manager
                                     .set_end(&command_id, None, action_status)
@@ -183,8 +179,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                                 return Ok(true.into());
                             }
                             ProcessStatus::Cancelled(_) => {
-                                log.info(format!("Command {command_id} has been cancelled."))
-                                    .await;
+                                log.info(format!("Command {command_id} has been cancelled."));
                                 mod_platform
                                     .acting_manager
                                     .set_end(&command_id, None, action_status)

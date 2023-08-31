@@ -1,7 +1,6 @@
 pub mod aries;
 pub mod c_choice;
 pub mod rae_plan;
-use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::error::RaeExecError;
@@ -11,7 +10,7 @@ use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::interval::Interval;
 use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
 use crate::ompas::manager::acting::process::ProcessOrigin;
-use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
+use crate::ompas::manager::acting::{ActingManager, ActingProcessId, MethodModel};
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::ompas::OMPASManager;
@@ -164,14 +163,20 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         },
     };
 
+    let log = ctx.log.clone();
+    let debug = acting_manager.get_debug(&task_id).await.unwrap();
+    log.debug(format!("({task_id}) Refine {debug} "));
+
     acting_manager.set_start(&task_id, None).await;
     let sr: SelectResponse = select(task_id, env)
         .await
         .map_err(|e: LRuntimeError| e.chain("select"))?;
 
-    check_select_response(env, ctx, &task_id, sr)
+    let r = check_select_response(env, ctx, &task_id, sr)
         .await
-        .map_err(|e| e.chain("check_select_response"))
+        .map_err(|e| e.chain("check_select_response"));
+
+    r
 }
 
 async fn check_select_response(
@@ -185,15 +190,19 @@ async fn check_select_response(
     let debug = acting_manager.get_debug(task_id).await.unwrap();
     let method_id = match sr {
         SelectResponse::Planned(refinement_id) => {
-            log.debug(format!("Planned refinement for {debug}")).await;
+            let method_debug = acting_manager.get_debug(&refinement_id).await.unwrap();
+            log.debug(format!(
+                "({task_id}) Chose planned refinement for {debug}: ({refinement_id}) {method_debug}"
+            ));
             refinement_id
         }
         SelectResponse::Generated(r) => {
             let method = r.method_value.clone();
 
             if method == LValue::Nil {
-                log.error(format!("No applicable method for task {debug}({task_id})"))
-                    .await;
+                log.error(format!(
+                    "({task_id}) No applicable method for task {debug}({task_id})"
+                ));
                 acting_manager
                     .set_end(task_id, None, ProcessStatus::Failure)
                     .await;
@@ -206,38 +215,33 @@ async fn check_select_response(
                     unpure_bindings: Default::default(),
                 };
 
-                //println!("generating refinement for {}", method);
-                let model: ActingModel = acting_manager
-                    .generate_acting_model_for_method(&method, p_env)
-                    .await?;
-
-                //println!("refinement args: {}", &method);
-
-                let args = if let LValue::List(list) = method {
+                let args = if let LValue::List(list) = &method {
                     list.iter().map(|lv| lv.as_cst()).collect()
                 } else {
                     panic!()
                 };
 
                 acting_manager
-                    .new_executed_method(task_id, debug, args, model, ProcessOrigin::Execution)
+                    .new_executed_method(
+                        task_id,
+                        debug,
+                        args,
+                        MethodModel::Raw(method, p_env),
+                        ProcessOrigin::Execution,
+                    )
                     .await
             }
         }
     };
 
     acting_manager
-        .set_status(task_id, ProcessStatus::Running(None))
-        .await;
-    acting_manager.set_start(&method_id, None).await;
-    acting_manager
         .set_executed_refinement(task_id, &method_id)
-        .await;
-    acting_manager
-        .set_status(&method_id, ProcessStatus::Running(None))
         .await;
 
     let program = acting_manager.get_om_lvalue(&method_id).await;
+
+    log.debug(format!("({method_id}) program: \n{}", program.format(0)));
+
     Ok(program)
 }
 
@@ -249,6 +253,8 @@ pub async fn set_success(env: &LEnv) -> LResult {
     - Return true
      */
 
+    let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
+
     let task_id = env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref
@@ -258,6 +264,9 @@ pub async fn set_success(env: &LEnv) -> LResult {
     let acting_manager = &env
         .get_context::<ModRefinement>(MOD_REFINEMENT)?
         .acting_manager;
+
+    ctx.log.debug(format!("({task_id}) Success"));
+
     acting_manager
         .set_end(&task_id, None, ProcessStatus::Success)
         .await;
@@ -276,14 +285,10 @@ pub async fn _retry(env: &LEnv, err: LValue) -> LResult {
         .unwrap();
     let debug = acting_manager.get_debug(&task_id).await.unwrap();
     let log = ctx.log.clone();
-    log.error(format!("Failed {debug}({task_id}):{}", err))
-        .await;
-    sleep(Duration::from_secs(1)).await;
+    log.error(format!("({task_id}) Failed {debug}: {}", err));
     if let Some(refinement_id) = acting_manager.get_last_executed_refinement(&task_id).await {
         acting_manager.set_failed_method(&refinement_id).await;
-        let debug = acting_manager.get_debug(&task_id).await.unwrap();
         let sr: SelectResponse = select(task_id, env).await?;
-
         check_select_response(env, ctx, &task_id, sr).await
     } else {
         println!(
@@ -295,12 +300,6 @@ pub async fn _retry(env: &LEnv, err: LValue) -> LResult {
         std::process::exit(0)
     }
 }
-
-/*const LAMBDA_SELECT: &str = "
-(define select
-  (lambda (task)
-    (sim_block
-    (rae-select task (generate_applicable_instances task)))))))";*/
 
 pub enum SelectResponse {
     Planned(ActingProcessId),
@@ -337,17 +336,20 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
         Some(refinement) => {
             let lv: LValue = acting_manager.get_refinement_lv(&refinement).await;
             let possibilities = &greedy_refinement.possibilities;
-            /*println!(
-                "{}.refinement = planned({}) = {}\napplicable = {}",
-                task_id,
-                refinement,
+            log.debug(format!(
+                "({task_id}) Select found planned refinement: ({refinement}) {}; possibilities: {}",
                 lv,
-                LValue::from(possibilities.clone())
-            );*/
+                LValue::from(possibilities)
+            ));
             if possibilities.contains(&lv) {
-                //println!("selecting planned refinement!");
+                log.debug(format!(
+                    "({task_id}) Valid planned refinement ({refinement}) {lv}"
+                ));
                 Ok(SelectResponse::Planned(refinement))
             } else {
+                log.warn(format!(
+                    "({task_id}) Unvalid planned refinement ({refinement}) {lv}"
+                ));
                 Ok(SelectResponse::Generated(greedy_refinement))
             }
         }
@@ -358,23 +360,23 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
                     Returns all applicable methods sorted by their score
                      */
 
-                    log.debug(format!("select greedy for {debug}")).await;
+                    log.debug(format!("({task_id}) Select greedy",));
                     greedy_refinement
                 }
                 SelectMode::Planning(Planner::Aries(bool)) => {
-                    log.debug(format!("select with aries for {debug}")).await;
+                    log.debug(format!("({task_id}) Select with aries for {debug}"));
                     aries_select(&state, greedy_refinement, env, bool)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
                 }
                 SelectMode::Planning(Planner::CChoice(config)) => {
-                    log.debug(format!("select with c-choice for {debug}")).await;
+                    log.debug(format!("({task_id}) select with c-choice for {debug}"));
                     c_choice_select(&state, greedy_refinement, env, config)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
                 }
                 SelectMode::Planning(Planner::RAEPlan(config)) => {
-                    log.debug(format!("select with c-choice for {debug}")).await;
+                    log.debug(format!("({task_id}) select with c-choice for {debug}"));
                     rae_plan_select(&state, greedy_refinement, env, config)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
@@ -382,13 +384,13 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
                 _ => todo!(),
             };
 
-            log.debug(format!(
+            /*log.debug(format!(
                 "Sorted_methods for {}({}): {}",
                 debug,
                 task_id,
                 LValue::from(&rt.possibilities)
             ))
-            .await;
+            .await;*/
 
             Ok(SelectResponse::Generated(rt))
         }

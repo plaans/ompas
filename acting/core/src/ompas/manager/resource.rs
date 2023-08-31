@@ -336,6 +336,10 @@ impl Resource {
     pub fn get_client_quantity(&self, client_id: &ClientId) -> usize {
         self.clients.get(client_id).unwrap().quantity
     }
+
+    pub fn get_client_priority(&self, client_id: &ClientId) -> WaiterPriority {
+        self.clients.get(client_id).unwrap().priority
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -558,6 +562,16 @@ impl ResourceManager {
         resource.get_client_quantity(client_id)
     }
 
+    pub async fn get_client_priority(
+        &self,
+        resource_id: &ResourceId,
+        client_id: &ClientId,
+    ) -> WaiterPriority {
+        let map = self.inner.lock().await;
+        let resource: &Resource = map.get(resource_id).unwrap();
+        resource.get_client_priority(client_id)
+    }
+
     pub async fn get_list_resources(&self) -> Vec<String> {
         self.labels
             .lock()
@@ -576,9 +590,27 @@ impl ResourceManager {
             let r: &Resource = inner.get(&id).unwrap();
 
             let mut w_str = "".to_string();
-            for w in r.clients.values() {
+            for client_id in &r.queue {
+                let client = r.clients.get(&client_id).unwrap();
                 w_str.push_str(
-                    format!("\n\t\t-capacity = {};priority= {}", w.quantity, w.priority).as_str(),
+                    format!(
+                        "\n\t\t- ({}) capacity = {};priority= {}",
+                        client_id, client.quantity, client.priority
+                    )
+                    .as_str(),
+                );
+            }
+
+            let mut acq_str = "".to_string();
+
+            for client_id in &r.in_service {
+                let client = r.clients.get(&client_id).unwrap();
+                acq_str.push_str(
+                    format!(
+                        "\n\t\t- ({}) capacity = {}; priority= {}",
+                        client_id, client.quantity, client.priority
+                    )
+                    .as_str(),
                 );
             }
 
@@ -589,11 +621,7 @@ impl ResourceManager {
                     \t- capacity: {}\n\
                     \t- acquirers: {}\n\
                     \t- waiters: {} \n",
-                    label,
-                    r.max_capacity,
-                    r.capacity,
-                    r.in_service.len(),
-                    w_str,
+                    label, r.max_capacity, r.capacity, acq_str, w_str,
                 )
                 .as_str(),
             );

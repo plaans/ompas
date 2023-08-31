@@ -135,6 +135,10 @@ impl ActingProcess {
         &self.debug
     }
 
+    pub fn set_debug(&mut self, debug: String) {
+        self.debug = Some(debug);
+    }
+
     pub fn set_status(&mut self, status: ProcessStatus) {
         self.status = status;
         if let Some(sender) = &mut self.status_update {

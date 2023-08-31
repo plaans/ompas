@@ -7,7 +7,6 @@ use crate::ompas::interface::trigger_collection::TaskTrigger;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
-use crate::TOKIO_CHANNEL_SIZE;
 use futures::FutureExt;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::logger::LogClient;
@@ -21,7 +20,7 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use std::ops::Deref;
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 pub mod error;
 pub mod interface;
@@ -38,7 +37,7 @@ pub async fn rae(
     acting_manager: ActingManager,
     log: LogClient,
     env: LEnv,
-    mut command_rx: Receiver<OMPASJob>,
+    mut command_rx: UnboundedReceiver<OMPASJob>,
 ) {
     let mut process =
         ProcessInterface::new(PROCESS_OMPAS_MAIN, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
@@ -51,7 +50,7 @@ pub async fn rae(
                 match command {
                     None => break,
                     Some(OMPASJob::Job(job)) => {
-                        log.debug("new job received!").await;
+                        log.debug("new job received!");
 
                         let mut new_env = env.clone();
 
@@ -60,20 +59,18 @@ pub async fn rae(
                         let job_type = job.r#type;
                         let job_expr = &job.expr;
 
-
-
                         let job_lvalue: LValue = match parse(job_expr, &mut new_env).await {
                             Ok(l) => l,
                             Err(e) => {
                                 job
-                                    .sender.try_send(Err(e)).unwrap();
+                                    .sender.send(Err(e)).unwrap();
                                 continue;
                                 }
                         };
 
                         match job_type {
                             JobType::Task => {
-                                log.debug(format!("new triggered task: {}", job_expr)).await;
+                                log.debug(format!("new triggered task: {}", job_expr));
                                 let vec: Vec<LValue> = job_lvalue.clone().try_into().unwrap();
                                 let mut vec_cst = vec![];
                                 for e in vec {
@@ -95,7 +92,7 @@ pub async fn rae(
 
                             },
                             JobType::Debug => {
-                                log.debug(format!("new triggered debug: {}", job_expr)).await;
+                                log.debug(format!("new triggered debug: {}", job_expr));
                             },
                         }
 
@@ -122,8 +119,8 @@ pub async fn rae(
                                         }
                                         lv => lv.to_string(),
                                     }
-                                )).await,
-                                Err(e) => log2.error(format!("Error evaluating task {job_lvalue}({:?}): {e}", pr2)).await,
+                                )),
+                                Err(e) => log2.error(format!("Error evaluating task {job_lvalue}({:?}): {e}", pr2)),
                             }
 
                             result
@@ -148,22 +145,22 @@ pub async fn rae(
 
 
                         match job.sender
-                            .try_send(Ok(response)) {
+                            .send(Ok(response)) {
                             Ok(_) =>{}
                             Err(e) => {
-                                log.error(e.to_string()).await;
+                                log.error(e.to_string());
                             }
                         }
                     }
                 }
             }
             _ = process.recv() => {
-                process.log("Main loop of rae ended", LogLevel::Info).await;
+                process.log("Main loop of rae ended", LogLevel::Info);
 
                 for k in &mut killers {
-                    k.interrupt().await;
+                    k.interrupt();
                 }
-                break ;//process.die().await;
+                break ;
             }
         }
         //For each new event or task to be addressed, we search for the best method a create a new refinement stack

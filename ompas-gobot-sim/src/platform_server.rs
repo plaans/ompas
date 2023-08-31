@@ -1,4 +1,3 @@
-use crate::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use ompas_interface::platform_interface::platform_interface_server::PlatformInterface;
 use ompas_interface::platform_interface::{
@@ -7,14 +6,15 @@ use ompas_interface::platform_interface::{
 use ompas_language::interface::*;
 use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::{LogLevel, ProcessInterface};
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{broadcast, mpsc};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::Response;
 use tonic::Status;
 use tonic::{Request, Streaming};
 
 pub struct PlatformGobotSimService {
-    pub command_request: mpsc::Sender<CommandRequest>,
+    pub command_request: UnboundedSender<CommandRequest>,
     pub command_response: broadcast::Receiver<CommandResponse>,
     pub state_update: broadcast::Receiver<PlatformUpdate>,
 }
@@ -24,7 +24,7 @@ const PROCESS_GOBOT_SIM_SERVICE_SEND_COMMANDS: &str = "__PROCESS_GOBOT_SIM_SERVI
 
 #[async_trait]
 impl PlatformInterface for PlatformGobotSimService {
-    type GetUpdatesStream = tokio_stream::wrappers::ReceiverStream<Result<PlatformUpdate, Status>>;
+    type GetUpdatesStream = UnboundedReceiverStream<Result<PlatformUpdate, Status>>;
 
     async fn get_updates(
         &self,
@@ -36,8 +36,8 @@ impl PlatformInterface for PlatformGobotSimService {
             LOG_TOPIC_PLATFORM,
         )
         .await;
-        process.log_info("Received request for updates!").await;
-        let (tx, rx) = tokio::sync::mpsc::channel(TOKIO_CHANNEL_SIZE);
+        process.log_info("Received request for updates!");
+        let (tx, rx) = mpsc::unbounded_channel();
         //let request: InitGetUpdate = request.into_inner();
 
         let mut state_update = self.state_update.resubscribe();
@@ -50,8 +50,8 @@ impl PlatformInterface for PlatformGobotSimService {
                     }
                     msg = state_update.recv() => {
                         if let Ok(msg) = msg {
-                            if tx.send(Ok(msg)).await.is_err() {
-                                process.kill(PROCESS_TOPIC_OMPAS).await;
+                            if tx.send(Ok(msg)).is_err() {
+                                process.kill(PROCESS_TOPIC_OMPAS);
                                 break; //process.die();
                             }
                         }
@@ -61,13 +61,10 @@ impl PlatformInterface for PlatformGobotSimService {
             }
         });
 
-        Ok(tonic::Response::new(
-            tokio_stream::wrappers::ReceiverStream::new(rx),
-        ))
+        Ok(tonic::Response::new(UnboundedReceiverStream::new(rx)))
     }
 
-    type SendCommandsStream =
-        tokio_stream::wrappers::ReceiverStream<Result<CommandResponse, Status>>;
+    type SendCommandsStream = UnboundedReceiverStream<Result<CommandResponse, Status>>;
 
     async fn send_commands(
         &self,
@@ -79,10 +76,8 @@ impl PlatformInterface for PlatformGobotSimService {
             LOG_TOPIC_PLATFORM,
         )
         .await;
-        process
-            .log_debug("Received request to execute stream of commands!")
-            .await;
-        let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        process.log_debug("Received request to execute stream of commands!");
+        let (tx, rx) = mpsc::unbounded_channel();
 
         //Two threads, one handling the sending of request, the other one handling the reponses.
         let command_request_to_godot = self.command_request.clone();
@@ -98,17 +93,17 @@ impl PlatformInterface for PlatformGobotSimService {
                     }
                     msg = command_request_receiver.message() => {
                         if let Ok(Some(request)) = msg {
-                            process.log("Received new command request.", LogLevel::Debug).await;
-                            if command_request_to_godot.send(request).await.is_err() {
-                                process.kill(PROCESS_TOPIC_OMPAS).await;
+                            process.log("Received new command request.", LogLevel::Debug);
+                            if command_request_to_godot.send(request).is_err() {
+                                process.kill(PROCESS_TOPIC_OMPAS);
                                 break; //process.die();
                             }
                         }
                     }
                     msg = command_response_receiver.recv() => {
                         if let Ok(response) = msg {
-                            if tx.send(Ok(response)).await.is_err() {
-                                process.kill(PROCESS_TOPIC_OMPAS).await;
+                            if tx.send(Ok(response)).is_err() {
+                                process.kill(PROCESS_TOPIC_OMPAS);
                                 break;// process.die();
                             }
                         }
@@ -117,6 +112,6 @@ impl PlatformInterface for PlatformGobotSimService {
             }
         });
 
-        Ok(Response::new(ReceiverStream::new(rx)))
+        Ok(Response::new(UnboundedReceiverStream::new(rx)))
     }
 }

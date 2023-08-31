@@ -119,4 +119,8 @@ impl DomainManager {
     pub async fn get_method(&self, label: &str) -> Option<Method> {
         self.inner.read().await.methods.get(label).cloned()
     }
+
+    pub async fn get_task(&self, label: &str) -> Option<Task> {
+        self.inner.read().await.tasks.get(label).cloned()
+    }
 }

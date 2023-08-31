@@ -465,15 +465,14 @@ impl PLDebug {
         self.inner.pop();
     }
 
-    pub async fn log_last_result(&mut self, results: &PResults) {
+    pub fn log_last_result(&mut self, results: &PResults) {
         //if get_debug() {
-        self.log
-            .trace(format!(
-                "{} => {}",
-                self.inner.pop().unwrap(),
-                results.last().unwrap()
-            ))
-            .await
+        self.log.trace(format!(
+            "{} => {}",
+            self.inner.pop().unwrap(),
+            results.last().unwrap()
+        ))
+
         //}
     }
 }

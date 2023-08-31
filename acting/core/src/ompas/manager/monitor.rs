@@ -71,12 +71,11 @@ impl MonitorManager {
                     if let LValue::True = lv {
                         let waiter = waiters.map.remove(id).unwrap();
                         waiter.channel.send(true).expect("");
-                        log.debug(format!("{} became true", waiter.lambda.to_string()))
-                            .await;
+                        log.debug(format!("{} became true", waiter.lambda.to_string()));
                     }
                 }
                 Err(e) => {
-                    log.warn(format!("error checking wait on: {e}")).await;
+                    log.warn(format!("error checking wait on: {e}"));
                 }
             }
         }
@@ -135,7 +134,7 @@ pub async fn task_check_wait_for(
 ) {
     let mut process: ProcessInterface =
         ProcessInterface::new(PROCESS_CHECK_WAIT_FOR, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
-    process.log("check wait for launched", LogLevel::Info).await;
+    process.log("check wait for launched", LogLevel::Info);
     //println!("wait for working");
     loop {
         tokio::select! {

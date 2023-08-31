@@ -31,8 +31,7 @@ use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::{run_planner, PMetric};
 use crate::{
-    ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_DEBUG_CONTINUOUS_PLANNING,
-    OMPAS_PLAN_OUTPUT_ON, TOKIO_CHANNEL_SIZE,
+    ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_DEBUG_CONTINUOUS_PLANNING, OMPAS_PLAN_OUTPUT_ON,
 };
 use aries::collections::seq::Seq;
 use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
@@ -71,7 +70,7 @@ struct PlannerManagerConfig {
     st: RefSymTable,
     env: LEnv,
     opt: Option<PMetric>,
-    rx_update: mpsc::Receiver<PlannerUpdate>,
+    rx_update: mpsc::UnboundedReceiver<PlannerUpdate>,
 }
 
 pub struct PlannerManager {}
@@ -87,7 +86,7 @@ impl PlannerManager {
         env: LEnv,
         opt: Option<PMetric>,
     ) -> PlannerManagerInterface {
-        let (tx_update, rx_update) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx_update, rx_update) = mpsc::unbounded_channel();
 
         let pmi = PlannerManagerInterface::new(tx_update);
 
@@ -103,6 +102,26 @@ impl PlannerManager {
             rx_update,
         }));
         pmi
+    }
+
+    async fn wait_plan(
+        plan_receiver: &mut Option<oneshot::Receiver<ActingTreeUpdate>>,
+    ) -> Option<ActingTreeUpdate> {
+        if let Some(plan_receiver) = plan_receiver {
+            match plan_receiver.await {
+                Ok(pu) => Some(pu),
+                Err(_) => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn interrupt(interrupter: &mut Option<oneshot::Sender<bool>>) {
+        let interrupter = mem::replace(interrupter, None);
+        if let Some(interrupter) = interrupter {
+            let _ = interrupter.send(true);
+        }
     }
 
     async fn continuous_planning(config: PlannerManagerConfig) {
@@ -128,28 +147,8 @@ impl PlannerManager {
 
         let mut planning = false;
         let mut interrupter: Option<oneshot::Sender<bool>> = None;
-        let mut _updater: Option<mpsc::Sender<VarUpdate>> = None;
+        let mut _updater: Option<mpsc::UnboundedSender<VarUpdate>> = None;
         let mut plan_receiver: Option<oneshot::Receiver<ActingTreeUpdate>> = None;
-
-        async fn wait_plan(
-            plan_receiver: &mut Option<oneshot::Receiver<ActingTreeUpdate>>,
-        ) -> Option<ActingTreeUpdate> {
-            if let Some(plan_receiver) = plan_receiver {
-                match plan_receiver.await {
-                    Ok(pu) => Some(pu),
-                    Err(_) => None,
-                }
-            } else {
-                None
-            }
-        }
-
-        fn interrupt(interrupter: &mut Option<oneshot::Sender<bool>>) {
-            let interrupter = mem::replace(interrupter, None);
-            if let Some(interrupter) = interrupter {
-                let _ = interrupter.send(true);
-            }
-        }
 
         let mut state_update_subscriber = state_manager.new_subscriber(StateRule::All).await;
 
@@ -157,22 +156,21 @@ impl PlannerManager {
 
         //TODO: Remove
         let mut state: Option<WorldStateSnapshot>;
-        let mut first = true;
         'main: loop {
             tokio::select! {
-                Some(pu) = wait_plan(&mut plan_receiver) => {
+                Some(pu) = Self::wait_plan(&mut plan_receiver) => {
                     plan_receiver = None;
                     interrupter = None;
                     _updater = None;
-                    acting_manager.write().await.update_acting_tree(pu).await
+                    acting_manager.write().await.update_acting_tree(pu).await;
                 }
                 _ = process.recv() => {
-                    interrupt(&mut interrupter);
+                    Self::interrupt(&mut interrupter);
                     break 'main;
                 }
                 Ok(_) = clock.changed() => {
+
                         let now = clock_manager.now();
-                        //println!("tick {}", index);
                         let tick = *clock.borrow();
                         let mut updates = vec![];
                         while let Ok(update) = rx_update.try_recv() {
@@ -181,11 +179,9 @@ impl PlannerManager {
                         if let Ok(state_update) = state_update_subscriber.channel.try_recv() {
                             updates.push(PlannerUpdate::StateUpdate(state_update))
                         }
-                        if first && !updates.is_empty() {
-                        first= false;
+                        if !updates.is_empty() {
                         //Debug
                         let explanation = {
-
                             let mut explanation = format!("Planning tick n°{tick}\n");
                             for update in updates {
                                 let update: PlannerUpdate = update;
@@ -210,13 +206,13 @@ impl PlannerManager {
                             explanation
                         };
                         if planning {
-                            interrupt(&mut interrupter);
+                            Self::interrupt(&mut interrupter);
                         }
 
-                            let mut new_state = state_manager.get_snapshot().await;
-                            let resource_state = resource_manager.get_snapshot(Some(now)).await;
-                            new_state.absorb(resource_state);
-                            state = Some(new_state);
+                        let mut new_state = state_manager.get_snapshot().await;
+                        let resource_state = resource_manager.get_snapshot(Some(now)).await;
+                        new_state.absorb(resource_state);
+                        state = Some(new_state);
                         //}
 
                         let ep = ExecutionProblem {
@@ -238,8 +234,8 @@ impl PlannerManager {
                             }
                         }
 
-                        //let rule = StateRule::Specific(pp.domain.sf.iter().map(|sf|sf.get_label().into()).collect());
-                        //state_manager.update_subscriber_rule(&state_update_subscriber.id, rule).await;
+                        let rule = StateRule::Specific(pp.domain.sf.iter().map(|sf|sf.get_label().into()).collect());
+                        state_manager.update_subscriber_rule(&state_update_subscriber.id, rule).await;
 
                         let (problem, table) = encode(&pp).await.unwrap();
                         if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
@@ -265,7 +261,7 @@ impl PlannerManager {
 }
 
 pub struct PlannerInstance {
-    _updater: mpsc::Sender<VarUpdate>,
+    _updater: mpsc::UnboundedSender<VarUpdate>,
     interrupter: oneshot::Sender<bool>,
     plan_receiver: oneshot::Receiver<ActingTreeUpdate>,
 }
@@ -281,7 +277,7 @@ impl PlannerInstance {
         if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
             println!("Planning for:\n{}", explanation);
         }
-        let (_updater, _updated) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (_updater, _updated) = mpsc::unbounded_channel();
         let (interrupter, interrupted) = oneshot::channel();
         let (plan_sender, plan_receiver) = oneshot::channel();
 
@@ -317,20 +313,36 @@ impl PlannerInstance {
         }));
 
         tokio::spawn(async move {
+            let mut process =
+                ProcessInterface::new("__PROCESS__ARIES__", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS)
+                    .await;
+
             tokio::select! {
+                _ = process.recv() => {
+
+                }
                 _ = interrupted => {
                     handle.abort();
                     if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
                         println!("Interrupted planning for: \n{}", explanation);
                     }
                 }
-                Ok(Ok(Some(pu))) = planner => {
-                    if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
-                        println!("Successfully planned for:\n{}", explanation);
+                Ok(Ok(pu)) = planner => {
+                    match pu {
+                        Some(pu) => {
+                             if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
+                                println!("Successfully planned for:\n{}", explanation);
+                            }
+                            if plan_sender.send(pu).is_err() {
+                                panic!("error sending plan update");
+                            }
+                        }
+                        None => {
+                            println!("Error while planning");
+                            //std::process::exit(0);
+                        }
                     }
-                    if plan_sender.send(pu).is_err() {
-                        panic!("error sending plan update");
-                    }
+
                 }
             }
         });
@@ -350,9 +362,9 @@ impl PlannerInstance {
         let _ = self.interrupter.send(true);
     }
 
-    pub async fn update(&self, updates: Vec<VarUpdate>) {
+    pub fn update(&self, updates: Vec<VarUpdate>) {
         for update in updates {
-            let _ = self._updater.send(update).await;
+            let _ = self._updater.send(update);
         }
     }
 }
@@ -419,9 +431,6 @@ pub async fn populate_problem(
         }
         for effect in chronicle.get_effects() {
             let label = effect.sv[0].format(st, true);
-            /*if label != "max-q" && label != "quantity" {
-                println!("detected sf: {}", label);
-            }*/
             sf_labels.insert(label);
         }
 
@@ -439,8 +448,6 @@ pub async fn populate_problem(
     while let Some(action) = p_actions.pop() {
         let tps = &action.args;
         if let Some(task) = domain.tasks.get(tps[0].lvalues().to_string().as_str()) {
-            //tasks.insert(task.get_label().to_string());
-
             let params = task.get_parameters().get_labels();
             assert_eq!(params.len(), tps.len() - 1);
 
@@ -557,10 +564,6 @@ pub async fn populate_problem(
         .cloned()
         .collect();
 
-    /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
-        println!("sf_labels: {:?}\nstate functions {:?}", sf_labels, sf)
-    }*/
-
     let mut pp = PlannerProblem {
         st: st.clone(),
         instances,
@@ -622,12 +625,6 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
     //println!("state: ");
     //We suppose for the moment that all args of state variable are objects
     'loop_fact: for (key, fact) in state.get_state(None).inner {
-        /*println!(
-            " - [{}]{} <- {}",
-            fact.date.map(|t| t.to_string()).unwrap_or("0".to_string()),
-            key,
-            fact.value
-        );*/
         let sv: Vec<VarId> = match key {
             LValueS::List(vec) => {
                 let sf = vec[0].to_string();
@@ -713,22 +710,13 @@ pub fn extract_new_acting_models(
     _model: &Model<VarLabel>,
     mut pp: PlannerProblem,
 ) -> Vec<ChronicleInstance> {
-    pp.instances
-        .drain(..)
-        .filter(|c| c.generated)
-        /*.filter(|c| {
-            let presence = c.am.chronicle.as_ref().unwrap().get_presence();
-            let cst = get_var_as_cst(table, ass, model, presence);
-            //println!("{cst}");
-            Cst::Bool(true) == cst
-        })*/
-        .collect()
+    pp.instances.drain(..).filter(|c| c.generated).collect()
 }
 
 pub struct ActingPlanResult {
     pub instances: Vec<ChronicleInstance>,
     pub table: ActingVarRefTable,
-    pub assignements: Arc<SavedAssignment>,
+    pub assignments: Arc<SavedAssignment>,
     pub finite_problem: Arc<FiniteProblem>,
 }
 

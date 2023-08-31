@@ -69,7 +69,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                             }
                         };
                         results.push(result);
-                        debug.log_last_result(&results).await;
+                        debug.log_last_result(&results);
                     }
                     LValue::List(list) => {
                         let list = list.as_slice();
@@ -135,7 +135,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                                         ))
                                         .into(),
                                     );
-                                    debug.log_last_result(&results).await;
+                                    debug.log_last_result(&results);
                                 }
                                 LPrimitive::If => {
                                     scopes.new_scope();
@@ -149,13 +149,13 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                                 }
                                 LPrimitive::Quote => {
                                     results.push(args[0].clone().into());
-                                    debug.log_last_result(&results).await;
+                                    debug.log_last_result(&results);
                                 }
                                 LPrimitive::Err => {
                                     results.push(PLValue::unpure(LValue::Err(
                                         args[0].clone().into_ref(),
                                     )));
-                                    debug.log_last_result(&results).await;
+                                    debug.log_last_result(&results);
                                 }
                                 LPrimitive::QuasiQuote => {
                                     panic!("quasiquote not allowed")
@@ -228,7 +228,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                     }
                     _ => {
                         results.push(lv.clone().into());
-                        debug.log_last_result(&results).await;
+                        debug.log_last_result(&results);
                     }
                 }
             }
@@ -324,7 +324,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                             };
 
                             results.push(r_lvalue);
-                            debug.log_last_result(&results).await;
+                            debug.log_last_result(&results);
                         }
                         LValue::AsyncFn(fun) => {
                             scopes.revert_scope();
@@ -361,7 +361,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                             };
 
                             results.push(r_lvalue);
-                            debug.log_last_result(&results).await;
+                            debug.log_last_result(&results);
                         }
                         lv => {
                             let e = wrong_type!("eval", lv, KindLValue::Fn);
@@ -400,7 +400,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                             result.lvalue_as_quote()
                         ]));
                     }
-                    debug.log_last_result(&results).await;
+                    debug.log_last_result(&results);
                 }
                 PCoreOperatorFrame::If(i) => {
                     let result = results.pop().unwrap();
@@ -470,7 +470,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                         results.push(PLValue::unpure(expr.into()))
                     }
 
-                    debug.log_last_result(&results).await;
+                    debug.log_last_result(&results);
                     scopes.revert_scope();
                 }
                 PCoreOperatorFrame::Lambda => {
@@ -483,7 +483,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                         LPrimitive::Async.into(),
                         last_result.lvalue_as_quote()
                     ]));
-                    debug.log_last_result(&results).await;
+                    debug.log_last_result(&results);
                 }
                 PCoreOperatorFrame::Await => {
                     let last_result = results.pop().unwrap();
@@ -491,7 +491,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                         LPrimitive::Await.into(),
                         last_result.lvalue_as_quote()
                     ]));
-                    debug.log_last_result(&results).await;
+                    debug.log_last_result(&results);
                 }
                 PCoreOperatorFrame::Eval => {
                     //debug.print_last_result(&results);
@@ -511,7 +511,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                     if result.is_pure() {
                         results.push(p_expand(&result.lvalue, true, scopes.get_last_mut()).await?);
                         debug.push(list!(LPrimitive::Expand.into(), result.lvalue));
-                        debug.log_last_result(&results).await;
+                        debug.log_last_result(&results);
                     } else {
                         results.push(PLValue::unpure(list!(
                             LPrimitive::Expand.into(),
@@ -524,7 +524,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                     if result.is_pure() {
                         if let LValue::String(s) = &result.lvalue {
                             results.push(p_parse(s.as_str(), scopes.get_last_mut()).await?);
-                            debug.log_last_result(&results).await;
+                            debug.log_last_result(&results);
                         } else {
                             let e = wrong_type!("p_eval", &result.lvalue, KindLValue::String);
                             expression_error = list![LPrimitive::Parse.into(), result.lvalue];
@@ -567,7 +567,7 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                         LPrimitive::Interruptible.into(),
                         last_result.lvalue_as_quote()
                     ]));
-                    debug.log_last_result(&results).await;
+                    debug.log_last_result(&results);
                 }
                 PCoreOperatorFrame::Uninterruptible => {
                     let last_result = results.pop().unwrap();
@@ -575,10 +575,10 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                         LPrimitive::Uninterruptible.into(),
                         last_result.lvalue_as_quote()
                     ]));
-                    debug.log_last_result(&results).await;
+                    debug.log_last_result(&results);
                 }
                 PCoreOperatorFrame::EvalEnd | PCoreOperatorFrame::EnrEnd => {
-                    debug.log_last_result(&results).await;
+                    debug.log_last_result(&results);
                 }
             },
         }
@@ -911,8 +911,7 @@ pub async fn p_expand(
                         p_env
                             .env
                             .log
-                            .trace(format!("In expand: macro expanded: {:?}", expanded))
-                            .await;
+                            .trace(format!("In expand: macro expanded: {:?}", expanded));
                         return Ok(expanded);
                     }
                 }

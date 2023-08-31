@@ -12,10 +12,10 @@ use crate::ompas::manager::platform::PlatformManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::state_update_manager::StateRule;
 use crate::ompas::manager::state::StateType;
+use crate::ompas::rae;
 use crate::ompas::scheme::exec::ModExec;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::ompas::scheme::monitor::ModMonitor;
-use crate::ompas::{rae, TOKIO_CHANNEL_SIZE};
 use crate::planning::planner::solver::PMetric;
 use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
 use ompas_language::monitor::control::*;
@@ -48,7 +48,7 @@ pub struct ModControl {
     pub(crate) options: OMPASManager,
     pub acting_manager: ActingManager,
     pub log: LogClient,
-    pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
+    pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::UnboundedSender<OMPASJob>>>>,
     pub(crate) platform: PlatformManager,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
     pub(crate) triggers: TriggerCollection,
@@ -99,7 +99,7 @@ impl ModControl {
         env
     }
 
-    pub async fn get_sender(&self) -> Option<tokio::sync::mpsc::Sender<OMPASJob>> {
+    pub async fn get_sender(&self) -> Option<tokio::sync::mpsc::UnboundedSender<OMPASJob>> {
         self.task_stream.read().await.clone()
     }
 
@@ -216,7 +216,7 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
         &mut tasks_to_execute,
     );
 
-    let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (tx, rx) = mpsc::unbounded_channel();
 
     *ctx.task_stream.write().await = Some(tx);
 
@@ -243,7 +243,6 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
             .as_ref()
             .unwrap()
             .send(t.into())
-            .await
             .expect("error sending job")
     }
 
@@ -266,7 +265,7 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
         &mut tasks_to_execute,
     );
 
-    let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (tx, rx) = mpsc::unbounded_channel();
 
     *ctx.task_stream.write().await = Some(tx);
 
@@ -293,7 +292,6 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
             .as_ref()
             .unwrap()
             .send(t.into())
-            .await
             .expect("error sending job")
     }
 
@@ -307,7 +305,7 @@ pub async fn stop(env: &LEnv) {
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    process.kill(PROCESS_TOPIC_OMPAS).await;
+    process.kill(PROCESS_TOPIC_OMPAS);
     drop(process);
     ctx.platform.stop().await;
 
@@ -321,17 +319,14 @@ pub async fn __debug_ompas__(env: &LEnv, arg: LValue) -> LResult {
     let env = env.clone();
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (tx, mut rx) = mpsc::unbounded_channel();
     let job = Job::new_debug(tx, arg);
 
     match ctx.get_sender().await {
         None => Err(LRuntimeError::new(__DEBUG_OMPAS__, "no sender to rae")),
         Some(sender) => {
             tokio::spawn(async move {
-                sender
-                    .send(job.into())
-                    .await
-                    .expect("could not send job to rae");
+                sender.send(job.into()).expect("could not send job to rae");
             });
 
             if let Response::Handle(handle) = rx.recv().await.unwrap()? {
@@ -349,7 +344,7 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntime
     let env = env.clone();
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let (tx, mut rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (tx, mut rx) = mpsc::unbounded_channel();
     let task = args[0].to_string();
     if !ctx.acting_manager.domain.is_task(&task).await {
         return Err(LRuntimeError::new(
@@ -364,10 +359,7 @@ pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntime
         None => Err(LRuntimeError::new(TRIGGER_TASK, "no sender to rae")),
         Some(sender) => {
             tokio::spawn(async move {
-                sender
-                    .send(job.into())
-                    .await
-                    .expect("could not send job to rae");
+                sender.send(job.into()).expect("could not send job to rae");
             });
             let trigger: Response = rx.recv().await.unwrap()?;
             if let Response::Trigger(trigger) = trigger {
@@ -385,7 +377,7 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
     let env = env.clone();
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let (tx, _) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (tx, _) = mpsc::unbounded_channel();
     let task = args[0].to_string();
 
     if !ctx.acting_manager.domain.is_task(&task).await {
@@ -403,10 +395,7 @@ pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRun
         }
         Some(sender) => {
             tokio::spawn(async move {
-                sender
-                    .send(job.into())
-                    .await
-                    .expect("could not send job to rae");
+                sender.send(job.into()).expect("could not send job to rae");
             });
         }
     };

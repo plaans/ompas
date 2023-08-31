@@ -1,6 +1,5 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::OMPASDomain;
-use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
@@ -17,17 +16,12 @@ use crate::ompas::manager::planning::PlannerManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::StateManager;
-use crate::planning::conversion::_convert;
-use crate::planning::conversion::flow_graph::algo::annotate::annotate;
-use crate::planning::conversion::flow_graph::algo::p_eval::p_eval;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
-use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processing;
 use crate::planning::planner::solver::PMetric;
 use inner::InnerActingManager;
 use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
-use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
@@ -66,16 +60,17 @@ impl ActingManager {
         let resource_manager = ResourceManager::default();
         let mut ompas_domain = OMPASDomain::default();
         ompas_domain.init(&st);
-        let domain = ompas_domain.into();
+        let domain: DomainManager = ompas_domain.into();
         Self {
             st: st.clone(),
             resource_manager: resource_manager.clone(),
             monitor_manager: MonitorManager::from(clock_manager.clone()),
-            domain,
+            domain: domain.clone(),
             state: StateManager::new(clock_manager.clone(), st.clone()),
             inner: Arc::new(RwLock::new(InnerActingManager::new(
                 resource_manager,
                 clock_manager.clone(),
+                domain,
                 st,
             ))),
             clock_manager,
@@ -87,6 +82,11 @@ impl Default for ActingManager {
     fn default() -> Self {
         Self::new(RefSymTable::default())
     }
+}
+
+pub enum MethodModel {
+    Raw(LValue, PLEnv),
+    ActingModel(ActingModel),
 }
 
 impl ActingManager {
@@ -152,11 +152,7 @@ impl ActingManager {
     //ActingProcess declaration
 
     pub async fn new_high_level_task(&self, debug: String, args: Vec<Cst>) -> ProcessRef {
-        self.inner
-            .write()
-            .await
-            .new_high_level_task(debug, args)
-            .await
+        self.inner.write().await.new_high_level_task(debug, args)
     }
 
     //Task methods
@@ -172,7 +168,6 @@ impl ActingManager {
             .write()
             .await
             .new_action(label, parent, args, debug, origin)
-            .await
     }
 
     pub async fn new_refinement(&self, parent: &ActingProcessId) -> usize {
@@ -180,7 +175,7 @@ impl ActingManager {
     }
 
     pub async fn set_failed_method(&self, method: &ActingProcessId) {
-        self.inner.write().await.set_failed_method(method).await
+        self.inner.write().await.set_failed_method(method)
     }
 
     pub async fn new_executed_method(
@@ -188,7 +183,7 @@ impl ActingManager {
         parent: &ActingProcessId,
         debug: String,
         args: Vec<Option<Cst>>,
-        model: ActingModel,
+        model: MethodModel,
         origin: ProcessOrigin,
     ) -> ActingProcessId {
         self.inner
@@ -197,22 +192,6 @@ impl ActingManager {
             .new_executed_method(parent, debug, args, model, origin)
             .await
     }
-
-    /*async fn new_method(
-        &self,
-        label:
-        parent: &ActingProcessId,
-        debug: String,
-        args: Vec<Option<Cst>>,
-        model: ActingModel,
-        origin: ProcessOrigin,
-    ) -> ActingProcessId {
-        self.inner
-            .write()
-            .await
-            .new_method(label, parent, debug, args, model, origin)
-            .await
-    }*/
 
     pub async fn new_arbitrary(
         &self,
@@ -224,7 +203,6 @@ impl ActingManager {
             .write()
             .await
             .new_arbitrary(label, parent, origin)
-            .await
     }
 
     // Acquire methods
@@ -234,11 +212,7 @@ impl ActingManager {
         parent: &ActingProcessId,
         origin: ProcessOrigin,
     ) -> ActingProcessId {
-        self.inner
-            .write()
-            .await
-            .new_acquire(label, parent, origin)
-            .await
+        self.inner.write().await.new_acquire(label, parent, origin)
     }
 
     pub async fn subscribe(&self, id: &ActingProcessId) -> watch::Receiver<ProcessStatus> {
@@ -248,7 +222,7 @@ impl ActingManager {
     // Setters
     //ActingProcess methods
     pub async fn set_start(&self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner.write().await.set_start(id, instant).await
+        self.inner.write().await.set_start(id, instant)
     }
 
     pub async fn set_end(
@@ -257,7 +231,7 @@ impl ActingManager {
         instant: Option<Timepoint>,
         status: ProcessStatus,
     ) {
-        self.inner.write().await.set_end(id, instant, status).await
+        self.inner.write().await.set_end(id, instant, status)
     }
 
     pub async fn set_status(&self, id: &ActingProcessId, status: ProcessStatus) {
@@ -265,7 +239,7 @@ impl ActingManager {
     }
 
     pub async fn set_moment(&self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner.write().await.set_moment(id, instant).await
+        self.inner.write().await.set_moment(id, instant)
     }
 
     pub async fn set_executed_refinement(
@@ -277,7 +251,6 @@ impl ActingManager {
             .write()
             .await
             .set_executed_refinement(action, method)
-            .await
     }
 
     pub async fn get_last_planned_refinement(
@@ -356,7 +329,6 @@ impl ActingManager {
             .write()
             .await
             .set_arbitrary_value(id_arbitrary, set, greedy)
-            .await
     }
 
     pub async fn acquire(
@@ -374,11 +346,7 @@ impl ActingManager {
     }
 
     pub async fn set_s_acq(&self, acquire_id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner
-            .write()
-            .await
-            .set_s_acq(acquire_id, instant)
-            .await
+        self.inner.write().await.set_s_acq(acquire_id, instant)
     }
 
     pub async fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
@@ -386,7 +354,7 @@ impl ActingManager {
     }
 
     pub async fn set_action_args(&self, id: &ActingProcessId, args: Vec<Cst>) {
-        self.inner.write().await.set_action_args(id, args).await;
+        self.inner.write().await.set_action_args(id, args);
     }
 
     pub async fn get_lv(&self, id: &ActingProcessId) -> LValue {
@@ -422,7 +390,7 @@ impl ActingManager {
             .write()
             .await
             .set_planner_manager_interface(pmi)
-            .await
+            .await;
     }
 
     pub async fn get_execution_problem(&self) -> ExecutionProblem {
@@ -444,7 +412,7 @@ impl ActingManager {
     }
 
     pub async fn plan(&self) {
-        self.inner.write().await.plan().await;
+        self.inner.write().await.plan();
     }
 
     pub async fn get_om_lvalue(&self, id: &ActingProcessId) -> LValue {
@@ -480,65 +448,6 @@ impl ActingManager {
 
         body.push(lv_om);
         list!(body.into(), (action_id).into())
-    }
-
-    pub async fn generate_acting_model_for_method(
-        &self,
-        lv: &LValue,
-        mut p_env: PLEnv,
-    ) -> Result<ActingModel, LRuntimeError> {
-        let debug = lv.to_string();
-        let p_eval_lv = p_eval(lv, &mut p_env).await?;
-        //debug_println!("{}\np_eval =>\n{}", lv.format(0), p_eval_lv.format(0));
-        let lv_om = annotate(p_eval_lv);
-
-        let mut lv_expanded = None;
-        let mut chronicle = None;
-
-        if self.inner.read().await.is_planner_launched() {
-            let st = self.st.clone();
-            let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
-            let mut name = vec![];
-            if let LValue::List(list) = &lv {
-                for arg in list.as_slice() {
-                    let id = match arg {
-                        LValue::Symbol(s) => st.new_symbol(s),
-                        LValue::Number(LNumber::Int(i)) => st.new_int(*i),
-                        LValue::Number(LNumber::Float(f)) => st.new_float(*f),
-                        LValue::True => st.new_bool(true),
-                        LValue::Nil => st.new_bool(false),
-                        _ => unreachable!(),
-                    };
-                    ch.add_var(id);
-                    name.push(id);
-                }
-            } else {
-                panic!()
-            };
-            ch.set_name(name);
-
-            let ch = Some(ch);
-            let pp_lv = pre_processing(&lv_om, &p_env).await?;
-            //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
-
-            chronicle = match _convert(ch, &pp_lv, &mut p_env, st).await {
-                Ok(ch) => Some(ch),
-                Err(e) => {
-                    println!("convert error: {}", e);
-                    None
-                }
-            };
-
-            lv_expanded = Some(pp_lv);
-        }
-
-        Ok(ActingModel {
-            lv: lv.clone(),
-            lv_om,
-            lv_expanded,
-            instantiations: vec![],
-            chronicle,
-        })
     }
 
     pub async fn update_acting_tree(&self, update: ActingTreeUpdate) {

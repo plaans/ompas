@@ -3,7 +3,8 @@
     (read planning_domain/base.lisp)
     (read planning_domain/lambdas.lisp)
     (read planning_domain/plan_model.lisp)
-    (read planning_domain/problems/j02.lisp)
+    ;(read planning_domain/problems/j02.lisp)
+    (read planning_domain/problems/j01.lisp)
 
     (start-with-planner false)
     ;(start)

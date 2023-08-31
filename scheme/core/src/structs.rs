@@ -338,15 +338,11 @@ impl LDebug {
         self.inner.pop();
     }
 
-    pub async fn log_last_result(&mut self, results: &Results) {
-        //if get_debug() {
-        self.log
-            .trace(format!(
-                "{} => {}",
-                self.inner.pop().unwrap(),
-                results.last().unwrap()
-            ))
-            .await
-        //}
+    pub fn log_last_result(&mut self, results: &Results) {
+        self.log.trace(format!(
+            "{} => {}",
+            self.inner.pop().unwrap(),
+            results.last().unwrap()
+        ))
     }
 }

@@ -25,10 +25,14 @@ impl Display for ProcessStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             ProcessStatus::Accepted => write!(f, "accepted"),
-            ProcessStatus::Running(progress) => match progress {
-                Some(p) => write!(f, "running: {}", p),
-                None => write!(f, "none"),
-            },
+            ProcessStatus::Running(progress) => {
+                write!(f, "running")?;
+                if let Some(p) = progress {
+                    write!(f, "({})", p)
+                } else {
+                    Ok(())
+                }
+            }
             ProcessStatus::Success => write!(f, "success"),
             ProcessStatus::Cancelled(r) => write!(f, "cancelled: {}", r),
             ProcessStatus::Rejected => write!(f, "rejected"),

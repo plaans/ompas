@@ -2,7 +2,6 @@
 //! The repl is based on the project rustyline.
 //!
 //! It contains only one function (for the moment): run that takes two arguments.
-use crate::TOKIO_CHANNEL_SIZE;
 use chrono::{DateTime, Utc};
 use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use rustyline::error::ReadlineError;
@@ -13,12 +12,12 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::{env, fs};
 use tokio::sync::broadcast;
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 
 ///Spawn repl task
-pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
-    let (sender_repl, receiver_repl) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+pub async fn spawn_repl(sender: UnboundedSender<String>) -> Option<UnboundedSender<String>> {
+    let (sender_repl, receiver_repl) = mpsc::unbounded_channel();
     let mut end_receiver = subscribe_new_task();
     tokio::spawn(async move {
         tokio::select! {
@@ -34,8 +33,10 @@ pub async fn spawn_repl(sender: Sender<String>) -> Option<Sender<String>> {
 }
 
 /// Spawn the log task
-pub async fn spawn_log(log_path: Option<PathBuf>) -> Option<(Sender<String>, JoinHandle<()>)> {
-    let (sender_log, receiver_log) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+pub async fn spawn_log(
+    log_path: Option<PathBuf>,
+) -> Option<(UnboundedSender<String>, JoinHandle<()>)> {
+    let (sender_log, receiver_log) = mpsc::unbounded_channel();
 
     let end_receiver = subscribe_new_task();
     let handle = tokio::spawn(async move {
@@ -46,7 +47,7 @@ pub async fn spawn_log(log_path: Option<PathBuf>) -> Option<(Sender<String>, Joi
 }
 
 async fn log(
-    mut receiver: Receiver<String>,
+    mut receiver: UnboundedReceiver<String>,
     working_dir: Option<PathBuf>,
     mut end_receiver: broadcast::Receiver<EndSignal>,
 ) {
@@ -114,7 +115,7 @@ async fn log(
 /// - receiver: channel object to receive ack from lisp interpreter after evaluation.
 /// Used for synchronization.
 #[warn(deprecated)]
-async fn repl(sender: Sender<String>, mut receiver: Receiver<String>) {
+async fn repl(sender: UnboundedSender<String>, mut receiver: UnboundedReceiver<String>) {
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
@@ -128,7 +129,6 @@ async fn repl(sender: Sender<String>, mut receiver: Receiver<String>) {
                 rl.add_history_entry(string.clone());
                 sender
                     .send(format!("repl:{}", string))
-                    .await
                     .expect("couldn't send lisp command");
                 let buffer = match receiver.recv().await {
                     None => {
@@ -157,7 +157,6 @@ async fn repl(sender: Sender<String>, mut receiver: Receiver<String>) {
     }
     sender
         .send("exit".to_string())
-        .await
         .expect("couldn't send exit msg");
     rl.save_history("history.txt").unwrap();
 }

@@ -121,21 +121,17 @@ impl PlatformManager {
                     supervisor
                         .set_status(&command_id, ProcessStatus::Failure)
                         .await;
-                    process
-                        .log_error(format!("Eval error executing command {}: {}", command, err))
-                        .await;
-                    process.kill(PROCESS_TOPIC_OMPAS).await;
+                    process.log_error(format!("Eval error executing command {}: {}", command, err));
+                    process.kill(PROCESS_TOPIC_OMPAS);
                 }
                 Ok(LValue::Err(err)) => {
                     supervisor
                         .set_status(&command_id, ProcessStatus::Failure)
                         .await;
-                    process
-                        .log_error(format!(
-                            "Execution of {}({}) returned an error: {}",
-                            command, command_id, err
-                        ))
-                        .await;
+                    process.log_error(format!(
+                        "Execution of {}({}) returned an error: {}",
+                        command, command_id, err
+                    ));
                 }
                 Ok(_) => {
                     supervisor
@@ -171,7 +167,7 @@ impl PlatformManager {
 
                 match int {
                     None => {}
-                    Some(mut int) => int.interrupt().await,
+                    Some(mut int) => int.interrupt(),
                 }
             }
             Some(p) => p.cancel_command(command_id).await,

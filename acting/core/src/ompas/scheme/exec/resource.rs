@@ -98,17 +98,17 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
     let pr = &env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref;
-    let supervisor = env.get_context::<ModExec>(MOD_EXEC)?.acting_manager.clone();
+    let acting_manager = env.get_context::<ModExec>(MOD_EXEC)?.acting_manager.clone();
     let label: String = args
         .get(0)
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
         .try_into()?;
     let id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
-            if supervisor.get_kind(id).await == ProcessKind::Method {
-                supervisor
+            if acting_manager.get_kind(id).await == ProcessKind::Method {
+                acting_manager
                     .new_acquire(
-                        Label::Acquire(supervisor.get_number_acquire(*id).await),
+                        Label::Acquire(acting_manager.get_number_acquire(*id).await),
                         id,
                         ProcessOrigin::Execution,
                     )
@@ -117,11 +117,11 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
                 panic!()
             }
         }
-        ProcessRef::Relative(id, labels) => match supervisor.get_id(pr.clone()).await {
+        ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
             Some(id) => id,
             None => match labels[0] {
                 Label::Acquire(s) => {
-                    supervisor
+                    acting_manager
                         .new_acquire(Label::Acquire(s), id, ProcessOrigin::Execution)
                         .await
                 }
@@ -172,30 +172,34 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
     };
 
     let f: LFuture = (Box::pin(async move {
-        log.info(format!(
-            "Acquiring {label}; capacity = {quantity}; priority = {priority}"
-        ))
-        .await;
+        acting_manager.set_start(&id, None).await;
 
-        supervisor.set_start(&id, None).await;
-
-        let mut wait: WaitAcquire = supervisor
+        let mut wait: WaitAcquire = acting_manager
             .acquire(&id, label.to_string(), quantity, priority)
             .await?;
 
+        let priority = acting_manager
+            .resource_manager
+            .get_client_priority(&wait.get_resource_id(), &wait.get_client_id())
+            .await;
+
+        log.info(format!(
+            "({id}) Acquiring {label}; capacity = {quantity}; priority = {priority}"
+        ));
+
         let rh: ResourceHandler = tokio::select! {
             _ = rx.recv() => {
-                log.info(format!("Acquisition of {label} cancelled.")).await;
+                log.info(format!("Acquisition of {label} cancelled."));
                 resources.remove_waiter(wait).await;
                 return Ok(LValue::Err(LValue::Nil.into()))
             }
             rh = wait.recv() => {
-                log.info(format!("Resource {label} unlocked !!!")).await;
+                log.info(format!("({}) Acquired unlocked", id));
                 rh
             }
         };
 
-        supervisor.set_s_acq(&id, None).await;
+        acting_manager.set_s_acq(&id, None).await;
 
         let rc = resources.clone();
         let (tx, mut rx) = new_interruption_handler();
@@ -206,8 +210,10 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
             rx.recv().await;
             let label = rh.get_label().to_string();
             let r = rc.release(rh).await.map(|_| LValue::Nil);
-            log2.info(format!("Released {}", label)).await;
-            supervisor.set_end(&id, None, ProcessStatus::Success).await;
+            log2.info(format!("Released {}", label));
+            acting_manager
+                .set_end(&id, None, ProcessStatus::Success)
+                .await;
             r
         }) as FutureResult)
             .shared();
@@ -216,8 +222,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
 
         tokio::spawn(f);
 
-        log.info(format!("{label} acquired with {quantity} capacity."))
-            .await;
+        log.info(format!("{label} acquired with {quantity} capacity."));
 
         Ok(LAsyncHandle::new(f2, tx).into())
     }) as FutureResult)
@@ -245,8 +250,7 @@ async fn check_acquire<'a>(arg: (LEnv, Vec<LValue>, usize)) -> LResult {
     let h: LValue = h_await.get_future().await?;
     env.get_context::<ModResource>(MOD_RESOURCE)?
         .log
-        .info(format!("{} unlocked {}", d, label))
-        .await;
+        .info(format!("{} unlocked {}", d, label));
     Ok(list![label, h])
 }
 
@@ -265,8 +269,7 @@ pub async fn __acquire_in_list__(
     let d: usize = thread_rng().gen();
     env.get_context::<ModResource>(MOD_RESOURCE)?
         .log
-        .info(format!("Acquire element from {}, id: {} ", args[0], d))
-        .await;
+        .info(format!("Acquire element from {}, id: {} ", args[0], d));
     //let capacity = args.get(1).cloned();
     let rest = if args.len() > 1 {
         args[1..].to_vec()

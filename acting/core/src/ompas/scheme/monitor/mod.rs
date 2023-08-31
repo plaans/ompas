@@ -43,7 +43,7 @@ pub struct ModMonitor {
     pub(crate) options: OMPASManager,
     pub acting_manager: ActingManager,
     pub log: LogClient,
-    pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::Sender<OMPASJob>>>>,
+    pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::UnboundedSender<OMPASJob>>>>,
     pub(crate) platform: PlatformManager,
     pub(crate) empty_env: LEnv,
     pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,

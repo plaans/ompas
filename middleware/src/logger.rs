@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicUsize;
@@ -52,47 +53,45 @@ pub struct Logger {
     system_start: SystemTime,
     current_log_dir: String,
     max_log_level: Arc<RwLock<Level>>,
-    end_receiver: Arc<RwLock<Option<broadcast::Receiver<EndSignal>>>>,
-    sender_log: Arc<RwLock<Option<mpsc::Sender<LogMessage>>>>,
+    end_receiver: Arc<broadcast::Receiver<EndSignal>>,
+    sender_log: Arc<mpsc::UnboundedSender<LogMessage>>,
 }
 
-impl Default for Logger {
-    fn default() -> Self {
+impl Logger {
+    pub fn new() -> (Self, mpsc::Sender<EndSignal>) {
         let start = Utc::now() + chrono::Duration::hours(2);
         let current_log_dir = start.format("%Y-%m-%d_%H-%M-%S").to_string();
 
-        Self {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx_end_logger, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
+
+        let logger = Self {
             collection: Default::default(),
             absolute_start: start,
             system_start: SystemTime::now(),
             current_log_dir,
             max_log_level: Arc::new(RwLock::new(DEFAULT_MAX_LOG_LEVEL)),
-            end_receiver: Arc::new(Default::default()),
-            sender_log: Arc::new(Default::default()),
-        }
-    }
-}
+            end_receiver: Arc::new(rx_end),
+            sender_log: Arc::new(tx),
+        };
 
-impl Logger {
-    pub fn new() -> (Self, mpsc::Sender<EndSignal>) {
-        let logger = Self::default();
         let logger2 = logger.clone();
 
-        let (tx, rx) = mpsc::channel(1);
+        let (tx_end, rx_end) = mpsc::channel(1);
 
-        tokio::spawn(async move { logger2.start(rx).await });
-        (logger, tx)
+        tokio::spawn(async move { logger2.start(rx_end, rx, tx_end_logger).await });
+        (logger, tx_end)
     }
 
-    pub(crate) async fn start(&self, end_signal: mpsc::Receiver<EndSignal>) {
-        if self.sender_log.read().await.is_none() && self.end_receiver.read().await.is_none() {
-            let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-            let (tx_end, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
-            *self.sender_log.write().await = Some(tx);
-            *self.end_receiver.write().await = Some(rx_end);
-            let logger = self.clone();
-            tokio::spawn(async move { Logger::run_logger(logger, end_signal, rx, tx_end).await });
-        }
+    pub(crate) async fn start(
+        self,
+        end_signal: mpsc::Receiver<EndSignal>,
+        log_receiver: mpsc::UnboundedReceiver<LogMessage>,
+        tx_end: broadcast::Sender<EndSignal>,
+    ) {
+        tokio::spawn(
+            async move { Logger::run_logger(self, end_signal, log_receiver, tx_end).await },
+        );
     }
 
     async fn log_to_file(&self, message: LogMessage) {
@@ -132,13 +131,13 @@ impl Logger {
     async fn run_logger(
         logger: Logger,
         mut end_signal: mpsc::Receiver<EndSignal>,
-        mut receiver: mpsc::Receiver<LogMessage>,
+        mut receiver: mpsc::UnboundedReceiver<LogMessage>,
         end: broadcast::Sender<EndSignal>,
     ) {
         'main: loop {
             tokio::select! {
                 _ = end_signal.recv() => {
-                    logger.log(LogMessage::new(LogLevel::Info, "MASTER_LOGGER", logger.subscribe_to_topic(LOG_TOPIC_ROOT).await, "Ending logger")).await;
+                    logger.log(LogMessage::new(LogLevel::Info, "MASTER_LOGGER", logger.subscribe_to_topic(LOG_TOPIC_ROOT).await, "Ending logger"));
                     break 'main;
                 }
                 message = receiver.recv() => {
@@ -148,9 +147,7 @@ impl Logger {
                 }
             }
         }
-        //receiver.close();
-
-        *logger.sender_log.write().await = None;
+        receiver.close();
 
         while let Some(message) = receiver.recv().await {
             logger.log_to_file(message).await;
@@ -170,30 +167,21 @@ impl Logger {
     }
 
     pub(crate) async fn end(&self) {
-        let end = self
-            .end_receiver
-            .read()
-            .await
-            .as_ref()
-            .map(|end| end.resubscribe());
-        if let Some(mut end) = end {
-            let _ = end.recv().await;
-        }
+        let mut end_receiver = self.end_receiver.resubscribe();
+        let _ = end_receiver.recv().await;
     }
 
     async fn enabled(&self, level: Level) -> bool {
         level <= self.get_max_log_level().await
     }
 
-    pub(crate) async fn log(&self, message: LogMessage) {
-        let sender = self.sender_log.read().await.clone();
-        if let Some(sender) = sender {
-            let from = message.source.to_string();
-            sender
-                .send(message)
-                .await
-                .unwrap_or_else(|e| panic!("Error sending log from {}\nerror = {}", from, e));
-        }
+    pub(crate) fn log(&self, message: LogMessage) {
+        let sender = self.sender_log.deref().clone();
+
+        let from = message.source.to_string();
+        sender
+            .send(message)
+            .unwrap_or_else(|e| panic!("Error sending log from {}\nerror = {}", from, e));
     }
 
     pub(crate) async fn get_topic_id(&self, topic: impl Display) -> Option<LogTopicId> {
@@ -272,21 +260,14 @@ impl Logger {
                                 source: PROCESS_LOGGER.to_string(),
                                 topic: topic_id,
                                 message: format!("Stop display log topic {}.", name),
-                            })
-                            .await;
+                            });
                         }
-                        Err(err) => {
-                            self.log(LogMessage {
-                                level: Level::Error,
-                                source: PROCESS_LOGGER.to_string(),
-                                topic: topic_id,
-                                message: format!(
-                                    "Error stop display log topic {}: {:?}.",
-                                    name, err
-                                ),
-                            })
-                            .await
-                        }
+                        Err(err) => self.log(LogMessage {
+                            level: Level::Error,
+                            source: PROCESS_LOGGER.to_string(),
+                            topic: topic_id,
+                            message: format!("Error stop display log topic {}: {:?}.", name, err),
+                        }),
                     };
                 }
             }
@@ -421,72 +402,54 @@ impl LogClient {
         Self { topic_id, source }
     }
 
-    pub async fn log(&self, message: impl Display, level: LogLevel) {
-        MASTER
-            .logger
-            .log(LogMessage {
-                level: level.into(),
-                source: self.source.to_string(),
-                topic: self.topic_id,
-                message: message.to_string(),
-            })
-            .await;
+    pub fn log(&self, message: impl Display, level: LogLevel) {
+        MASTER.logger.log(LogMessage {
+            level: level.into(),
+            source: self.source.to_string(),
+            topic: self.topic_id,
+            message: message.to_string(),
+        });
     }
 
-    pub async fn info(&self, message: impl Display) {
-        MASTER
-            .logger
-            .log(LogMessage {
-                level: Level::Info,
-                source: self.source.to_string(),
-                topic: self.topic_id,
-                message: message.to_string(),
-            })
-            .await;
+    pub fn info(&self, message: impl Display) {
+        MASTER.logger.log(LogMessage {
+            level: Level::Info,
+            source: self.source.to_string(),
+            topic: self.topic_id,
+            message: message.to_string(),
+        });
     }
-    pub async fn warn(&self, message: impl Display) {
-        MASTER
-            .logger
-            .log(LogMessage {
-                level: Level::Warn,
-                source: self.source.to_string(),
-                topic: self.topic_id,
-                message: message.to_string(),
-            })
-            .await;
+    pub fn warn(&self, message: impl Display) {
+        MASTER.logger.log(LogMessage {
+            level: Level::Warn,
+            source: self.source.to_string(),
+            topic: self.topic_id,
+            message: message.to_string(),
+        });
     }
-    pub async fn debug(&self, message: impl Display) {
-        MASTER
-            .logger
-            .log(LogMessage {
-                level: Level::Debug,
-                source: self.source.to_string(),
-                topic: self.topic_id,
-                message: message.to_string(),
-            })
-            .await;
+    pub fn debug(&self, message: impl Display) {
+        MASTER.logger.log(LogMessage {
+            level: Level::Debug,
+            source: self.source.to_string(),
+            topic: self.topic_id,
+            message: message.to_string(),
+        });
     }
-    pub async fn error(&self, message: impl Display) {
-        MASTER
-            .logger
-            .log(LogMessage {
-                level: Level::Error,
-                source: self.source.to_string(),
-                topic: self.topic_id,
-                message: message.to_string(),
-            })
-            .await;
+    pub fn error(&self, message: impl Display) {
+        MASTER.logger.log(LogMessage {
+            level: Level::Error,
+            source: self.source.to_string(),
+            topic: self.topic_id,
+            message: message.to_string(),
+        });
     }
-    pub async fn trace(&self, message: impl Display) {
-        MASTER
-            .logger
-            .log(LogMessage {
-                level: Level::Trace,
-                source: self.source.to_string(),
-                topic: self.topic_id,
-                message: message.to_string(),
-            })
-            .await;
+    pub fn trace(&self, message: impl Display) {
+        MASTER.logger.log(LogMessage {
+            level: Level::Trace,
+            source: self.source.to_string(),
+            topic: self.topic_id,
+            message: message.to_string(),
+        });
     }
 }
 

@@ -1,4 +1,3 @@
-use crate::TOKIO_CHANNEL_SIZE;
 use ompas_utils::other::get_and_update_id_counter;
 use sompas_structs::lvalues::LValueS;
 use std::collections::HashMap;
@@ -15,12 +14,12 @@ pub enum StateRule {
 }
 
 struct StateUpdateSubscriberInterface {
-    channel: mpsc::Sender<StateUpdate>,
+    channel: mpsc::UnboundedSender<StateUpdate>,
     rule: StateRule,
 }
 
 pub struct StateUpdateSubscriber {
-    pub channel: mpsc::Receiver<StateUpdate>,
+    pub channel: mpsc::UnboundedReceiver<StateUpdate>,
     pub id: SubscriberId,
 }
 
@@ -33,11 +32,11 @@ pub struct StateUpdateManager {
 }
 
 impl StateUpdateManager {
-    pub async fn check_updates_and_send_notifications(&self, updated: StateUpdate) {
+    pub fn check_updates_and_send_notifications(&self, updated: StateUpdate) {
         for subscriber in self.inner.values() {
             match &subscriber.rule {
                 StateRule::All => {
-                    let _ = subscriber.channel.send(updated.clone()).await;
+                    let _ = subscriber.channel.send(updated.clone());
                 }
                 StateRule::Specific(rules) => {
                     let string_updated: Vec<String> =
@@ -52,7 +51,7 @@ impl StateUpdateManager {
                         }
 
                         if !concerned.is_empty() {
-                            let _ = subscriber.channel.send(concerned).await;
+                            let _ = subscriber.channel.send(concerned);
                         }
                     }
                 }
@@ -66,7 +65,7 @@ impl StateUpdateManager {
 
     pub fn new_subscriber(&mut self, rule: StateRule) -> StateUpdateSubscriber {
         let id = get_and_update_id_counter(self.next_id.clone());
-        let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx, rx) = mpsc::unbounded_channel();
 
         self.inner
             .insert(id, StateUpdateSubscriberInterface { channel: tx, rule });

@@ -118,8 +118,7 @@ impl StateManager {
             self.state_update_manager
                 .read()
                 .await
-                .check_updates_and_send_notifications(updated)
-                .await;
+                .check_updates_and_send_notifications(updated);
         }
     }
 

@@ -21,7 +21,7 @@ pub enum JobType {
 
 #[derive(Debug, Clone)]
 pub struct Job {
-    pub sender: mpsc::Sender<Result<Response, LRuntimeError>>,
+    pub sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>,
     pub expr: String,
     pub r#type: JobType,
 }
@@ -33,7 +33,10 @@ impl Display for Job {
 }
 
 impl Job {
-    pub fn new_task(sender: mpsc::Sender<Result<Response, LRuntimeError>>, value: LValue) -> Self {
+    pub fn new_task(
+        sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>,
+        value: LValue,
+    ) -> Self {
         Self {
             sender,
             expr: value.to_string(),
@@ -41,7 +44,10 @@ impl Job {
         }
     }
 
-    pub fn new_debug(sender: mpsc::Sender<Result<Response, LRuntimeError>>, value: LValue) -> Self {
+    pub fn new_debug(
+        sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>,
+        value: LValue,
+    ) -> Self {
         Self {
             sender,
             expr: value.to_string(),

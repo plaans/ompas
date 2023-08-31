@@ -141,7 +141,7 @@ impl PlatformGobotSim {
         tokio::spawn(async move {
             process.recv().await.expect("error receiving kill message");
             child.kill().expect("could not kill godot");
-            process.log("Godot simulator killed", LogLevel::Info).await;
+            process.log("Godot simulator killed", LogLevel::Info);
         });
         Ok(LValue::Nil)
     }
@@ -150,7 +150,7 @@ impl PlatformGobotSim {
     pub async fn open_com(&self) -> LResult {
         let socket_addr = self.godot_tcp_info;
 
-        let (tx_request, rx_request) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx_request, rx_request) = mpsc::unbounded_channel();
         let (tx_response, rx_response) = tokio::sync::broadcast::channel(TOKIO_CHANNEL_SIZE);
         let (tx_update, rx_update) = tokio::sync::broadcast::channel(TOKIO_CHANNEL_SIZE);
 
@@ -326,22 +326,19 @@ impl PlatformDescriptor for PlatformGobotSim {
 
         match self.start_platform(config).await {
             Ok(_) => {
-                self.log.info("Successfully started platform.").await;
+                self.log.info("Successfully started platform.");
                 match self.open_com().await {
                     Ok(_) => {
-                        self.log.info("Successfully open com with platform.").await;
+                        self.log.info("Successfully open com with platform.");
                     }
                     Err(e) => {
                         self.log
-                            .error(format!("Error opening com with platform: {e}."))
-                            .await;
+                            .error(format!("Error opening com with platform: {e}."));
                     }
                 }
             }
             Err(e) => {
-                self.log
-                    .error(format!("Error starting platform: {e}"))
-                    .await;
+                self.log.error(format!("Error starting platform: {e}"));
             }
         }
     }

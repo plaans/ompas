@@ -11,7 +11,6 @@ use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::partial_state::Fact;
 use crate::ompas::manager::state::partial_state::PartialState;
 use crate::ompas::manager::state::StateType;
-use crate::ompas::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
 use ompas_interface::platform_interface::command_request::Request;
 use ompas_interface::platform_interface::command_response::Response;
@@ -39,7 +38,7 @@ use tokio::sync::{Mutex, RwLock};
 pub struct ExecPlatform {
     inner: Arc<RwLock<dyn PlatformDescriptor>>,
     acting_manager: ActingManager,
-    command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
+    command_stream: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<CommandRequest>>>>,
     log: LogClient,
     pub config: Arc<RwLock<PlatformConfig>>,
 }
@@ -48,7 +47,7 @@ impl ExecPlatform {
     pub async fn new(
         inner: Arc<RwLock<dyn PlatformDescriptor>>,
         acting_manager: ActingManager,
-        command_stream: Arc<Mutex<Option<tokio::sync::mpsc::Sender<CommandRequest>>>>,
+        command_stream: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<CommandRequest>>>>,
         log: LogClient,
         config: Arc<RwLock<PlatformConfig>>,
     ) -> Self {
@@ -71,8 +70,7 @@ impl ExecPlatform {
         }
 
         self.log
-            .debug(format!("New command request: {}", LValue::from(command)))
-            .await;
+            .debug(format!("New command request: {}", LValue::from(command)));
 
         let request = CommandRequest {
             request: Some(Request::Execution(CommandExecutionRequest {
@@ -86,7 +84,6 @@ impl ExecPlatform {
             .as_ref()
             .unwrap()
             .send(request)
-            .await
             .unwrap_or_else(|_| eprintln!("Error on sending request."));
     }
 
@@ -96,14 +93,14 @@ impl ExecPlatform {
                 command_id: command_id as u64,
             })),
         };
-        self.command_stream
+        if let Err(_) = self
+            .command_stream
             .lock()
             .await
             .as_ref()
             .unwrap()
             .send(request)
-            .await
-            .unwrap_or_else(|e| panic!("{}", e));
+        {}
     }
 
     async fn get_updates(
@@ -115,15 +112,13 @@ impl ExecPlatform {
                 .await;
         let request = tonic::IntoRequest::into_request(InitGetUpdate {});
 
-        process_interface.log_info("Initiating update stream").await;
+        process_interface.log_info("Initiating update stream");
 
         let stream = match client.get_updates(request).await {
             Ok(s) => s,
             Err(e) => {
-                process_interface
-                    .log_error(format!("Error starting update stream: {e}"))
-                    .await;
-                process_interface.kill(PROCESS_TOPIC_OMPAS).await;
+                process_interface.log_error(format!("Error starting update stream: {e}"));
+                process_interface.kill(PROCESS_TOPIC_OMPAS);
                 return;
             }
         };
@@ -135,14 +130,13 @@ impl ExecPlatform {
                     break;
                 }
                 msg = stream.message() => {
-                    //println!("[PlatformClient] received new update: {:?}", msg);
                     match msg {
                         Err(err) => {
-                                process_interface.log_error(format!("Ggpc error: {err}")).await;
+                                process_interface.log_error(format!("Ggpc error: {err}"));
                         }
                         Ok(None) => {
-                            process_interface.log_error("Grpc stream closed").await;
-                            process_interface.kill(PROCESS_TOPIC_OMPAS).await;
+                            process_interface.log_error("Grpc stream closed");
+                            process_interface.kill(PROCESS_TOPIC_OMPAS);
                         }
                         Ok(Some(msg)) => {
                             if let Some(update) =  msg.update {
@@ -219,7 +213,7 @@ impl ExecPlatform {
     async fn send_commands(
         mut client: PlatformInterfaceClient<tonic::transport::Channel>,
         acting_manager: ActingManager,
-        command_stream: tokio::sync::mpsc::Receiver<CommandRequest>,
+        command_stream: tokio::sync::mpsc::UnboundedReceiver<CommandRequest>,
     ) {
         let mut process = ProcessInterface::new(
             PROCESS_SEND_COMMANDS,
@@ -227,17 +221,15 @@ impl ExecPlatform {
             LOG_TOPIC_PLATFORM,
         )
         .await;
-        let stream = tokio_stream::wrappers::ReceiverStream::new(command_stream);
+        let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(command_stream);
 
-        process.log_info("initiating command stream").await;
+        process.log_info("initiating command stream");
 
         let stream = match client.send_commands(tonic::Request::new(stream)).await {
             Ok(s) => s,
             Err(e) => {
-                process
-                    .log_error(format!("Error starting command stream: {e}"))
-                    .await;
-                process.kill(PROCESS_TOPIC_OMPAS).await;
+                process.log_error(format!("Error starting command stream: {e}"));
+                process.kill(PROCESS_TOPIC_OMPAS);
                 return;
             }
         };
@@ -251,11 +243,11 @@ impl ExecPlatform {
                 msg = stream.message() => {
                     match msg {
                         Err(err) => {
-                                process.log_error(format!("Ggpc error: {err}")).await;
+                                process.log_error(format!("Ggpc error: {err}"));
                         }
                         Ok(None) => {
-                            process.log_error("Grpc stream closed").await;
-                            process.kill(PROCESS_TOPIC_OMPAS).await;
+                            process.log_error("Grpc stream closed");
+                            process.kill(PROCESS_TOPIC_OMPAS);
                         }
                         Ok(Some(command_response)) => {
                             let command_response: CommandResponse = command_response;
@@ -322,16 +314,14 @@ impl PlatformDescriptor for ExecPlatform {
 
         let server: SocketAddr = self.socket().await;
         let socket = format!("https://{}", server);
-        process.log_info(format!("socket: {socket}")).await;
+        process.log_info(format!("socket: {socket}"));
         //println!("server addr: {}", server);
         let client: PlatformInterfaceClient<_> =
             match PlatformInterfaceClient::connect(socket).await {
                 Ok(c) => c,
                 Err(e) => {
-                    process
-                        .log_error(format!("Error connecting to client: {:?}", e))
-                        .await;
-                    process.kill(PROCESS_TOPIC_OMPAS).await;
+                    process.log_error(format!("Error connecting to client: {:?}", e));
+                    process.kill(PROCESS_TOPIC_OMPAS);
                     return;
                 }
             };
@@ -343,7 +333,7 @@ impl PlatformDescriptor for ExecPlatform {
         });
 
         let acting_manager = self.acting_manager.clone();
-        let (tx, command_stream) = tokio::sync::mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx, command_stream) = tokio::sync::mpsc::unbounded_channel();
         *self.command_stream.lock().await = Some(tx);
         tokio::spawn(async move {
             ExecPlatform::send_commands(client2, acting_manager, command_stream).await;

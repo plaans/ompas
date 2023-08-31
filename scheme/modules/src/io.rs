@@ -97,7 +97,7 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
         LogOutput::Log(log) => {
             let log = log.clone();
             tokio::spawn(async move {
-                log.debug(lv).await;
+                log.debug(lv);
             });
         }
         LogOutput::File(pb) => {

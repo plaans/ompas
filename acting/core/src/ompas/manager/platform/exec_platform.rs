@@ -93,13 +93,14 @@ impl ExecPlatform {
                 command_id: command_id as u64,
             })),
         };
-        if let Err(_) = self
+        if self
             .command_stream
             .lock()
             .await
             .as_ref()
             .unwrap()
             .send(request)
+            .is_err()
         {}
     }
 

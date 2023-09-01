@@ -963,7 +963,6 @@ mod test {
         env
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_macro_def_task() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -983,7 +982,6 @@ mod test {
         test_expression_with_env(macro_to_test, &mut env, true).await
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_macro_def_state_function() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1022,7 +1020,6 @@ mod test {
         Ok(())
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_macro_def_command() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1092,7 +1089,6 @@ mod test {
         Ok(())
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_macro_def_command_om_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1133,7 +1129,6 @@ mod test {
         Ok(())
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_macro_def_task_pddl_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1177,7 +1172,6 @@ mod test {
         Ok(())
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_macro_def_task_om_model() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {
@@ -1218,7 +1212,6 @@ mod test {
         Ok(())
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_macro_def_method() -> Result<(), LRuntimeError> {
         let macro_to_test = TestExpression {

@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::manager::platform::lisp_domain::LispDomain;
 use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};

@@ -253,7 +253,7 @@ impl Resource {
         id: &ClientId,
         quantity: Capacity,
     ) -> Result<(), LRuntimeError> {
-        let client = self.clients.get_mut(&id).unwrap();
+        let client = self.clients.get_mut(id).unwrap();
         if client.quantity != quantity {
             return Err(LRuntimeError::new(
                 "_acquire_reservation",
@@ -263,7 +263,7 @@ impl Resource {
                 ),
             ));
         }
-        self.clients.get_mut(&id).unwrap().kind = TicketKind::Direct;
+        self.clients.get_mut(id).unwrap().kind = TicketKind::Direct;
         self.check_queue().await;
         Ok(())
     }
@@ -519,7 +519,7 @@ impl ResourceManager {
         client_id: &ClientId,
     ) -> Result<(), LRuntimeError> {
         let mut map = self.inner.lock().await;
-        let resource: &mut Resource = map.get_mut(&resource_id).unwrap();
+        let resource: &mut Resource = map.get_mut(resource_id).unwrap();
         if &resource.label != label {
             return Err(LRuntimeError::new(
                 "resource_manager.acquire_reservation",
@@ -591,7 +591,7 @@ impl ResourceManager {
 
             let mut w_str = "".to_string();
             for client_id in &r.queue {
-                let client = r.clients.get(&client_id).unwrap();
+                let client = r.clients.get(client_id).unwrap();
                 w_str.push_str(
                     format!(
                         "\n\t\t- ({}) capacity = {};priority= {}",
@@ -604,7 +604,7 @@ impl ResourceManager {
             let mut acq_str = "".to_string();
 
             for client_id in &r.in_service {
-                let client = r.clients.get(&client_id).unwrap();
+                let client = r.clients.get(client_id).unwrap();
                 acq_str.push_str(
                     format!(
                         "\n\t\t- ({}) capacity = {}; priority= {}",
@@ -651,11 +651,11 @@ impl ResourceManager {
             r#static: Default::default(),
             dynamic: Default::default(),
             inner_static: PartialState {
-                inner: r#static.into(),
+                inner: r#static,
                 _type: Some(StateType::InnerStatic),
             },
             inner_dynamic: PartialState {
-                inner: r#dynamic.into(),
+                inner: r#dynamic,
                 _type: Some(StateType::InnerDynamic),
             },
             instance: Default::default(),

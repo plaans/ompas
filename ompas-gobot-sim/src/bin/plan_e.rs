@@ -1,5 +1,5 @@
 //use ompas_gobotsim::mod_godot::CtxGodot;
-use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::manager::platform::lisp_domain::LispDomain;
 use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_gobotsim::default_gobot_sim_plan_domain_e;
 use ompas_gobotsim::platform::PlatformGobotSim;

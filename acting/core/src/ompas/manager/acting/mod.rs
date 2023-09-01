@@ -377,8 +377,6 @@ impl ActingManager {
         let pmi = PlannerManager::run(
             self.inner.clone(),
             self.state.clone(),
-            self.resource_manager.clone(),
-            self.clock_manager.clone(),
             self.domain.get_inner().await,
             self.st.clone(),
             env,

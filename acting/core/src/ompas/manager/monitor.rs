@@ -71,7 +71,7 @@ impl MonitorManager {
                     if let LValue::True = lv {
                         let waiter = waiters.map.remove(id).unwrap();
                         waiter.channel.send(true).expect("");
-                        log.debug(format!("{} became true", waiter.lambda.to_string()));
+                        log.debug(format!("{} became true", waiter.lambda));
                     }
                 }
                 Err(e) => {

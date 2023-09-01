@@ -179,9 +179,9 @@ impl Logger {
         let sender = self.sender_log.deref().clone();
 
         let from = message.source.to_string();
-        sender
-            .send(message)
-            .unwrap_or_else(|e| panic!("Error sending log from {}\nerror = {}", from, e));
+        if let Err(e) = sender.send(message) {
+            eprintln!("Error sending log from {}\nerror = {}", from, e)
+        }
     }
 
     pub(crate) async fn get_topic_id(&self, topic: impl Display) -> Option<LogTopicId> {
@@ -228,7 +228,7 @@ impl Logger {
                     let pid = fs::read_to_string(&pid_file)
                         .unwrap_or_else(|e| panic!("pid_file = {}: {}", pid_file, e));
                     //println!("pid = {}", pid);
-                    let pid = pid.replace("\n", "");
+                    let pid = pid.replace('\n', "");
                     //println!("pid = {}", pid);
                     //let pid: i64 = pid.parse().unwrap();
                     killed.recv().await.expect("error on receiver");

@@ -50,8 +50,6 @@ use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
-use std::mem;
-use std::process::exit;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
@@ -79,8 +77,6 @@ impl PlannerManager {
     pub async fn run(
         acting_manager: RefInnerActingManager,
         state_manager: StateManager,
-        resource_manager: ResourceManager,
-        clock_manager: ClockManager,
         domain: OMPASDomain,
         st: RefSymTable,
         env: LEnv,
@@ -89,7 +85,8 @@ impl PlannerManager {
         let (tx_update, rx_update) = mpsc::unbounded_channel();
 
         let pmi = PlannerManagerInterface::new(tx_update);
-
+        let resource_manager = acting_manager.read().await.resource_manager.clone();
+        let clock_manager = acting_manager.read().await.clock_manager.clone();
         tokio::spawn(Self::continuous_planning(PlannerManagerConfig {
             acting_manager,
             state_manager,
@@ -118,7 +115,7 @@ impl PlannerManager {
     }
 
     fn interrupt(interrupter: &mut Option<oneshot::Sender<bool>>) {
-        let interrupter = mem::replace(interrupter, None);
+        let interrupter = interrupter.take();
         if let Some(interrupter) = interrupter {
             let _ = interrupter.send(true);
         }
@@ -351,17 +348,10 @@ impl PlannerInstance {
                         println!("Interrupted planning for: \n{}", exp_2);
                     }
                 }
-                Ok(Ok(pu)) = planner => {
-                    match pu {
-                        Some(pu) => {
-                            if plan_sender.send(pu).is_err() {
-                                panic!("error sending plan update");
-                            }
-                        }
-                        None => {
-                        }
+                Ok(Ok(Some(pu))) = planner => {
+                    if plan_sender.send(pu).is_err() {
+                        panic!("error sending plan update");
                     }
-
                 }
             }
         });
@@ -559,7 +549,6 @@ pub async fn populate_problem(
             update_problem(&mut p_actions, &vec![], &instance, instances.len());
 
             instances.push(instance)
-        } else {
         }
     }
 
@@ -690,15 +679,14 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
             .unwrap();
         let sv = effect.sv.format(&st, true);
         for ae in &active_effects {
-            if sv == ae.sv {
-                if effect_date >= ae.start {
-                    if match &ae.end {
-                        None => true,
-                        Some(end) => &effect_date <= end,
-                    } {
-                        continue 'loop_effect;
-                    }
+            if sv == ae.sv
+                && effect_date >= ae.start
+                && match &ae.end {
+                    None => true,
+                    Some(end) => &effect_date <= end,
                 }
+            {
+                continue 'loop_effect;
             }
         }
 

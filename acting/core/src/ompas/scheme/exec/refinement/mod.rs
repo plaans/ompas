@@ -172,11 +172,9 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         .await
         .map_err(|e: LRuntimeError| e.chain("select"))?;
 
-    let r = check_select_response(env, ctx, &task_id, sr)
+    check_select_response(env, ctx, &task_id, sr)
         .await
-        .map_err(|e| e.chain("check_select_response"));
-
-    r
+        .map_err(|e| e.chain("check_select_response"))
 }
 
 async fn check_select_response(

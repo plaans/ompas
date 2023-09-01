@@ -221,7 +221,7 @@ impl Master {
         }
 
         log.info("END MASTER");
-        let _ = tx_end_logger.send(END_SIGNAL);
+        let _ = tx_end_logger.send(END_SIGNAL).await;
         master.logger.end().await;
         let _ = tx_end_master.send(END_SIGNAL);
     }

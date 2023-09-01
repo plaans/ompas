@@ -118,7 +118,7 @@ pub async fn __convert(lv: LValue, mut p_env: PLEnv) -> Result<ActingModel, LRun
         lv,
         lv_om,
         lv_expanded: Some(pp_lv),
-        instantiations: vec![],
+        runtime_info: Default::default(),
         chronicle,
     })
 }

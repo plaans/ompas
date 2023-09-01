@@ -96,8 +96,8 @@ pub struct InnerActingManager {
     pub(in crate::ompas::manager::acting) models: Vec<ActingModel>,
     acting_vars: ActingVarCollection,
     pub(in crate::ompas::manager::acting) st: RefSymTable,
-    resource_manager: ResourceManager,
-    clock_manager: ClockManager,
+    pub resource_manager: ResourceManager,
+    pub clock_manager: ClockManager,
     domain_manager: DomainManager,
     planner_manager_interface: Option<PlannerManagerInterface>,
 }
@@ -289,7 +289,7 @@ impl InnerActingManager {
         let cst = val_t.as_cst().unwrap();
 
         for PlanVarRef { var_id, am_id } in
-            self.acting_vars.set_execution_val(&acting_var_ref, val_t)
+            self.acting_vars.set_execution_val(acting_var_ref, val_t)
         {
             /*println!(
                 "set_execution_val: {} => {}",
@@ -384,7 +384,7 @@ impl InnerActingManager {
             .unwrap()
             .get_args()
             .iter()
-            .map(|r| self.get_acting_var_val(&r).unwrap())
+            .map(|r| self.get_acting_var_val(r).unwrap())
             .collect()
     }
 
@@ -628,7 +628,7 @@ impl InnerActingManager {
             .unwrap()
             .set_executed(refinement_label.refinement_id, method);
         let instant = self.clock_manager.now();
-        if self.get_status(&action) != ProcessStatus::Pending {
+        if self.get_status(action) != ProcessStatus::Pending {
             self.set_status(action, ProcessStatus::Running(None));
             self.set_start(action, Some(instant));
         }
@@ -694,94 +694,92 @@ impl InnerActingManager {
 
         let has_abstract_model = task.abstract_model.is_some();
 
-        if self.is_planner_launched() {
-            if !has_abstract_model {
-                let task = self
-                    .domain_manager
-                    .get_task(&task_name[0].to_string())
-                    .await
-                    .unwrap();
-                match task.get_model(&PlanModel) {
-                    Some(model) => {
-                        let mut lv = vec![model];
-                        for arg in &task_name[1..] {
-                            lv.push(arg.clone().into())
+        if self.is_planner_launched() && !has_abstract_model {
+            let task = self
+                .domain_manager
+                .get_task(&task_name[0].to_string())
+                .await
+                .unwrap();
+            match task.get_model(&PlanModel) {
+                Some(model) => {
+                    let mut lv = vec![model];
+                    for arg in &task_name[1..] {
+                        lv.push(arg.clone().into())
+                    }
+                    let lv = lv.into();
+                    let p_eval_lv = p_eval(&lv, &mut p_env).await?;
+                    let lv_om = annotate(p_eval_lv);
+
+                    let st = self.st.clone();
+                    let mut ch = Chronicle::new(debug, ChronicleKind::Task, st.clone());
+                    let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
+                    let mut name = vec![];
+                    if let LValue::List(list) = &lv {
+                        let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
+                        for arg in list.as_slice() {
+                            let id = st.new_cst(arg.clone());
+                            ch.add_var(id);
+                            name.push(id);
                         }
-                        let lv = lv.into();
-                        let p_eval_lv = p_eval(&lv, &mut p_env).await?;
-                        let lv_om = annotate(p_eval_lv);
+                    } else {
+                        panic!()
+                    };
+                    ch.set_task(task_name);
+                    ch.set_name(name);
 
-                        let st = self.st.clone();
-                        let mut ch = Chronicle::new(debug, ChronicleKind::Task, st.clone());
-                        let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
-                        let mut name = vec![];
-                        if let LValue::List(list) = &lv {
-                            let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
-                            for arg in list.as_slice() {
-                                let id = st.new_cst(arg.clone());
-                                ch.add_var(id);
-                                name.push(id);
-                            }
-                        } else {
-                            panic!()
-                        };
-                        ch.set_task(task_name);
-                        ch.set_name(name);
+                    let ch = Some(ch);
+                    let pp_lv = pre_processing(&lv_om, &p_env).await?;
 
-                        let ch = Some(ch);
-                        let pp_lv = pre_processing(&lv_om, &p_env).await?;
+                    let chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
+                        Ok(ch) => Some(ch),
+                        Err(e) => {
+                            println!("convert error: {}", e);
+                            ch
+                        }
+                    };
+                    let lv_expanded = None;
 
-                        let chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
-                            Ok(ch) => Some(ch),
-                            Err(e) => {
-                                println!("convert error: {}", e);
-                                ch
-                            }
-                        };
-                        let lv_expanded = None;
+                    let model = ActingModel {
+                        lv,
+                        lv_om,
+                        lv_expanded,
+                        runtime_info: Default::default(),
+                        chronicle,
+                    };
 
-                        let model = ActingModel {
-                            lv,
-                            lv_om,
-                            lv_expanded,
-                            runtime_info: Default::default(),
-                            chronicle,
-                        };
+                    self.new_abstract_model(task_id, model);
+                }
+                None => {
+                    let st = self.st.clone();
+                    let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
+                    let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
+                    let mut name = vec![];
+                    if let LValue::List(list) = &lv {
+                        let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
+                        for arg in list.as_slice() {
+                            let id = st.new_cst(arg.clone());
+                            ch.add_var(id);
+                            name.push(id);
+                        }
+                    } else {
+                        panic!()
+                    };
+                    ch.set_task(task_name);
+                    ch.set_name(name);
 
-                        self.new_abstract_model(task_id, model);
-                    }
-                    None => {
-                        let st = self.st.clone();
-                        let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
-                        let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
-                        let mut name = vec![];
-                        if let LValue::List(list) = &lv {
-                            let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
-                            for arg in list.as_slice() {
-                                let id = st.new_cst(arg.clone());
-                                ch.add_var(id);
-                                name.push(id);
-                            }
-                        } else {
-                            panic!()
-                        };
-                        ch.set_task(task_name);
-                        ch.set_name(name);
+                    let ch = Some(ch);
+                    let pp_lv = pre_processing(&lv_om, &p_env).await?;
+                    //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
 
-                        let ch = Some(ch);
-                        let pp_lv = pre_processing(&lv_om, &p_env).await?;
-                        //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
+                    chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
+                        Ok(ch) => Some(ch),
+                        Err(e) => {
+                            println!("convert error: {}", e);
+                            ch
+                        }
+                    };
 
-                        chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
-                            Ok(ch) => Some(ch),
-                            Err(e) => {
-                                println!("convert error: {}", e);
-                                ch
-                            }
-                        };
-
-                        lv_expanded = Some(pp_lv);
-                    }
+                    lv_expanded = Some(pp_lv);
                 }
             }
         }
@@ -1235,7 +1233,7 @@ impl InnerActingManager {
         }: Reservation,
     ) -> Result<(), LRuntimeError> {
         let process = &mut self.processes[id];
-        let status = process.status.clone();
+        let status = process.status;
         let acquire = process.inner.as_mut_acquire().unwrap();
 
         match status {

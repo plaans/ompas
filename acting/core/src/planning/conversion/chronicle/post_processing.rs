@@ -31,7 +31,6 @@ pub async fn post_processing(c: &mut Chronicle, env: &LEnv) -> Result<(), LRunti
     rm_useless_var(c);
     simplify_constraints(c)?;
     rm_useless_var(c);
-    //simplify_timepoints(c)?;
     simplify_conditions(c)?;
     rm_useless_var(c);
     c.flat_bindings();

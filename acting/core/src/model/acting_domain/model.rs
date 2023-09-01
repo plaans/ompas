@@ -240,16 +240,10 @@ impl ActingModel {
             label: Some(label),
         };
 
-        let mut constraints = vec![];
-
-        constraints.push(Constraint::leq(
-            chronicle.interval.get_start(),
-            interval.get_start(),
-        ));
-        constraints.push(Constraint::leq(
-            interval.get_end(),
-            chronicle.interval.get_end(),
-        ));
+        let constraints = vec![
+            Constraint::leq(chronicle.interval.get_start(), interval.get_start()),
+            Constraint::leq(interval.get_end(), chronicle.interval.get_end()),
+        ];
 
         let binding = ActionModel::new(subtask, constraints);
 

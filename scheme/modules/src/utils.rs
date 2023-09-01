@@ -14,7 +14,7 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
-use aries_utils::StreamingIterator;
+use aries::utils::StreamingIterator;
 use rand::Rng;
 use sompas_language::utils::*;
 use sompas_macros::scheme_fn;
@@ -134,7 +134,7 @@ pub fn enumerate(element: &[LValue]) -> Vec<LValue> {
         }
     }
 
-    let mut iter_params = aries_utils::enumerate(vec_iter);
+    let mut iter_params = aries::utils::enumerate(vec_iter);
 
     let mut vec_result: Vec<LValue> = vec![];
 

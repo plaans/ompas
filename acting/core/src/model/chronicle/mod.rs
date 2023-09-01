@@ -1,4 +1,6 @@
-use crate::model::chronicle::acting_binding::{ActingBinding, ActingBindingCollection};
+use crate::model::chronicle::acting_process_model::{
+    AcquireModel, ActingProcessModel, ActingProcessModelCollection, ActingProcessModelLabel,
+};
 use crate::model::chronicle::condition::Condition;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::effect::Effect;
@@ -6,11 +8,13 @@ use crate::model::chronicle::interval::Interval;
 use crate::model::chronicle::lit::Lit;
 use crate::model::chronicle::subtask::SubTask;
 use crate::model::chronicle::task_template::TaskTemplate;
+use crate::model::process_ref::Label;
 use crate::model::sym_domain::basic_type::BasicType;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, GetVariables, Replace};
 use crate::model::sym_table::VarId;
+use crate::planning::conversion::chronicle::post_processing::simplify_timepoints;
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use im::HashSet;
 use std::borrow::Borrow;
@@ -18,7 +22,7 @@ use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
-pub mod acting_binding;
+pub mod acting_process_model;
 pub mod computation;
 pub mod condition;
 pub mod constraint;
@@ -57,7 +61,7 @@ pub struct Chronicle {
     pub conditions: Vec<Condition>,
     effects: Vec<Effect>,
     subtasks: Vec<SubTask>,
-    pub bindings: ActingBindingCollection,
+    pub acting_process_models: ActingProcessModelCollection,
     pub sub_chronicles: Vec<TaskTemplate>,
     pub st: RefSymTable,
 }
@@ -90,7 +94,7 @@ impl Chronicle {
             conditions: vec![],
             effects: vec![],
             subtasks: vec![],
-            bindings: Default::default(),
+            acting_process_models: Default::default(),
             sub_chronicles: vec![],
         };
         for v in init_var {
@@ -252,8 +256,6 @@ impl Chronicle {
         indexes.reverse();
         for index in indexes {
             self.remove_subtask(index);
-            let label = self.bindings.get_action_label(index).unwrap();
-            self.bindings.remove_action(&label);
         }
     }
 
@@ -277,13 +279,6 @@ impl Chronicle {
         for var in constraint.get_variables() {
             self.add_var(var)
         }
-
-        /*if let Constraint::And(vec) = constraint {
-            self.constraints.push(a.deref().clone());
-            self.constraints.push(b.deref().clone());
-        } else {
-
-        }*/
         self.constraints.push(constraint);
     }
 
@@ -410,7 +405,7 @@ impl Chronicle {
             }
         }
         s.push_str("}\n");
-        write!(s, "{}", self.bindings.format(st, sym_version)).unwrap();
+        write!(s, "{}", self.acting_process_models.format(st, sym_version)).unwrap();
 
         //Debug
         /*if let Some(exp) = &self.debug {
@@ -440,11 +435,43 @@ impl Chronicle {
         self.conditions.flat_bindings(st);
         self.effects.flat_bindings(st);
         self.subtasks.flat_bindings(st);
-        self.bindings.flat_bindings(st);
+        self.acting_process_models.flat_bindings(st);
     }
 
-    pub fn instantiate(&self, instantiations: Vec<Instantiation>) -> Self {
+    pub fn instantiate(&self, runtime_info: RuntimeInfo) -> Self {
         let mut new = self.clone();
+
+        let RuntimeInfo {
+            to_remove,
+            instantiations,
+        } = runtime_info;
+
+        let models = &mut new.acting_process_models.inner;
+
+        to_remove.iter().for_each(|l| match l {
+            ActingProcessModelLabel::Label(_) => {
+                models.remove(l);
+            }
+            ActingProcessModelLabel::Acquire(i) => {
+                if let Some(acquire) = models.get_mut(&ActingProcessModelLabel::Label(
+                    Label::ResourceAcquisition(*i),
+                )) {
+                    acquire.as_mut_acquire().unwrap().acquire = AcquireModel::default();
+                }
+            }
+            ActingProcessModelLabel::Release(i) => {
+                if let Some(acquire) = models.get_mut(&ActingProcessModelLabel::Label(
+                    Label::ResourceAcquisition(*i),
+                )) {
+                    acquire.as_mut_acquire().unwrap().release = AcquireModel::default();
+                }
+            }
+        });
+
+        let models: Vec<_> = models.values().cloned().collect();
+        for model in models {
+            new.absorb_acting_process_model(model.clone());
+        }
 
         for Instantiation { var, value } in instantiations {
             new.replace(&var, &value);
@@ -452,10 +479,47 @@ impl Chronicle {
             new.variables.remove(&value);
         }
 
+        new.remove_instantiated_elements();
+
+        simplify_timepoints(&mut new).unwrap();
+
         new
     }
 
-    pub fn remove_instantiated_elements(&mut self) {
+    pub fn absorb_acting_process_model(&mut self, model: impl Into<ActingProcessModel>) {
+        let model = model.into();
+        match model {
+            ActingProcessModel::Arbitrary(a) => {
+                if let Some(c) = a.constraints {
+                    self.add_constraint(c)
+                }
+            }
+            ActingProcessModel::Action(a) => {
+                self.add_subtask(a.task);
+                for c in a.constraints {
+                    self.add_constraint(c)
+                }
+            }
+            ActingProcessModel::Resource(acq) => {
+                self.absorb_acquire_model(acq.acquire);
+                self.absorb_acquire_model(acq.release);
+            }
+        }
+    }
+
+    pub fn absorb_acquire_model(&mut self, model: AcquireModel) {
+        for c in model.constraints {
+            self.add_constraint(c)
+        }
+        for e in model.effects {
+            self.add_effect(e)
+        }
+        for c in model.conditions {
+            self.add_condition(c)
+        }
+    }
+
+    fn remove_instantiated_elements(&mut self) {
         let st = self.st.clone();
         let mut free_variables: HashSet<VarId> = Default::default();
         for var in &self.variables {
@@ -528,19 +592,19 @@ impl Chronicle {
             self.remove_subtasks(to_remove)
         }
 
-        // Remove bindings
+        /*// Remove bindings
         {
             let mut to_remove = vec![];
-            'loop_binding: for (label, binding) in &self.bindings.inner {
+            'loop_binding: for (label, binding) in &self.acting_process_models.inner {
                 match binding {
-                    ActingBinding::Acquire(acq) => {
+                    ActingProcessModel::Resource(acq) => {
                         if free_variables.contains(&acq.request)
                             && free_variables.contains(&acq.acquisition.get_start())
                         {
                             to_remove.push(*label)
                         }
                     }
-                    ActingBinding::Action(_) => {}
+                    ActingProcessModel::Action(_) => {}
                     _ => {
                         let variables = binding.get_variables();
                         for var in &variables {
@@ -554,9 +618,25 @@ impl Chronicle {
             }
 
             for label in to_remove {
-                self.bindings.remove_binding(&label);
+                self.acting_process_models.remove_process_model(label);
             }
-        }
+        }*/
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct RuntimeInfo {
+    to_remove: Vec<ActingProcessModelLabel>,
+    instantiations: Vec<Instantiation>,
+}
+
+impl RuntimeInfo {
+    pub fn add_instantiation(&mut self, instantiation: Instantiation) {
+        self.instantiations.push(instantiation)
+    }
+
+    pub fn add_to_remove(&mut self, label: impl Into<ActingProcessModelLabel>) {
+        self.to_remove.push(label.into())
     }
 }
 
@@ -596,7 +676,7 @@ impl Replace for Chronicle {
         self.constraints.replace(old, new);
         self.subtasks.replace(old, new);
         self.effects.replace(old, new);
-        self.bindings.replace(old, new);
+        self.acting_process_models.replace(old, new);
     }
 }
 

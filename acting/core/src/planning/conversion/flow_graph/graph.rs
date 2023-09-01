@@ -1,4 +1,4 @@
-use crate::model::chronicle::acting_binding::ActingBindingCollection;
+use crate::model::chronicle::acting_process_model::ActingProcessModelCollection;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::interval::Interval;
 use crate::model::chronicle::lit::{Lit, LitSet};
@@ -24,7 +24,7 @@ pub struct FlowGraph {
     pub handles: HashMap<VarId, FlowId>,
     pub resource_handles: HashMap<VarId, VarId>,
     pub flow: FlowId,
-    pub bindings: ActingBindingCollection,
+    pub bindings: ActingProcessModelCollection,
 }
 
 impl FlowGraph {

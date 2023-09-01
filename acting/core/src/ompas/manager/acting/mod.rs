@@ -311,7 +311,7 @@ impl ActingManager {
             .unwrap()
             .childs
             .keys()
-            .filter(|p| matches!(p, Label::Acquire(_)))
+            .filter(|p| matches!(p, Label::ResourceAcquisition(_)))
             .count()
     }
 

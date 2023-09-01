@@ -2,6 +2,7 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+ARIES_PRINT_PLANNER_OUTPUT=true
 # print the generates chronicles
 export OMPAS_CHRONICLE_DEBUG=off
 
@@ -28,6 +29,7 @@ export ARIES_LCP_TIME_SCALE=1000
 
 export ARIES_PRINT_INITIAL_PROPAGATION=false
 
+export ARIES_LCP_RELAXED_TEMPORAL_CONSTRAINT_TASK_METHOD=true;
 # Environemnt variables for ompas-gobot-sim
 #export GODOT3_PATH=$HOME/godot3
 #export GODOT3_HEADLESS_PATH=$HOME/godot3-headless

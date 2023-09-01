@@ -2,7 +2,6 @@ use crate::model::acting_domain::model::{ActingModel, ModelKind};
 use crate::model::acting_domain::parameters::Parameters;
 use crate::model::acting_domain::task::Task;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
-use crate::model::process_ref::{MethodLabel, RefinementLabel};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::scheme::exec::ModExec;
@@ -16,11 +15,8 @@ use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, P
 use crate::planning::conversion::flow_graph::algo::post_processing::flow_graph_post_processing;
 use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processing;
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
-use crate::planning::planner::problem::{
-    ChronicleInstance, PlanningDomain, PlanningInstance, PlanningProblem,
-};
+use crate::planning::planner::problem::PlanningDomain;
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON};
-use aries_planning::chronicles::{ChronicleOrigin, TaskId};
 use chrono::{DateTime, Utc};
 #[allow(unused)]
 use debug_print::debug_println;
@@ -88,7 +84,7 @@ pub async fn convert(
         lv: lv.clone(),
         lv_om,
         lv_expanded: Some(pp_lv),
-        instantiations: vec![],
+        runtime_info: Default::default(),
         chronicle,
     })
 }
@@ -135,6 +131,7 @@ pub async fn _convert(
     Ok(ch)
 }
 
+/*
 pub async fn p_convert_task(
     task: &[LValue],
     context: &ConversionContext,
@@ -171,6 +168,7 @@ pub async fn p_convert_task(
             .await?;
 
             instances.push(ChronicleInstance {
+                instantiated_chronicle: (),
                 generated: true,
                 origin: ChronicleOrigin::Refinement {
                     refined: vec![TaskId {
@@ -245,7 +243,7 @@ pub async fn p_convert_task(
         },
         st: context.st.clone(),
     })
-}
+}*/
 
 #[allow(unused)]
 const CONVERT_LVALUE_TO_CHRONICLE: &str = "convert_lvalue_to_chronicle";

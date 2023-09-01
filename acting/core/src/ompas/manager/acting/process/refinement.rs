@@ -59,7 +59,7 @@ impl RefinementProcess {
         self.childs
             .iter()
             .filter_map(|(k, v)| {
-                if let Label::Acquire(_) = k {
+                if let Label::ResourceAcquisition(_) = k {
                     Some(*v)
                 } else {
                     None

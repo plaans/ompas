@@ -108,7 +108,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
             if acting_manager.get_kind(id).await == ProcessKind::Method {
                 acting_manager
                     .new_acquire(
-                        Label::Acquire(acting_manager.get_number_acquire(*id).await),
+                        Label::ResourceAcquisition(acting_manager.get_number_acquire(*id).await),
                         id,
                         ProcessOrigin::Execution,
                     )
@@ -120,9 +120,9 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
             Some(id) => id,
             None => match labels[0] {
-                Label::Acquire(s) => {
+                Label::ResourceAcquisition(s) => {
                     acting_manager
-                        .new_acquire(Label::Acquire(s), id, ProcessOrigin::Execution)
+                        .new_acquire(Label::ResourceAcquisition(s), id, ProcessOrigin::Execution)
                         .await
                 }
                 _ => panic!(),

@@ -1,10 +1,10 @@
 use crate::model::chronicle;
-use crate::model::chronicle::acting_binding::ActionBinding;
+use crate::model::chronicle::acting_process_model::ActionModel;
 use crate::model::chronicle::condition::Condition;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::effect::Effect;
 use crate::model::chronicle::subtask::SubTask;
-use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation};
+use crate::model::chronicle::{Chronicle, ChronicleKind, RuntimeInfo};
 use crate::model::process_ref::Label;
 use crate::model::sym_domain::{cst, Domain};
 use crate::model::sym_table::r#ref::RefSymTable;
@@ -53,17 +53,15 @@ pub struct ActingModel {
     pub lv: LValue,
     pub lv_om: LValue,
     pub lv_expanded: Option<LValue>,
-    pub instantiations: Vec<Instantiation>,
+    pub runtime_info: RuntimeInfo,
     pub chronicle: Option<Chronicle>,
 }
 
 impl ActingModel {
     pub fn get_instantiated_chronicle(&self) -> Option<Chronicle> {
-        self.chronicle.as_ref().map(|c| {
-            let mut i = c.instantiate(self.instantiations.clone());
-            i.remove_instantiated_elements();
-            i
-        })
+        self.chronicle
+            .as_ref()
+            .map(|c| c.instantiate(self.runtime_info.clone()))
     }
 }
 #[derive(Clone)]
@@ -144,7 +142,7 @@ impl ActingModel {
             lv: LValue::Nil,
             lv_om: LValue::Nil,
             lv_expanded: Some(LValue::Nil),
-            instantiations: vec![],
+            runtime_info: Default::default(),
             chronicle: Some(chronicle),
         }
     }
@@ -242,23 +240,20 @@ impl ActingModel {
             label: Some(label),
         };
 
-        let binding = ActionBinding {
-            name: name.clone(),
-            task_id: chronicle.get_subtasks().len(),
-            interval,
-        };
+        let mut constraints = vec![];
 
-        chronicle.add_constraint(Constraint::leq(
+        constraints.push(Constraint::leq(
             chronicle.interval.get_start(),
             interval.get_start(),
         ));
-        chronicle.add_constraint(Constraint::leq(
+        constraints.push(Constraint::leq(
             interval.get_end(),
             chronicle.interval.get_end(),
         ));
 
-        chronicle.add_subtask(subtask);
-        chronicle.bindings.add_binding(label, binding);
+        let binding = ActionModel::new(subtask, constraints);
+
+        chronicle.acting_process_models.add_binding(label, binding);
 
         TaskRef { start, end, name }
     }

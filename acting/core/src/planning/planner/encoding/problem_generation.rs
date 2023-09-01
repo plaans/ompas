@@ -125,7 +125,14 @@ pub async fn convert_into_chronicle_instance(
 
     let om: ActingModel = convert(Some(ch), lv, &mut p_env, st.clone()).await?;
 
+    let instantiated_chronicle = om
+        .chronicle
+        .as_ref()
+        .unwrap()
+        .instantiate(Default::default());
+
     Ok(ChronicleInstance {
+        instantiated_chronicle,
         generated: true,
         origin: p_action.origin,
         am: om,

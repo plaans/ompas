@@ -24,7 +24,7 @@ pub fn generate_instances(
         let template = read_chronicle(
             ctx,
             table,
-            instance.am.chronicle.as_ref().unwrap(),
+            &instance.instantiated_chronicle,
             Container::Instance(id),
             Some(scope),
         )?;

@@ -1,7 +1,7 @@
 use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::add_domain_symbols;
-use crate::model::chronicle::acting_binding::ActingBinding;
+use crate::model::chronicle::acting_process_model::{ActingProcessModel, ActingProcessModelLabel};
 use crate::model::chronicle::effect::Effect;
 use crate::model::chronicle::interval::Interval;
 use crate::model::chronicle::ChronicleKind;
@@ -38,7 +38,6 @@ use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries::model::lang::Variable;
 use aries::model::Model;
 use aries_planning::chronicles;
-use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId, VarLabel};
 use futures::future::abortable;
 use itertools::Itertools;
@@ -52,6 +51,7 @@ use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::mem;
+use std::process::exit;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
@@ -223,12 +223,13 @@ impl PlannerManager {
                         env.update_context(ModState::new_from_snapshot(ep.state.clone()));
 
                         let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
+                        //std::process::exit(0);
 
                         if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
                             for (origin, chronicle) in pp
                                 .instances
                                 .iter()
-                                .map(|i| (i.origin.clone(), i.am.chronicle.as_ref().unwrap()))
+                                .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
                             {
                                 println!("{:?}:\n{}", origin, chronicle)
                             }
@@ -238,11 +239,11 @@ impl PlannerManager {
                         state_manager.update_subscriber_rule(&state_update_subscriber.id, rule).await;
 
                         let (problem, table) = encode(&pp).await.unwrap();
-                        if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                        /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
                                 for instance in &problem.chronicles {
                                     Printer::print_chronicle(&instance.chronicle, &problem.context.model);
                                 }
-                            }
+                            }*/
 
                         let PlannerInstance {
                             _updater: u,
@@ -280,6 +281,8 @@ impl PlannerInstance {
         let (_updater, _updated) = mpsc::unbounded_channel();
         let (interrupter, interrupted) = oneshot::channel();
         let (plan_sender, plan_receiver) = oneshot::channel();
+        let exp = Arc::new(explanation);
+        let exp_2 = exp.clone();
 
         let (planner, handle) = abortable(tokio::spawn(async move {
             let result = run_planner(problem, opt);
@@ -290,14 +293,24 @@ impl PlannerInstance {
                 let PlanResult { ass, fp } = pr;
 
                 let choices = extract_choices(&table, &ass, &fp.model, &planner_problem);
-                let new_ams = extract_new_acting_models(&table, &ass, &fp.model, planner_problem);
 
                 if OMPAS_PLAN_OUTPUT_ON.get() {
-                    println!("Plan found");
+                    println!("Successfully planned for:\n{}", exp);
+
+                    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                        for (origin, chronicle) in planner_problem
+                            .instances
+                            .iter()
+                            .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                        {
+                            println!("{:?}:\n{}", origin, chronicle)
+                        }
+                    }
                     for choice in &choices {
                         println!("{}:{}", choice.process_ref, choice.choice_inner)
                     }
                 }
+                let new_ams = extract_new_acting_models(&table, &ass, &fp.model, planner_problem);
 
                 //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
                 Some(ActingTreeUpdate {
@@ -306,7 +319,18 @@ impl PlannerInstance {
                 })
             } else {
                 if OMPAS_PLAN_OUTPUT_ON.get() {
-                    println!("No solution found by planner");
+                    println!("Successfully planned for:\n{}", exp);
+                    println!("No solution found by planner for");
+                    //println!("{exp}");
+                    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                        for (origin, chronicle) in planner_problem
+                            .instances
+                            .iter()
+                            .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                        {
+                            println!("{:?}:\n{}", origin, chronicle)
+                        }
+                    }
                 }
                 None
             }
@@ -324,22 +348,17 @@ impl PlannerInstance {
                 _ = interrupted => {
                     handle.abort();
                     if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
-                        println!("Interrupted planning for: \n{}", explanation);
+                        println!("Interrupted planning for: \n{}", exp_2);
                     }
                 }
                 Ok(Ok(pu)) = planner => {
                     match pu {
                         Some(pu) => {
-                             if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
-                                println!("Successfully planned for:\n{}", explanation);
-                            }
                             if plan_sender.send(pu).is_err() {
                                 panic!("error sending plan update");
                             }
                         }
                         None => {
-                            println!("Error while planning");
-                            //std::process::exit(0);
                         }
                     }
 
@@ -387,7 +406,14 @@ pub async fn populate_problem(
                               cis: &Vec<ChronicleInstance>,
                               ci: &ChronicleInstance,
                               instance_id: usize| {
-        let chronicle = ci.am.chronicle.as_ref().unwrap();
+        let chronicle = &ci.instantiated_chronicle;
+        /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+            println!(
+                "instantiated:{}\nmodel:{}",
+                chronicle,
+                ci.am.chronicle.as_ref().unwrap()
+            )
+        }*/
         if ci.origin != ChronicleOrigin::Original {
             names.insert(chronicle.get_name()[0].format(st, true));
             tasks.insert(chronicle.get_task()[0].format(st, true));
@@ -584,7 +610,7 @@ pub async fn populate_problem(
 
 fn initialize_root_chronicle(pp: &mut PlannerProblem) {
     let state = &pp.state;
-    let init_ch = pp.instances[0].am.chronicle.as_ref().unwrap();
+    let init_ch = &pp.instances[0].instantiated_chronicle;
     let st = pp.st.clone();
     let present_sf: Vec<&str> = pp.domain.sf.iter().map(|sf| sf.get_label()).collect();
 
@@ -599,11 +625,7 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
     // List of sv that are currently modified in the model
     let mut active_effects: Vec<ActiveEffect> = vec![];
 
-    for chronicle in pp
-        .instances
-        .iter()
-        .map(|i| i.am.chronicle.as_ref().unwrap())
-    {
+    for chronicle in pp.instances.iter().map(|i| &i.instantiated_chronicle) {
         for e in chronicle.get_effects() {
             let start_domain = st.get_domain_of_var(&e.get_start());
             if start_domain.is_constant() {
@@ -657,7 +679,7 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
         });
     }
 
-    let init_ch = pp.instances[0].am.chronicle.as_mut().unwrap();
+    let init_ch = &mut pp.instances[0].instantiated_chronicle;
 
     'loop_effect: for effect in effects {
         let effect_date = st
@@ -692,6 +714,7 @@ pub async fn encode(
     let domain = &pp.domain;
     let st = &pp.st;
     let mut context = encode_ctx(st, domain, &pp.state.instance)?;
+
     let chronicles = generate_instances(&mut context, &mut table, &pp.instances)?;
 
     Ok((
@@ -737,13 +760,13 @@ pub fn extract_choices(
 
     //We extract only present chronicles
     for instance in pp.instances.iter().filter(|c| {
-        let presence = c.am.chronicle.as_ref().unwrap().get_presence();
+        let presence = c.instantiated_chronicle.get_presence();
         let cst = get_var_as_cst(table, ass, model, presence);
         //println!("{cst}");
         Cst::Bool(true) == cst
     }) {
         let pr = instance.pr.clone();
-        let chronicle = instance.am.chronicle.as_ref().unwrap();
+        let chronicle = &instance.instantiated_chronicle;
         let st = &chronicle.st;
 
         let start = var_id_as_cst(st, &chronicle.interval.get_start());
@@ -766,29 +789,33 @@ pub fn extract_choices(
             },
         ));
 
-        'choice: for (label, binding) in &chronicle.bindings.inner {
+        'choice: for (label, binding) in &chronicle.acting_process_models.inner {
             let mut pr = pr.clone();
+            let ActingProcessModelLabel::Label(label) = label else {
+                todo!()
+            };
             pr.push(*label);
             let choice: ChoiceInner = match binding {
-                ActingBinding::Arbitrary(a) => {
+                ActingProcessModel::Arbitrary(a) => {
                     let val = var_id_as_cst(st, &a.var_id);
 
                     ChoiceInner::Arbitrary(ChoiceArbitrary { val })
                 }
-                ActingBinding::Action(action) => {
+                ActingProcessModel::Action(action) => {
                     let name: Vec<Cst> = action
+                        .task
                         .name
                         .iter()
                         .map(|var_id| var_id_as_cst(st, var_id))
                         .collect();
 
-                    let start = var_id_as_cst(st, &action.interval.get_start());
+                    let start = var_id_as_cst(st, &action.task.interval.get_start());
 
-                    let end = var_id_as_cst(st, &action.interval.get_end());
+                    let end = var_id_as_cst(st, &action.task.interval.get_end());
 
                     ChoiceInner::SubTask(ChoiceSubTask { name, start, end })
                 }
-                ActingBinding::Acquire(a) => {
+                ActingProcessModel::Resource(a) => {
                     let resource = var_id_as_cst(st, &a.resource);
                     let quantity = var_id_as_cst(st, &a.quantity);
                     let request = var_id_as_cst(st, &a.request);

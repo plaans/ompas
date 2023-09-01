@@ -1,6 +1,6 @@
 use crate::model::acting_domain::model::ModelKind::PlanModel;
 use crate::model::acting_domain::model::{ActingModel, NewTask, ROOT};
-use crate::model::chronicle::acting_binding::ActingBinding;
+use crate::model::chronicle::acting_process_model::{ActingProcessModel, ActingProcessModelLabel};
 use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation};
 use crate::model::process_ref::{Label, MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
@@ -130,7 +130,7 @@ impl InnerActingManager {
         let end = self.new_acting_var_with_ref(&chronicle.interval.get_end(), &0);
         let now = self.clock_manager.now();
         let cst = now.as_cst().unwrap();
-        model.instantiations.push(Instantiation::new(
+        model.runtime_info.add_instantiation(Instantiation::new(
             chronicle.interval.get_start(),
             self.st.new_cst(cst.clone()),
         ));
@@ -139,6 +139,7 @@ impl InnerActingManager {
         let root = ActingProcess::new(
             0,
             0,
+            None,
             ProcessOrigin::Execution,
             0,
             Some(ROOT.to_string()),
@@ -242,7 +243,7 @@ impl InnerActingManager {
                                 return None;
                             }
                         }
-                        Label::Acquire(_) | Label::Arbitrary(_) => {
+                        Label::ResourceAcquisition(_) | Label::Arbitrary(_) => {
                             id = if let Some(id) = obj.inner.as_method().unwrap().childs.get(&label)
                             {
                                 *id
@@ -296,8 +297,8 @@ impl InnerActingManager {
                 val
             );*/
             self.models[am_id]
-                .instantiations
-                .push(Instantiation::new(var_id, self.st.new_cst(cst.clone())));
+                .runtime_info
+                .add_instantiation(Instantiation::new(var_id, self.st.new_cst(cst.clone())));
             self.notify_planner(PlannerUpdate::VarUpdate(VarUpdate {
                 var_ref: PlanVarRef { var_id, am_id },
                 value: cst.clone(),
@@ -355,6 +356,7 @@ impl InnerActingManager {
 
     pub fn set_end(&mut self, id: &ActingProcessId, t: Option<Timepoint>, status: ProcessStatus) {
         let instant = t.unwrap_or(self.clock_manager.now());
+        self.remove_process_from_model(id, None);
         let end = self.processes[*id].end.clone();
         self.set_execution_val(&end, instant);
 
@@ -443,9 +445,15 @@ impl InnerActingManager {
             new_args.push(arg)
         }
 
+        let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
+        let rank = root.n_task();
+        root.add_top_level_task(id);
+
+        let label = Label::Action(rank);
         self.processes.push(ActingProcess::new(
             id,
             0,
+            Some(label),
             ProcessOrigin::Execution,
             0,
             Some(debug),
@@ -453,13 +461,9 @@ impl InnerActingManager {
             end,
             ActionProcess::new(new_args),
         ));
-
-        let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
-        let rank = root.n_task();
-        root.add_top_level_task(id);
         self.notify_planner(PlannerUpdate::ProblemUpdate(id));
 
-        ProcessRef::Relative(0, vec![Label::Action(rank)])
+        ProcessRef::Relative(0, vec![label])
     }
 
     //Task methods
@@ -477,15 +481,15 @@ impl InnerActingManager {
         let model = &self.models[om_id];
         let (start, end, name) = if let Some(chronicle) = &model.chronicle {
             let binding = chronicle
-                .bindings
-                .get_binding(&label)
+                .acting_process_models
+                .get_process_model(label)
                 .unwrap()
                 .as_action()
                 .unwrap()
                 .clone();
-            let name = binding.name;
-            let start = self.new_acting_var_with_ref(&binding.interval.get_start(), &om_id);
-            let end = self.new_acting_var_with_ref(&binding.interval.get_end(), &om_id);
+            let name = binding.task.name;
+            let start = self.new_acting_var_with_ref(&binding.task.interval.get_start(), &om_id);
+            let end = self.new_acting_var_with_ref(&binding.task.interval.get_end(), &om_id);
             let mut new_name = vec![];
 
             for (cst, var_id) in args.drain(..).zip(name) {
@@ -513,6 +517,7 @@ impl InnerActingManager {
         self.processes.push(ActingProcess::new(
             id,
             *parent,
+            Some(label),
             origin,
             om_id,
             Some(debug),
@@ -580,6 +585,7 @@ impl InnerActingManager {
         self.processes.push(ActingProcess::new(
             id,
             *parent,
+            Some(Label::AbstractModel),
             ProcessOrigin::Planner,
             am_id,
             debug,
@@ -738,7 +744,7 @@ impl InnerActingManager {
                             lv,
                             lv_om,
                             lv_expanded,
-                            instantiations: vec![],
+                            runtime_info: Default::default(),
                             chronicle,
                         };
 
@@ -784,7 +790,7 @@ impl InnerActingManager {
             lv: lv.clone(),
             lv_om,
             lv_expanded,
-            instantiations: vec![],
+            runtime_info: Default::default(),
             chronicle,
         })
     }
@@ -845,6 +851,7 @@ impl InnerActingManager {
         self.processes.push(ActingProcess::new(
             id,
             *parent,
+            Some(Label::Refinement(label)),
             origin,
             am_id,
             Some(debug),
@@ -868,8 +875,8 @@ impl InnerActingManager {
         let (start, end, var) = match &model.chronicle {
             Some(chronicle) => {
                 let binding = chronicle
-                    .bindings
-                    .get_binding(&label)
+                    .acting_process_models
+                    .get_process_model(label)
                     .unwrap()
                     .as_arbitrary()
                     .unwrap();
@@ -892,6 +899,7 @@ impl InnerActingManager {
         self.processes.push(ActingProcess::new(
             id,
             *parent,
+            Some(label),
             origin,
             om_id,
             None,
@@ -923,12 +931,13 @@ impl InnerActingManager {
         let model = &self.models[om_id];
         let (start, end, s_acq, resource, quantity) = match &model.chronicle {
             Some(chronicle) => {
-                let binding = *chronicle
-                    .bindings
-                    .get_binding(&label)
+                let binding = chronicle
+                    .acting_process_models
+                    .get_process_model(label)
                     .unwrap()
                     .as_acquire()
-                    .unwrap();
+                    .unwrap()
+                    .clone();
 
                 let start = self.new_acting_var_with_ref(&binding.request, &om_id);
                 let s_acq = self.new_acting_var_with_ref(&binding.acquisition.get_start(), &om_id);
@@ -949,6 +958,7 @@ impl InnerActingManager {
         self.processes.push(ActingProcess::new(
             id,
             *parent,
+            Some(label),
             origin,
             om_id,
             None,
@@ -1077,15 +1087,32 @@ impl InnerActingManager {
             .collect()
     }
 
+    pub fn remove_process_from_model(
+        &mut self,
+        id: &ActingProcessId,
+        label: Option<ActingProcessModelLabel>,
+    ) {
+        let am_id = self.processes[*id].am_id();
+        let label = if let Some(label) = label {
+            label
+        } else {
+            self.processes[*id].label().unwrap().into()
+        };
+        self.models[am_id].runtime_info.add_to_remove(label);
+    }
+
     pub fn set_s_acq(&mut self, id: &ActingProcessId, instant: Option<Timepoint>) {
         let instant = instant.unwrap_or(self.clock_manager.now());
+        let Label::ResourceAcquisition(acquire_id) = self.processes[*id].label().unwrap() else {
+            todo!()
+        };
         let var = self.processes[*id]
             .inner
             .as_acquire()
             .unwrap()
             .s_acq
             .clone();
-
+        self.remove_process_from_model(id, Some(ActingProcessModelLabel::Acquire(acquire_id)));
         self.set_execution_val(&var, instant)
     }
 
@@ -1115,12 +1142,16 @@ impl InnerActingManager {
             _ => unreachable!(),
         };
 
-        let arbitrary = self.processes[*id].inner.as_mut_arbitrary().unwrap();
+        let arbitrary = &mut self.processes[*id];
+        let arbitrary = arbitrary.inner.as_mut_arbitrary().unwrap();
         arbitrary.set_set(set);
         let var_ref = arbitrary.var.clone();
+        let now = self.clock_manager.now();
+        self.set_start(id, Some(now));
         self.set_execution_val(&var_ref, value.clone());
         self.executed(id);
-        self.set_status(id, ProcessStatus::Success);
+        self.set_end(id, Some(now), ProcessStatus::Success);
+
         value
     }
 
@@ -1265,24 +1296,18 @@ impl InnerActingManager {
              refinement_label: RefinementLabel| {
                 let instance_id = chronicles.len();
 
-                for (label, action) in chronicle.bindings.inner.iter().filter_map(|(k, v)| {
-                    if let ActingBinding::Action(a) = v {
-                        Some((k, a))
-                    } else {
-                        None
-                    }
-                }) {
-                    if let Some(subtask_id) =
+                for (task_id, subtask) in chronicle.get_subtasks().iter().enumerate() {
+                    if let Some(id) = subtask.label.as_ref().and_then(|label| {
                         self.get_id(ProcessRef::Relative(action_id, vec![*label]))
-                    {
+                    }) {
                         exec_chronicles.insert(
                             0,
                             ExecChronicle {
-                                id: subtask_id,
+                                id,
                                 origin: ChronicleOrigin::Refinement {
                                     refined: vec![TaskId {
                                         instance_id,
-                                        task_id: action.task_id,
+                                        task_id,
                                     }],
                                     template_id: 0,
                                 },
@@ -1292,13 +1317,14 @@ impl InnerActingManager {
                 }
 
                 chronicles.push(ChronicleInstance {
+                    instantiated_chronicle: chronicle.clone(),
                     generated: false,
                     origin,
                     am: ActingModel {
                         lv: LValue::Nil,
                         lv_om: LValue::Nil,
                         lv_expanded: Some(LValue::Nil),
-                        instantiations: vec![],
+                        runtime_info: Default::default(),
                         chronicle: Some(chronicle),
                     },
                     pr: ProcessRef::Id(action_id),
@@ -1395,7 +1421,7 @@ impl InnerActingManager {
                     }
                 }
                 ActingProcessInner::Action(t) => {
-                    for (i, r) in t.refinements.iter().enumerate() {
+                    for (_i, r) in t.refinements.iter().enumerate() {
                         if let Some(executed) = r.get_executed() {
                             writeln!(dot, "P{id} -> P{};", executed).unwrap();
                             queue.push((*executed, color))
@@ -1510,7 +1536,7 @@ impl InnerActingManager {
         for instance in instances {
             if instance.generated {
                 let chronicle = instance.am.chronicle.as_ref().unwrap();
-                let bindings = chronicle.bindings.clone();
+                let bindings = chronicle.acting_process_models.clone();
                 let st = chronicle.st.clone();
                 let mut pr = instance.pr.clone();
                 let label = pr.pop().unwrap();
@@ -1564,8 +1590,6 @@ impl InnerActingManager {
                         let action = self.processes[parent].inner.as_mut_action().unwrap();
                         if action.refinements.len() == refinement_label.refinement_id {
                             action.new_refinement();
-                        } else {
-                            panic!()
                         }
 
                         let method = self.new_method(
@@ -1578,16 +1602,20 @@ impl InnerActingManager {
                         );
 
                         for (label, binding) in bindings.inner {
+                            let ActingProcessModelLabel::Label(label) = label else {
+                                todo!()
+                            };
                             match binding {
-                                ActingBinding::Arbitrary(_arbitrary) => {
+                                ActingProcessModel::Arbitrary(_arbitrary) => {
                                     let _id =
                                         self.new_arbitrary(label, &method, ProcessOrigin::Planner);
                                 }
-                                ActingBinding::Action(action_binding) => {
-                                    let action = &action_binding.name;
-                                    let debug = action.format(&st, true);
+                                ActingProcessModel::Action(action_binding) => {
+                                    let action = &action_binding.task;
+                                    let name = &action.name;
+                                    let debug = name.format(&st, true);
                                     let args: Vec<_> =
-                                        action.iter().map(|var_id| st.var_as_cst(var_id)).collect();
+                                        name.iter().map(|var_id| st.var_as_cst(var_id)).collect();
                                     let _id = self.new_action(
                                         label,
                                         &method,
@@ -1596,7 +1624,7 @@ impl InnerActingManager {
                                         ProcessOrigin::Planner,
                                     );
                                 }
-                                ActingBinding::Acquire(_acq) => {
+                                ActingProcessModel::Resource(_acq) => {
                                     let _id =
                                         self.new_acquire(label, &method, ProcessOrigin::Planner);
                                 }

@@ -52,7 +52,7 @@ pub async fn def_label(env: &mut LEnv, kind: String, id: usize) {
         .clone();
     let label = match kind.as_str() {
         ARBITRARY => Label::Arbitrary(id),
-        ACQUIRE => Label::Acquire(id),
+        ACQUIRE => Label::ResourceAcquisition(id),
         COMMAND | SUBTASK => Label::Action(id),
         _ => panic!("wrong label definition"),
     };

@@ -102,7 +102,7 @@ pub enum Label {
     AbstractModel,
     Refinement(RefinementLabel),
     Action(usize),
-    Acquire(usize),
+    ResourceAcquisition(usize),
     Arbitrary(usize),
 }
 
@@ -115,7 +115,7 @@ impl Display for Label {
             Label::Action(id) => {
                 write!(f, "action({id})")
             }
-            Label::Acquire(acq) => {
+            Label::ResourceAcquisition(acq) => {
                 write!(f, "acquire({acq})")
             }
             Label::Arbitrary(arb) => {

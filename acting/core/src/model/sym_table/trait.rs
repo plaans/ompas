@@ -90,6 +90,19 @@ pub trait GetVariables {
     }
 }
 
+impl<T> GetVariables for Vec<T>
+where
+    T: GetVariables,
+{
+    fn get_variables(&self) -> im::HashSet<VarId> {
+        let mut set: im::HashSet<VarId> = Default::default();
+        for e in self {
+            set = set.union(e.get_variables())
+        }
+        set
+    }
+}
+
 pub trait FlatBindings {
     fn flat_bindings(&mut self, st: &RefSymTable);
 }

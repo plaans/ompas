@@ -1,10 +1,4 @@
-use crate::model::acting_domain::model::ActingModel;
-use crate::model::chronicle::Instantiation;
-use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
-use crate::ompas::manager::planning::get_var_as_cst;
-use crate::planning::planner::problem::{ChronicleInstance, PlanningProblem};
-use crate::planning::planner::result::PlanResult;
-
+/*
 pub async fn instantiate_chronicles(
     pp: &PlanningProblem,
     pr: &PlanResult,
@@ -43,4 +37,4 @@ pub async fn instantiate_chronicles(
     }
 
     instances
-}
+}*/

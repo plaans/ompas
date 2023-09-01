@@ -598,7 +598,7 @@ fn convert_ctx_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowI
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_acquire(fl, seq)?;
     let flow_acquire = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_acquire, Label::Acquire(index));
+    fl.set_label(&flow_acquire, Label::ResourceAcquisition(index));
     Ok(flow_id)
 }
 

@@ -1,3 +1,4 @@
+use crate::model::process_ref::Label;
 use crate::ompas::manager::acting::acting_var::{ActingVarCollection, ActingVarRef};
 use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
@@ -38,6 +39,7 @@ impl ProcessOrigin {
 pub struct ActingProcess {
     id: ActingProcessId,
     parent: ActingProcessId,
+    label: Option<Label>,
     am_id: AMId,
     debug: Option<String>,
     pub origin: ProcessOrigin,
@@ -98,6 +100,7 @@ impl ActingProcess {
     pub fn new(
         id: ActingProcessId,
         parent: ActingProcessId,
+        label: Option<Label>,
         origin: ProcessOrigin,
         am_id: AMId,
         debug: Option<String>,
@@ -108,6 +111,7 @@ impl ActingProcess {
         Self {
             id,
             parent,
+            label,
             am_id,
             debug,
             origin,
@@ -129,6 +133,10 @@ impl ActingProcess {
 
     pub fn am_id(&self) -> AMId {
         self.am_id
+    }
+
+    pub fn label(&self) -> Option<Label> {
+        self.label
     }
 
     pub fn debug(&self) -> &Option<String> {

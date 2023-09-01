@@ -1,5 +1,5 @@
-use crate::model::chronicle::acting_binding::{
-    AcquireBinding, ActingBinding, ActionBinding, ArbitraryBinding,
+use crate::model::chronicle::acting_process_model::{
+    AcquireModel, ActionModel, ArbitraryModel, ReleaseModel, ResourceModel,
 };
 use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::condition::Condition;
@@ -254,17 +254,21 @@ pub fn convert_into_chronicle(
                         let t_prime = st.new_timepoint();
                         let t_release_prime = st.new_timepoint();
                         let t_release = acq.release_time;
+
                         //println!("convert_into_chronicle/max_capacity = {}", cv.max_capacity);
                         let quantity_domain: Domain = Domain::IntRange(
                             0,
                             cv.max_capacity, //Bound::Inc(Cst::Int(MAX_QUANTITY_VALUE)),
                         );
+
+                        let max_q_result = st.new_result();
+                        st.set_domain(&st.get_domain_id(&max_q_result), quantity_domain.clone());
                         //let int_domain: Domain = Domain::Simple(TYPE_ID_INT);
 
-                        let new_q = st.new_result();
-                        st.set_domain(&st.get_domain_id(&new_q), quantity_domain.clone());
-                        let new_q_prime = st.new_result();
-                        st.set_domain(&st.get_domain_id(&new_q_prime), quantity_domain.clone());
+                        let new_q_acquire = st.new_result();
+                        st.set_domain(&st.get_domain_id(&new_q_acquire), quantity_domain.clone());
+                        let new_q_release = st.new_result();
+                        st.set_domain(&st.get_domain_id(&new_q_release), quantity_domain.clone());
                         let current_release_quantity = st.new_result();
                         st.set_domain(
                             &st.get_domain_id(&current_release_quantity),
@@ -290,79 +294,103 @@ pub fn convert_into_chronicle(
                             ht.add_resource_drop(&t_release, drop)
                         }
 
+                        let mut acquire = AcquireModel::default();
+                        let mut release = ReleaseModel::default();
+
                         //Add all conditions
                         // Current quantity
-                        ch.add_condition(Condition {
+
+                        acquire.conditions.push(Condition {
                             interval: Interval::new_instantaneous(t_prime),
                             sv: vec![quantity_symbol, resource],
                             value: current_quantity,
                         });
 
-                        ch.add_condition(Condition {
+                        let quantity = if let Some(capacity) = acq.capacity {
+                            capacity
+                        } else {
+                            acquire.conditions.push(Condition {
+                                interval: Interval::new_instantaneous(interval.get_start()),
+                                sv: vec![max_q_symbol, resource],
+                                value: max_q_result,
+                            });
+                            max_q_result
+                        };
+
+                        //Add all constraints on acquisition and release of constraint
+                        acquire
+                            .constraints
+                            .push(Constraint::leq(interval.get_start(), t_prime));
+                        acquire.constraints.push(Constraint::eq(
+                            interval.get_end(),
+                            Computation::add(vec![t_prime, epsilon]),
+                        ));
+                        acquire.constraints.push(Constraint::eq(
+                            new_q_acquire,
+                            Computation::sub(vec![current_quantity, quantity]),
+                        ));
+                        acquire
+                            .constraints
+                            .push(Constraint::leq(st.new_int(0), new_q_acquire));
+                        acquire
+                            .constraints
+                            .push(Constraint::leq(new_q_acquire, max_q_result));
+
+                        acquire.effects.push(Effect {
+                            interval: Interval::new(t_prime, interval.get_end()),
+                            sv: vec![quantity_symbol, resource],
+                            value: new_q_acquire,
+                        });
+
+                        release.constraints.push(Constraint::eq(
+                            t_release_prime,
+                            Computation::add(vec![t_release, epsilon]),
+                        ));
+
+                        release.conditions.push(Condition {
                             interval: Interval::new_instantaneous(t_release),
                             sv: vec![quantity_symbol, resource],
                             value: current_release_quantity,
                         });
 
-                        let max_q_result = st.new_result();
-                        st.set_domain(&st.get_domain_id(&max_q_result), quantity_domain.clone());
-                        ch.add_condition(Condition {
-                            interval: Interval::new_instantaneous(interval.get_start()),
-                            sv: vec![max_q_symbol, resource],
-                            value: max_q_result,
-                        });
-
-                        let quantity = if let Some(capacity) = acq.capacity {
-                            capacity
-                        } else {
-                            max_q_result
-                        };
-
-                        //Add all constraints on acquisition and release of constraint
-                        ch.add_constraint(Constraint::leq(interval.get_start(), t_prime));
-                        ch.add_constraint(Constraint::eq(
-                            interval.get_end(),
-                            Computation::add(vec![t_prime, epsilon]),
-                        ));
-                        ch.add_constraint(Constraint::eq(
-                            t_release_prime,
-                            Computation::add(vec![t_release, epsilon]),
-                        ));
-                        ch.add_constraint(Constraint::eq(
-                            new_q,
-                            Computation::sub(vec![current_quantity, quantity]),
-                        ));
-                        ch.add_constraint(Constraint::eq(
-                            new_q_prime,
+                        release.constraints.push(Constraint::eq(
+                            new_q_release,
                             Computation::add(vec![current_release_quantity, quantity]),
                         ));
-                        ch.add_constraint(Constraint::leq(interval.get_end(), t_release));
-                        ch.add_constraint(Constraint::leq(st.new_int(0), new_q));
-                        ch.add_constraint(Constraint::leq(st.new_int(0), new_q_prime));
-                        ch.add_constraint(Constraint::leq(new_q, max_q_result));
-                        ch.add_constraint(Constraint::leq(new_q_prime, max_q_result));
 
-                        ch.add_effect(Effect {
-                            interval: Interval::new(t_prime, interval.get_end()),
-                            sv: vec![quantity_symbol, resource],
-                            value: new_q,
-                        });
-                        ch.add_effect(Effect {
+                        release
+                            .constraints
+                            .push(Constraint::leq(interval.get_end(), t_release));
+
+                        release
+                            .constraints
+                            .push(Constraint::leq(st.new_int(0), new_q_release));
+
+                        release
+                            .constraints
+                            .push(Constraint::leq(new_q_release, max_q_result));
+
+                        release.effects.push(Effect {
                             interval: Interval::new(t_release, t_release_prime),
                             sv: vec![quantity_symbol, resource],
-                            value: new_q_prime,
+                            value: new_q_release,
                         });
 
                         if let Some(label) = flow.label {
-                            ch.bindings.add_binding(
+                            ch.acting_process_models.add_binding(
                                 label,
-                                ActingBinding::Acquire(AcquireBinding {
+                                ResourceModel::new(
                                     resource,
                                     quantity,
-                                    request: start,
-                                    acquisition: Interval::new(end, t_release),
-                                }),
+                                    start,
+                                    Interval::new(end, t_release),
+                                    acquire,
+                                    release,
+                                ),
                             )
+                        } else {
+                            ch.absorb_acquire_model(acquire);
+                            ch.absorb_acquire_model(release);
                         }
                     }
                     Lit::Release(release) => {
@@ -371,16 +399,16 @@ pub fn convert_into_chronicle(
                     }
                     Lit::Constraint(c) => match c.deref() {
                         Constraint::Arbitrary(set) => {
-                            match set {
+                            let constraint = match set {
                                 LitSet::Finite(set) => {
                                     let mut constraints = vec![];
                                     for e in set {
                                         constraints.push(Constraint::eq(result, e))
                                     }
                                     if constraints.len() > 1 {
-                                        ch.add_constraint(Constraint::or(constraints));
+                                        Some(Constraint::or(constraints))
                                     } else {
-                                        ch.add_constraint(constraints[0].clone());
+                                        Some(constraints.remove(0))
                                     }
                                 }
                                 LitSet::Domain(d) => {
@@ -395,16 +423,20 @@ pub fn convert_into_chronicle(
                                         })?;
                                     st.meet_to_domain(&st.get_domain_id(&result), domain);
                                     st.union_var(&id, &result);
+                                    None
                                 }
                             };
                             if let Some(label) = flow.label {
-                                ch.bindings.add_binding(
+                                ch.acting_process_models.add_binding(
                                     label,
-                                    ActingBinding::Arbitrary(ArbitraryBinding {
-                                        timepoint: flow.interval.get_start(),
-                                        var_id: flow.result,
-                                    }),
+                                    ArbitraryModel::new(
+                                        flow.interval.get_start(),
+                                        flow.result,
+                                        constraint,
+                                    ),
                                 );
+                            } else if let Some(constraint) = constraint {
+                                ch.add_constraint(constraint)
                             }
                         }
                         _ => ch.add_constraint(Constraint::eq(result, c.deref())),
@@ -511,15 +543,12 @@ pub fn convert_into_chronicle(
                             }
                         }
                         if let Some(label) = flow.label {
-                            let binding = ActingBinding::Action(ActionBinding {
-                                name: exec.clone(),
-                                task_id: ch.get_subtasks().len(),
-                                interval,
-                            });
-                            ch.bindings.add_binding(label, binding);
+                            ch.acting_process_models
+                                .add_binding(label, ActionModel::new(subtask, vec![]));
+                        } else {
+                            ch.add_subtask(subtask);
                         }
 
-                        ch.add_subtask(subtask);
                         /*let subtask_result = ch.sym_table.new_nil();
                         st.union_atom(&subtask_result, &result);*/
                     }

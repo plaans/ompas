@@ -11,7 +11,7 @@ use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_domain::Domain::Simple;
 use crate::model::sym_domain::{Domain, TypeId};
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::model::sym_table::r#trait::GetVariables;
+use crate::model::sym_table::r#trait::{FormatWithSymTable, GetVariables};
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::state::instance::InstanceCollection;
@@ -28,10 +28,11 @@ use aries::model::types::TypeHierarchy;
 use aries::utils::input::Sym;
 use aries_planning::chronicles::constraints::{Constraint as aConstraint, ConstraintType};
 use aries_planning::chronicles::printer::Printer;
+use aries_planning::chronicles::EffectOp::Assign;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleKind as aChronicleKind,
-    ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect, StateFun, SubTask,
-    VarType, TIME_SCALE,
+    ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect, Fluent, StateVar,
+    SubTask, VarType, TIME_SCALE,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use function_name::named;
@@ -128,7 +129,10 @@ pub fn encode_ctx(
             args.push(get_type(&lattice, &symbol_table, tpe)?);
         }
         args.push(get_type(&lattice, &symbol_table, &sf.result)?);
-        state_functions.push(StateFun { sym, tpe: args })
+        state_functions.push(Fluent {
+            sym,
+            signature: args,
+        })
     }
 
     Ok(Ctx::new(Arc::new(symbol_table), state_functions))
@@ -175,7 +179,7 @@ fn convert_constraint(
             let b: FAtom = get_atom(&b, ctx).try_into().map_err(|c: ConversionError| {
                 LRuntimeError::new("conversion_error", c.to_string())
             })?;
-            aConstraint::fleq(a, b)
+            aConstraint::leq(a, b)
         }
         Constraint::Eq(a, b) => match (a, b) {
             (Lit::Atom(a), Lit::Atom(b)) => aConstraint::eq(get_atom(a, ctx), get_atom(b, ctx)),
@@ -331,7 +335,7 @@ fn convert_constraint(
                     cst += factor * shift;
                     match var {
                         IVar::ZERO => {}
-                        _ => terms.push(LinearTerm::new(factor, var, false)),
+                        _ => terms.push(LinearTerm::new(factor, var, true.into(), 1)),
                     }
                 }
 
@@ -691,14 +695,26 @@ pub fn read_chronicle(
 
     //print!("init conditions...");
     for c in ch.get_conditions() {
-        let sv =
-            c.sv.iter()
-                .map(|a| {
-                    get_atom(a, ctx)
-                        .try_into()
-                        .unwrap_or_else(|e| panic!("{}", e))
-                })
-                .collect();
+        let fluent = ctx
+            .get_fluent(
+                ctx.model
+                    .get_symbol_table()
+                    .id(&c.sv[0].format(&st, true))
+                    .unwrap(),
+            )
+            .unwrap()
+            .clone();
+
+        let args = c.sv[1..]
+            .iter()
+            .map(|a| {
+                get_atom(a, ctx)
+                    .try_into()
+                    .unwrap_or_else(|e| panic!("{}", e))
+            })
+            .collect();
+        let sv = StateVar { fluent, args };
+
         let value = get_atom(&c.value, ctx);
         let start: FAtom = get_atom(&c.get_start(), ctx).try_into()?;
         let end: FAtom = get_atom(&c.get_end(), ctx).try_into()?;
@@ -714,14 +730,26 @@ pub fn read_chronicle(
 
     //print!("init effects...");
     for e in ch.get_effects() {
-        let sv =
-            e.sv.iter()
-                .map(|a| {
-                    get_atom(a, ctx)
-                        .try_into()
-                        .unwrap_or_else(|e| panic!("{}", e))
-                })
-                .collect();
+        let fluent = ctx
+            .get_fluent(
+                ctx.model
+                    .get_symbol_table()
+                    .id(&e.sv[0].format(&st, true))
+                    .unwrap(),
+            )
+            .unwrap()
+            .clone();
+
+        let args = e.sv[1..]
+            .iter()
+            .map(|a| {
+                get_atom(a, ctx)
+                    .try_into()
+                    .unwrap_or_else(|e| panic!("{}", e))
+            })
+            .collect();
+        let sv = StateVar { fluent, args };
+
         let value = get_atom(&e.value, ctx);
         let start: FAtom = get_atom(&e.get_start(), ctx).try_into()?;
         let end: FAtom = get_atom(&e.get_end(), ctx).try_into()?;
@@ -730,7 +758,7 @@ pub fn read_chronicle(
             persistence_start: end,  // + FAtom::EPSILON,
             min_persistence_end: vec![],
             state_var: sv,
-            value,
+            operation: Assign(value),
         };
         effects.push(effect);
     }

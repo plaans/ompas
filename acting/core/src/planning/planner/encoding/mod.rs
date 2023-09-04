@@ -12,7 +12,7 @@ use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::generate_instances;
 use crate::planning::planner::problem::ChronicleInstance;
 use anyhow::Result;
-use aries::core::Lit as aLit;
+use aries::core::{Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
 use aries::model::lang::{
     Atom as aAtom, ConversionError, FAtom, FVar, IAtom, IVar, SAtom, Type as aType, Variable,
@@ -107,7 +107,10 @@ pub fn get_type(
     match t {
         Domain::Simple(t) => match *t {
             TYPE_ID_BOOLEAN => Ok(aType::Bool),
-            TYPE_ID_INT => Ok(aType::Int),
+            TYPE_ID_INT => Ok(aType::Int {
+                lb: INT_CST_MIN,
+                ub: INT_CST_MAX,
+            }),
             TYPE_ID_FLOAT => Ok(aType::Fixed(TIME_SCALE.get())),
             t => {
                 let other: String = lattice.format_type(&t);
@@ -120,6 +123,10 @@ pub fn get_type(
                 }
             }
         },
+        Domain::IntRange(lb, ub) => Ok(aType::Int {
+            lb: *lb as i32,
+            ub: *ub as i32,
+        }),
         t => Err(LRuntimeError::new(
             function_name!(),
             format!("{} not supported yet in aries encoding", t.format(lattice)),

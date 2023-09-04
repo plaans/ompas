@@ -1,3 +1,4 @@
+use crate::OMPAS_OUTPUT_PATH;
 use crate::{LogLevel, LOG_TOPIC_ROOT, MASTER, MASTER_LABEL, TOKIO_CHANNEL_SIZE, TOPIC_ALL_ID};
 use chrono::{DateTime, Utc};
 use log::Level;
@@ -12,15 +13,12 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::{env, fs, mem};
+use std::{fs, mem};
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::time::sleep;
 
 fn default_log_directory() -> String {
-    format!(
-        "{}/ompas_logs",
-        env::var("HOME").unwrap_or("/tmp".to_string())
-    )
+    format!("{}ompas_logs", OMPAS_OUTPUT_PATH.get_ref())
 }
 const DEFAULT_MAX_LOG_LEVEL: Level = Level::Info;
 pub const END_SIGNAL: EndSignal = EndSignal {};

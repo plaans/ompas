@@ -36,15 +36,16 @@ use aries_planning::chronicles::{ChronicleOrigin, TaskId};
 use chrono::{DateTime, Utc};
 use im::HashSet;
 use ompas_language::supervisor::*;
+use ompas_middleware::OMPAS_OUTPUT_PATH;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::any::Any;
 use std::env::set_current_dir;
 use std::fmt::{Debug, Display, Formatter, Write};
+use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
-use std::{env, fs};
 use tokio::sync::{broadcast, watch};
 
 const COLOR_PLANNING: &str = "grey";
@@ -1713,15 +1714,7 @@ impl InnerActingManager {
                 dir_path.push(OMPAS_STATS);
                 dir_path
             }
-            None => format!(
-                "{}/ompas/{}",
-                match env::var("HOME") {
-                    Ok(val) => val,
-                    Err(_) => ".".to_string(),
-                },
-                OMPAS_STATS
-            )
-            .into(),
+            None => format!("{}{}", OMPAS_OUTPUT_PATH.get_ref(), OMPAS_STATS).into(),
         };
 
         fs::create_dir_all(&dir_path).expect("could not create stats directory");

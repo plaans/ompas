@@ -7,14 +7,21 @@ pub mod planning;
 
 pub const TOKIO_CHANNEL_SIZE: usize = 100;
 
-pub const OMPAS_CHRONICLE_DEBUG: &str = "OMPAS_CHRONICLE_DEBUG";
-pub const OMPAS_PLAN_OUTPUT: &str = "OMPAS_PLAN_OUTPUT";
-pub const OMPAS_DEBUG: &str = "OMPAS_DEBUG";
-pub const OMPAS_PATH: &str = "OMPAS_PATH";
-pub const OMPAS_LOG: &str = "OMPAS_LOG";
-pub const OMPAS_PLAN_ENCODING_OPTIMIZATION: &str = "OMPAS_PLAN_ENCODING_OPTIMIZATION";
-pub const OMPAS_DELIBERATION_FREQUENCY: &str = "OMPAS_DELIBERATION_FREQUENCY";
-pub const OMPAS_DEFAULT_FREQUENCY: &str = "1";
+static OMPAS_CHRONICLE_DEBUG: EnvParam<ChronicleDebug> =
+    EnvParam::new("OMPAS_CHRONICLE_DEBUG", "off");
+pub static OMPAS_DEBUG: EnvParam<bool> = EnvParam::new("OMPAS_DEBUG", "false");
+pub static OMPAS_LOG: EnvParam<bool> = EnvParam::new("OMPAS_LOG", "false");
+static OMPAS_PLAN_OUTPUT: EnvParam<bool> = EnvParam::new("OMPAS_PLAN_OUTPUT", "false");
+static OMPAS_PLAN_ENCODING_OPTIMIZATION: EnvParam<bool> =
+    EnvParam::new("OMPAS_PLAN_ENCODING_OPTIMIZATION", "true");
+static OMPAS_DELIBERATION_FREQUENCY: EnvParam<u64> =
+    EnvParam::new("OMPAS_DELIBERATION_FREQUENCY", "1");
+static OMPAS_DEBUG_CONTINUOUS_PLANNING: EnvParam<bool> =
+    EnvParam::new("OMPAS_DEBUG_CONTINUOUS_PLANNING", "false");
+
+static OMPAS_PLANNER_OUTPUT: EnvParam<bool> = EnvParam::new("OMPAS_PLANNER_OUTPUT", "false");
+
+pub static OMPAS_PATH: EnvParam<String> = EnvParam::new("OMPAS_PATH", "~/ompas");
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum ChronicleDebug {
@@ -33,27 +40,5 @@ impl FromStr for ChronicleDebug {
             "full" => Ok(Self::Full),
             _ => Err(()),
         }
-    }
-}
-
-static OMPAS_CHRONICLE_DEBUG_ON: EnvParam<ChronicleDebug> =
-    EnvParam::new(OMPAS_CHRONICLE_DEBUG, "off");
-pub static OMPAS_DEBUG_ON: EnvParam<bool> = EnvParam::new(OMPAS_DEBUG, "false");
-pub static OMPAS_LOG_ON: EnvParam<bool> = EnvParam::new(OMPAS_LOG, "false");
-static OMPAS_PLAN_OUTPUT_ON: EnvParam<bool> = EnvParam::new(OMPAS_PLAN_OUTPUT, "false");
-static OMPAS_PLAN_ENCODING_OPTIMIZATION_ON: EnvParam<bool> =
-    EnvParam::new(OMPAS_PLAN_ENCODING_OPTIMIZATION, "true");
-static OMPAS_FREQUENCY: EnvParam<u64> =
-    EnvParam::new(OMPAS_DELIBERATION_FREQUENCY, OMPAS_DEFAULT_FREQUENCY);
-static OMPAS_DEBUG_CONTINUOUS_PLANNING: EnvParam<bool> =
-    EnvParam::new("OMPAS_DEBUG_CONTINUOUS_PLANNING", "false");
-
-static OMPAS_PLANNER_OUTPUT: EnvParam<bool> = EnvParam::new("OMPAS_PLANNER_OUTPUT", "false");
-
-pub fn ompas_path() -> String {
-    if let Ok(s) = std::env::var(OMPAS_PATH) {
-        s
-    } else {
-        format!("{}/ompas", std::env::var("HOME").unwrap())
     }
 }

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use im::HashMap;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
-use ompas_middleware::{Master, ProcessInterface, PROCESS_TOPIC_ALL};
+use ompas_middleware::{Master, ProcessInterface, OMPAS_OUTPUT_PATH, PROCESS_TOPIC_ALL};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
@@ -10,10 +10,10 @@ use sompas_language::PROCESS_TOPIC_INTERPRETER;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
+use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::{env, fs};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -265,14 +265,7 @@ async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
             dir_path.push("lisp_logs");
             dir_path
         }
-        None => format!(
-            "{}/ompas/lisp_logs",
-            match env::var("HOME") {
-                Ok(val) => val,
-                Err(_) => ".".to_string(),
-            }
-        )
-        .into(),
+        None => format!("{}/lisp_logs", OMPAS_OUTPUT_PATH.get_ref()).into(),
     };
 
     fs::create_dir_all(&dir_path).expect("could not create logs directory");

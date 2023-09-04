@@ -7,7 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use ompas_core::ompas::scheme::monitor::ModMonitor;
-use ompas_core::OMPAS_LOG_ON;
+use ompas_core::OMPAS_LOG;
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::FileDescriptor;
 use ompas_middleware::Master;
@@ -86,7 +86,7 @@ async fn lisp_interpreter(opt: &Opt) {
 
     let ctx_rae = ModMonitor::new("nil", opt.log.clone()).await;
 
-    if OMPAS_LOG_ON.get() {
+    if OMPAS_LOG.get() {
         Master::start_display_log_topic(LOG_TOPIC_OMPAS).await;
     }
 

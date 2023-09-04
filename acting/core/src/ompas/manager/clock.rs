@@ -1,5 +1,5 @@
 use crate::ompas::manager::acting::interval::Timepoint;
-use crate::OMPAS_FREQUENCY;
+use crate::OMPAS_DELIBERATION_FREQUENCY;
 use core::time::Duration;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::ProcessInterface;
@@ -32,7 +32,7 @@ impl ClockManager {
     }*/
 
     pub async fn start_global_clock(&self) {
-        let period = 1_000_000 / OMPAS_FREQUENCY.get();
+        let period = 1_000_000 / OMPAS_DELIBERATION_FREQUENCY.get();
         let (tx, rx) = watch::channel(0);
         let mut process =
             ProcessInterface::new("GLOBAL_CLOCK", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;

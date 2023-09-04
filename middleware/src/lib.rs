@@ -3,6 +3,7 @@ extern crate core;
 use crate::logger::{
     EndSignal, FileDescriptor, LogClient, LogMessage, LogTopicId, Logger, END_SIGNAL,
 };
+use env_param::EnvParam;
 use lazy_static::lazy_static;
 use log::Level;
 use map_macro::{hash_map, hash_set};
@@ -17,6 +18,8 @@ use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
 pub mod logger;
 const TOKIO_CHANNEL_SIZE: usize = 100;
+
+pub static OMPAS_OUTPUT_PATH: EnvParam<String> = EnvParam::new("OMPAS_OUTPUT_PATH", "/tmp/");
 
 lazy_static! {
     static ref MASTER: Master = Master::new();

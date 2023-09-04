@@ -1,7 +1,7 @@
 use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::FileDescriptor;
-use ompas_middleware::Master;
+use ompas_middleware::{Master, OMPAS_OUTPUT_PATH};
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
@@ -9,9 +9,9 @@ use sompas_modules::utils::ModUtils;
 use sompas_repl::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
 };
+use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
-use std::{env, fs};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -76,8 +76,8 @@ pub async fn lisp_interpreter(opt: Opt) {
     let log = if let Some(pb) = &opt.log {
         pb.clone()
     } else {
-        let home = env::var("HOME").unwrap();
-        PathBuf::from(format!("{}/ompas/benchmark", home))
+        let home = OMPAS_OUTPUT_PATH.get_ref();
+        PathBuf::from(format!("{}benchmark", home))
     };
 
     //println!("log path: {:?}", log);

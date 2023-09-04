@@ -16,7 +16,7 @@ use crate::planning::conversion::flow_graph::algo::post_processing::flow_graph_p
 use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processing;
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::planner::problem::PlanningDomain;
-use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON};
+use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG};
 use chrono::{DateTime, Utc};
 #[allow(unused)]
 use debug_print::debug_println;
@@ -98,7 +98,7 @@ pub async fn _convert(
     let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
     let mut graph = FlowGraph::new(st);
 
-    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
+    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
         println!("conversion n°{n_conversion}:\n{}", lv.format(0));
     }
     let flow = convert_lv(lv, &mut graph, &mut Default::default())?;
@@ -122,7 +122,7 @@ pub async fn _convert(
     let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env, cv)?;
 
     post_processing(&mut ch, &p_env.env).await?;
-    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
+    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
         println!("chronicle: {}", ch);
     }
     graph.flat_bindings();

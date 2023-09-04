@@ -31,7 +31,7 @@ use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::{run_planner, PMetric};
 use crate::{
-    ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_DEBUG_CONTINUOUS_PLANNING, OMPAS_PLAN_OUTPUT_ON,
+    ChronicleDebug, OMPAS_CHRONICLE_DEBUG, OMPAS_DEBUG_CONTINUOUS_PLANNING, OMPAS_PLAN_OUTPUT,
 };
 use aries::collections::seq::Seq;
 use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
@@ -222,7 +222,7 @@ impl PlannerManager {
                         let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
                         //std::process::exit(0);
 
-                        if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
                             for (origin, chronicle) in pp
                                 .instances
                                 .iter()
@@ -291,10 +291,10 @@ impl PlannerInstance {
 
                 let choices = extract_choices(&table, &ass, &fp.model, &planner_problem);
 
-                if OMPAS_PLAN_OUTPUT_ON.get() {
+                if OMPAS_PLAN_OUTPUT.get() {
                     println!("Successfully planned for:\n{}", exp);
 
-                    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
                         for (origin, chronicle) in planner_problem
                             .instances
                             .iter()
@@ -315,11 +315,11 @@ impl PlannerInstance {
                     choices,
                 })
             } else {
-                if OMPAS_PLAN_OUTPUT_ON.get() {
+                if OMPAS_PLAN_OUTPUT.get() {
                     println!("Successfully planned for:\n{}", exp);
                     println!("No solution found by planner for");
                     //println!("{exp}");
-                    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
                         for (origin, chronicle) in planner_problem
                             .instances
                             .iter()

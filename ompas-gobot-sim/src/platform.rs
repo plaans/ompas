@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use ompas_core::ompas::manager::platform::lisp_domain::LispDomain;
 use ompas_core::ompas::manager::platform::platform_config::{InnerPlatformConfig, PlatformConfig};
 use ompas_core::ompas::manager::platform::PlatformDescriptor;
-use ompas_core::ompas_path;
+use ompas_core::OMPAS_PATH;
 use ompas_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
 use ompas_language::interface::{
     DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT, LOG_TOPIC_PLATFORM,
@@ -196,7 +196,7 @@ impl PlatformGobotSim {
         match cmd!(sh, "which godot3.5").quiet().read() {
             Ok(s) => Some(s.into()),
             Err(_) => {
-                let ompas_path = ompas_path();
+                let ompas_path = OMPAS_PATH.get_ref();
                 let path =
                     PathBuf::from(format!("{}/ompas-gobot-sim/gobot-bin/godot3.5", ompas_path));
                 if path.is_file() {
@@ -213,7 +213,7 @@ impl PlatformGobotSim {
         match cmd!(sh, "which godot3.5-headless").quiet().read() {
             Ok(s) => Some(s.into()),
             Err(_) => {
-                let ompas_path = ompas_path();
+                let ompas_path = OMPAS_PATH.get_ref();
                 let path = PathBuf::from(format!(
                     "{}/ompas-gobot-sim/gobot-bin/godot3.5-headless",
                     ompas_path
@@ -245,7 +245,7 @@ impl PlatformGobotSim {
         let sh = Shell::new().unwrap();
 
         self.check_dependencies();
-        sh.change_dir(format!("{}/ompas-gobot-sim", ompas_path()));
+        sh.change_dir(format!("{}/ompas-gobot-sim", OMPAS_PATH.get_ref()));
         sh.create_dir("gobot-bin")
             .expect("Could not create dir gobot-bin");
         sh.change_dir("gobot-bin");
@@ -273,7 +273,7 @@ impl PlatformGobotSim {
         let sh = Shell::new().unwrap();
 
         self.check_dependencies();
-        sh.change_dir(format!("{}/ompas-gobot-sim", ompas_path()));
+        sh.change_dir(format!("{}/ompas-gobot-sim", OMPAS_PATH.get_ref()));
         sh.create_dir("gobot-bin")
             .expect("Could not create dir gobot-bin");
         sh.change_dir("gobot-bin");
@@ -296,7 +296,10 @@ impl PlatformGobotSim {
         // godot3 -e --quit (imports the project and quits).
         // Needed to generate the .import directory
         let sh = Shell::new().unwrap();
-        sh.change_dir(format!("{}/ompas-gobot-sim/gobot-sim/simu", ompas_path()));
+        sh.change_dir(format!(
+            "{}/ompas-gobot-sim/gobot-sim/simu",
+            OMPAS_PATH.get_ref()
+        ));
 
         if !sh.path_exists(format!("{}/.import", sh.current_dir().to_str().unwrap())) {
             print!("Init gobot-sim project in godot...");

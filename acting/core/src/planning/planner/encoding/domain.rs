@@ -18,7 +18,7 @@ use crate::ompas::manager::state::instance::InstanceCollection;
 use crate::planning::planner::encoding::{
     atom_from_cst, get_type, var_id_into_atom, PlannerDomain,
 };
-use crate::OMPAS_PLAN_ENCODING_OPTIMIZATION_ON;
+use crate::OMPAS_PLAN_ENCODING_OPTIMIZATION;
 use aries::core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
 use aries::model::lang::linear::{LinearSum, LinearTerm};
@@ -606,7 +606,7 @@ pub fn read_chronicle(
                 panic!()
             }
         } else if *t == TYPE_ID_INT {
-            let (lb, ub): (IntCst, IntCst) = if OMPAS_PLAN_ENCODING_OPTIMIZATION_ON.get() {
+            let (lb, ub): (IntCst, IntCst) = if OMPAS_PLAN_ENCODING_OPTIMIZATION.get() {
                 if let Some(VarVal::Range(l, u)) = var_val {
                     (*l as IntCst, *u as IntCst)
                 } else {

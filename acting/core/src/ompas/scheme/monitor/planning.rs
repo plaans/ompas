@@ -18,7 +18,7 @@ use crate::planning::planner::encoding::PlannerProblem;
 use crate::planning::planner::problem::new_problem_chronicle_instance;
 use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::{run_planner, PMetric};
-use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG_ON, OMPAS_PLAN_OUTPUT_ON};
+use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG, OMPAS_PLAN_OUTPUT};
 use aries_planning::chronicles;
 use aries_planning::chronicles::printer::Printer;
 use ompas_language::monitor::control::MOD_CONTROL;
@@ -195,7 +195,7 @@ pub async fn __plan(
     };
 
     let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
-    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
         for (origin, chronicle) in pp
             .instances
             .iter()
@@ -207,7 +207,7 @@ pub async fn __plan(
 
     let (aries_problem, table): (chronicles::Problem, ActingVarRefTable) =
         encode(&pp).await.unwrap();
-    if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
         for instance in &aries_problem.chronicles {
             Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);
         }
@@ -223,7 +223,7 @@ pub async fn __plan(
         let choices = extract_choices(&table, &ass, &fp.model, &pp);
         //let new_ams = extract_new_acting_models(&table, &ass, &fp.model, pp);
 
-        if OMPAS_PLAN_OUTPUT_ON.get() {
+        if OMPAS_PLAN_OUTPUT.get() {
             println!("Plan found");
             for choice in &choices {
                 println!("{}:{}", choice.process_ref, choice.choice_inner)

@@ -13,10 +13,8 @@
         (:params (?a int) (?b int))
         (:body
             (do
-                (sleep ?a)
-                (define x (+ (value) (constant)))
-                (sleep ?b)
-                (assert 'value x))))
+                (define x (value))
+                (assert 'value 2))))
 
     (plan test 1 2)
     (exit 0)

@@ -16,6 +16,7 @@ use crate::ompas::scheme::monitor::model::ModModel;
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::planning::planner::encoding::PlannerProblem;
 use crate::planning::planner::problem::new_problem_chronicle_instance;
+use crate::planning::planner::result::instance::instantiate_chronicles;
 use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::{run_planner, PMetric};
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG, OMPAS_PLAN_OUTPUT};
@@ -28,11 +29,11 @@ use sompas_macros::async_scheme_fn;
 use sompas_structs::kindlvalue::KindLValue;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
-use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::fmt::Write;
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct ModPlanning {
@@ -97,46 +98,6 @@ impl From<ModPlanning> for LModule {
     }
 }
 
-async fn _plan_in_ompas(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
-    let task: LValue = args.into();
-    println!("task to plan: {}", task);
-    let acting_manager = env
-        .get_context::<ModControl>(MOD_CONTROL)?
-        .acting_manager
-        .clone();
-    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
-    //let mut context: ConversionContext = ctx.get_conversion_context().await;
-    let mut env: LEnv = ctx.get_plan_env().await;
-    let state = ctx.get_plan_state().await;
-
-    env.update_context(ModState::new_from_snapshot(state));
-
-    acting_manager
-        .start_planner_manager(env, if opt { Some(PMetric::Makespan) } else { None })
-        .await;
-
-    let debug = LValue::from(args).to_string();
-    let args = args.iter().map(|lv| lv.as_cst().unwrap()).collect();
-
-    let _pr = acting_manager.new_high_level_task(debug, args).await;
-    let mut recv: broadcast::Receiver<bool> =
-        acting_manager.subscribe_on_plan_update().await.unwrap();
-    recv.recv()
-        .await
-        .expect("Error while waiting on plan update.");
-    Ok(LValue::Nil)
-}
-
-#[async_scheme_fn]
-pub async fn plan_in_ompas(env: &LEnv, args: &[LValue]) -> LResult {
-    _plan_in_ompas(env, args, false).await
-}
-
-#[async_scheme_fn]
-pub async fn plan_opt_in_ompas(env: &LEnv, args: &[LValue]) -> LResult {
-    _plan_in_ompas(env, args, true).await
-}
-
 async fn _plan(env: &LEnv, task: &[LValue], opt: bool) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModPlanning>(MOD_PLANNING)?;
 
@@ -199,7 +160,7 @@ pub async fn __plan(
         for (origin, chronicle) in pp
             .instances
             .iter()
-            .map(|i| (i.origin.clone(), i.am.chronicle.as_ref().unwrap()))
+            .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
         {
             println!("{:?}:{}", origin, chronicle)
         }
@@ -218,13 +179,16 @@ pub async fn __plan(
 
     if let Ok(Some(pr)) = result {
         //result::print_chronicles(&pr);
+        let instances = instantiate_chronicles(&pp, &pr, &table);
         let PlanResult { ass, fp } = pr;
 
         let choices = extract_choices(&table, &ass, &fp.model, &pp);
-        //let new_ams = extract_new_acting_models(&table, &ass, &fp.model, pp);
 
         if OMPAS_PLAN_OUTPUT.get() {
             println!("Plan found");
+            for i in instances {
+                println!("{}", i)
+            }
             for choice in &choices {
                 println!("{}:{}", choice.process_ref, choice.choice_inner)
             }

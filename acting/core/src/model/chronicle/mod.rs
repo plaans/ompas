@@ -438,7 +438,17 @@ impl Chronicle {
         self.acting_process_models.flat_bindings(st);
     }
 
-    pub fn instantiate(&self, runtime_info: RuntimeInfo) -> Self {
+    pub fn instantiate(&self, instantiations: Vec<Instantiation>) -> Self {
+        let mut new = self.clone();
+        for Instantiation { var, value } in instantiations {
+            new.replace(&var, &value);
+            new.variables.remove(&var);
+            new.variables.remove(&value);
+        }
+        new
+    }
+
+    pub fn instantiate_and_clean(&self, runtime_info: RuntimeInfo) -> Self {
         let mut new = self.clone();
 
         let RuntimeInfo {
@@ -628,6 +638,15 @@ impl Chronicle {
 pub struct RuntimeInfo {
     to_remove: Vec<ActingProcessModelLabel>,
     instantiations: Vec<Instantiation>,
+}
+
+impl From<Vec<Instantiation>> for RuntimeInfo {
+    fn from(instantiations: Vec<Instantiation>) -> Self {
+        Self {
+            to_remove: vec![],
+            instantiations,
+        }
+    }
 }
 
 impl RuntimeInfo {

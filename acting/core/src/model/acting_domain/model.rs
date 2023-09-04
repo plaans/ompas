@@ -4,8 +4,9 @@ use crate::model::chronicle::condition::Condition;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::effect::Effect;
 use crate::model::chronicle::subtask::SubTask;
-use crate::model::chronicle::{Chronicle, ChronicleKind, RuntimeInfo};
+use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation, RuntimeInfo};
 use crate::model::process_ref::Label;
+use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_domain::{cst, Domain};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
@@ -61,7 +62,7 @@ impl ActingModel {
     pub fn get_instantiated_chronicle(&self) -> Option<Chronicle> {
         self.chronicle
             .as_ref()
-            .map(|c| c.instantiate(self.runtime_info.clone()))
+            .map(|c| c.instantiate_and_clean(self.runtime_info.clone()))
     }
 }
 #[derive(Clone)]
@@ -138,11 +139,17 @@ impl ActingModel {
             Domain::d_true(),
         );
 
+        let mut runtime_info: RuntimeInfo = Default::default();
+        runtime_info.add_instantiation(Instantiation::new(
+            chronicle.get_interval().get_start(),
+            st.new_cst(Cst::Float(0.0)),
+        ));
+
         Self {
             lv: LValue::Nil,
             lv_om: LValue::Nil,
             lv_expanded: Some(LValue::Nil),
-            runtime_info: Default::default(),
+            runtime_info,
             chronicle: Some(chronicle),
         }
     }

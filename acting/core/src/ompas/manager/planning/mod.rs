@@ -38,6 +38,7 @@ use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries::model::lang::Variable;
 use aries::model::Model;
 use aries_planning::chronicles;
+use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId, VarLabel};
 use futures::future::abortable;
 use itertools::Itertools;
@@ -282,7 +283,7 @@ impl PlannerInstance {
         let exp_2 = exp.clone();
 
         let (planner, handle) = abortable(tokio::spawn(async move {
-            let result = run_planner(problem, opt);
+            let result = run_planner(problem.clone(), opt);
             //println!("{}", format_partial_plan(&pb, &x)?);
 
             if let Ok(Some(pr)) = result {
@@ -328,6 +329,13 @@ impl PlannerInstance {
                             println!("{:?}:\n{}", origin, chronicle)
                         }
                     }
+
+                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
+                        for instance in &problem.chronicles {
+                            Printer::print_chronicle(&instance.chronicle, &problem.context.model);
+                        }
+                    }
+                    std::process::exit(0)
                 }
                 None
             }
@@ -674,7 +682,7 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
         let effect_date = st
             .get_domain_of_var(&effect.get_start())
             .as_cst()
-            .unwrap()
+            .unwrap_or_else(|| panic!("{}", effect.format(&st, true)))
             .as_float()
             .unwrap();
         let sv = effect.sv.format(&st, true);

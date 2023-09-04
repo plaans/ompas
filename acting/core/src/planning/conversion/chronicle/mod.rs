@@ -306,14 +306,15 @@ pub fn convert_into_chronicle(
                             value: current_quantity,
                         });
 
+                        acquire.conditions.push(Condition {
+                            interval: Interval::new_instantaneous(interval.get_start()),
+                            sv: vec![max_q_symbol, resource],
+                            value: max_q_result,
+                        });
+
                         let quantity = if let Some(capacity) = acq.capacity {
                             capacity
                         } else {
-                            acquire.conditions.push(Condition {
-                                interval: Interval::new_instantaneous(interval.get_start()),
-                                sv: vec![max_q_symbol, resource],
-                                value: max_q_result,
-                            });
                             max_q_result
                         };
 
@@ -351,6 +352,12 @@ pub fn convert_into_chronicle(
                             interval: Interval::new_instantaneous(t_release),
                             sv: vec![quantity_symbol, resource],
                             value: current_release_quantity,
+                        });
+
+                        release.conditions.push(Condition {
+                            interval: Interval::new_instantaneous(interval.get_start()),
+                            sv: vec![max_q_symbol, resource],
+                            value: max_q_result,
                         });
 
                         release.constraints.push(Constraint::eq(

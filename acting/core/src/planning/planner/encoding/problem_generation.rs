@@ -129,7 +129,7 @@ pub async fn convert_into_chronicle_instance(
         .chronicle
         .as_ref()
         .unwrap()
-        .instantiate(Default::default());
+        .instantiate_and_clean(Default::default());
 
     Ok(ChronicleInstance {
         instantiated_chronicle,

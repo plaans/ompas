@@ -30,6 +30,7 @@ pub fn post_processing(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     simplify_conditions(c)?;
     simplify_timepoints(c)?;
     rm_useless_var(c);
+    rm_duplicated_constraints(c);
     c.flat_bindings();
     Ok(())
 }
@@ -173,6 +174,26 @@ pub fn simplify_timepoints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     Ok(())
 }
 
+pub fn rm_duplicated_constraints(c: &mut Chronicle) {
+    let mut to_remove: HashSet<usize> = im::hashset![];
+
+    for (i1, c1) in c.constraints.iter().enumerate() {
+        let n = i1 + 1;
+        for (i2, c2) in c.constraints[n..].iter().enumerate() {
+            let i2 = i2 + n;
+            if c1 == c2 {
+                to_remove.insert(i2);
+                println!(
+                    "remove same constraints: [{i1}]{} = [{i2}]{}",
+                    c1.format(&c.st, true),
+                    c2.format(&c.st, true)
+                )
+            }
+        }
+    }
+    c.remove_constraints(to_remove.iter().cloned().collect());
+}
+
 pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     //simple case where
     let st = c.st.clone();
@@ -180,14 +201,14 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     loop {
         let mut vec: Vec<(usize, Constraint)> = vec![];
         let mut to_remove: HashSet<usize> = im::hashset![];
-        for (i, c) in c.constraints.iter().enumerate() {
-            if let Constraint::Eq(a, b) = c {
+        for (i1, c1) in c.constraints.iter().enumerate() {
+            if let Constraint::Eq(a, b) = c1 {
                 match (a, b) {
                     //Simplify equality constraints between atoms
                     (Lit::Atom(a), Lit::Atom(b)) => {
                         let r = st.union_var(a, b);
                         if r.is_none() {
-                            to_remove.insert(i);
+                            to_remove.insert(i1);
                         } else {
                             LRuntimeError::new("", "");
                         }
@@ -195,7 +216,7 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
                     (Lit::Atom(a), Lit::Constraint(b)) | (Lit::Constraint(b), Lit::Atom(a)) => {
                         if st.contained_in_domain(&st.get_domain_of_var(a), &BasicType::True.into())
                         {
-                            vec.push((i, b.deref().clone()));
+                            vec.push((i1, b.deref().clone()));
                         }
                     }
                     _ => {}

@@ -335,7 +335,7 @@ fn convert_constraint(
                     cst += factor * shift;
                     match var {
                         IVar::ZERO => {}
-                        _ => terms.push(LinearTerm::new(factor, var, true.into(), 1)),
+                        _ => terms.push(LinearTerm::new(factor, var, prez, 1)),
                     }
                 }
 

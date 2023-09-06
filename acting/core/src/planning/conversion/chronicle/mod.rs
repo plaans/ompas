@@ -263,6 +263,10 @@ pub fn convert_into_chronicle(
 
                         let max_q_result = st.new_result();
                         st.set_domain(&st.get_domain_id(&max_q_result), quantity_domain.clone());
+
+                        let max_q_result_2 = st.new_result();
+                        st.set_domain(&st.get_domain_id(&max_q_result_2), quantity_domain.clone());
+
                         //let int_domain: Domain = Domain::Simple(TYPE_ID_INT);
 
                         let new_q_acquire = st.new_result();
@@ -355,9 +359,9 @@ pub fn convert_into_chronicle(
                         });
 
                         release.conditions.push(Condition {
-                            interval: Interval::new_instantaneous(interval.get_start()),
+                            interval: Interval::new_instantaneous(t_release),
                             sv: vec![max_q_symbol, resource],
-                            value: max_q_result,
+                            value: max_q_result_2,
                         });
 
                         release.constraints.push(Constraint::eq(
@@ -375,7 +379,7 @@ pub fn convert_into_chronicle(
 
                         release
                             .constraints
-                            .push(Constraint::leq(new_q_release, max_q_result));
+                            .push(Constraint::leq(new_q_release, max_q_result_2));
 
                         release.effects.push(Effect {
                             interval: Interval::new(t_release, t_release_prime),

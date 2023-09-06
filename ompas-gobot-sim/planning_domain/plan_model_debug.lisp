@@ -78,57 +78,84 @@
     
 
     (def-task t_jobshop)
-    ; (def-task-om-model t_jobshop
-    ;     (:params )
-    ;     (:body
-    ;         (do
-    ;             (sleep 1)))
-    ; )
+
     (def-method m1
        (:task t_jobshop)
        (:score 0)
        (:body
            (do
-               (define rh (acquire (arbitrary (instances robot))))
-               (release rh)
-               )))
-;               ;(define f2 (async (t_check_rob_bat)))
-;               (define tasks
-;                   (mapf (lambda (?p)
-;                       (do
-;                           ;(define tasks (mapf (lambda (process)
-;                           ;    `(t_process_on_machine ,?p
-;                           ;        (arbitrary ',(find_machines_for_process (car process)))
-;                           ;        ,(cadr process)
-;                           ;        ))
-;                           ;    (package.all_processes ?p)))
-;                            (define last_task
-;                                 `(begin
-;                                     (define ?r (arbitrary (instances robot)))
-;                                     (define h_r (acquire ?r))))
-;                                     ;(t_carry_to_machine ?r ,?p ,(find_output_machine))))
-;                            ;(define tasks (append tasks (list last_task)))
-;                            (define tasks (list last_task))
-;
-;                            `(apply seq ',tasks)))
-;                        (instances package)))
-;               (define h (apply par tasks)))))
+               (define f2 (async (t_check_rob_bat)))
+               (define tasks 
+                   (mapf (lambda (?p) 
+                       (do
+                           (define tasks (mapf (lambda (process)
+                               `(t_process_on_machine ,?p 
+                                   (arbitrary ',(find_machines_for_process (car process)))
+                                   ,(cadr process)
+                                   ))
+                               (package.all_processes ?p)))
+                            (define last_task
+                                 `(do
+                                     ;(define ?r (arbitrary (instances robot) rand-element))
+                                     (define ?r 'robot0)
+                                     (define h_r (acquire ?r))
+                                     ;(sleep 1)
+                                     ;(t_carry_to_machine ?r ,?p ,(find_output_machine))
+                                     ))
+                            (define tasks (append tasks (list last_task)))
+                            `(apply seq ',tasks)))
+                        (instances package)))
+               (define h (apply par tasks)))))
+
+
+
+    (def-task test (:params))
+    (def-task-om-model test
+        (:params)
+        (:body
+            (do
+                (begin
+                    ;(define ?r (arbitrary (instances robot) rand-element))
+                    (define ?r 'robot0)
+                    (define h2 (acquire ?r 1)))
+                ;(sleep 1)
+                (define ?r (arbitrary (instances robot) rand-element))
+                (define ?r 'robot0)
+                (define h_r (acquire ?r))
+                )))
+
 
     (def-task t_process_on_machine (:params (?p package) (?m machine) (?d int)))
+
     (def-method m_process_on_machine
         (:task t_process_on_machine)
         (:params (?p package) (?m machine) (?d int))
         (:pre-conditions true)
         (:score 0)
         (:body 
-            (begin
-                ;(define ?r (arbitrary (instances robot) rand-element))
+            (do
+                (define ?r (arbitrary (instances robot) rand-element))
                 (define h1 (acquire ?m))
-                ;(define h2 (acquire ?r))
-                ;(t_carry_to_machine ?r ?p ?m)
-                ;(release h2)
-                ;(t_process ?m ?p ?d)
-                )))
+                (define h2 (acquire ?r))
+                (t_carry_to_machine ?r ?p ?m)
+                (release h2)
+                (t_process ?m ?p ?d)
+            )))
+
+    ; (def-method m_process_on_machine
+    ;     (:task t_process_on_machine)
+    ;     (:params (?p package) (?m machine) (?d int))
+    ;     (:pre-conditions true)
+    ;     (:score 0)
+    ;     (:body 
+    ;         (begin
+    ;             ;(define ?r (arbitrary (instances robot) rand-element))
+    ;             (define h1 (acquire ?m))
+    ;             ;(define h2 (acquire ?r))
+    ;             ;(t_carry_to_machine ?r ?p ?m)
+    ;             ;(release h2)
+    ;             ;(t_process ?m ?p ?d)
+    ;             )))
 
     (def-task t_process (:params (?m machine) (?p package) (?d int)))
     (def-task-om-model t_process

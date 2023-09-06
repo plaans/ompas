@@ -8,7 +8,8 @@
 
     (def-resources
         robot0 robot1
-        machine0 machine1 machine2 machine3 machine4 machine5 input_machine0 output_machine0 machine)
+        ; machine0 machine1 machine2 machine3 machine4 machine5 input_machine0 output_machine0 machine
+        )
 
     (def-facts
         ((robot.rotation_speed robot1) 0)

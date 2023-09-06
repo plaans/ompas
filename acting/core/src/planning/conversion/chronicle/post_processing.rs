@@ -24,17 +24,22 @@ use std::ops::Deref;
 
 const TRY_EVAL_APPLY: &str = "try_eval_apply";
 
-pub async fn post_processing(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
+pub fn post_processing(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     c.st.flat_bindings();
-    merge_conditions(c)?;
-    try_eval_apply(c, env).await?;
-    rm_useless_var(c);
     simplify_constraints(c)?;
-    rm_useless_var(c);
     simplify_conditions(c)?;
+    simplify_timepoints(c)?;
     rm_useless_var(c);
     c.flat_bindings();
     Ok(())
+}
+pub async fn post_processing_and_try_eval_apply(
+    c: &mut Chronicle,
+    env: &LEnv,
+) -> Result<(), LRuntimeError> {
+    c.st.flat_bindings();
+    try_eval_apply(c, env).await?;
+    post_processing(c)
 }
 
 pub fn rm_useless_var(c: &mut Chronicle) {
@@ -174,7 +179,7 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
 
     loop {
         let mut vec: Vec<(usize, Constraint)> = vec![];
-        let mut to_remove: Vec<usize> = vec![];
+        let mut to_remove: HashSet<usize> = im::hashset![];
         for (i, c) in c.constraints.iter().enumerate() {
             if let Constraint::Eq(a, b) = c {
                 match (a, b) {
@@ -182,7 +187,7 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
                     (Lit::Atom(a), Lit::Atom(b)) => {
                         let r = st.union_var(a, b);
                         if r.is_none() {
-                            to_remove.push(i);
+                            to_remove.insert(i);
                         } else {
                             LRuntimeError::new("", "");
                         }
@@ -196,11 +201,6 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
                     _ => {}
                 }
             }
-            /*if let Constraint::Or(or) = c {
-                if or.len() == 1 {
-                    vec.push()
-                }
-            }*/
         }
 
         if vec.is_empty() && to_remove.is_empty() {
@@ -208,7 +208,7 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
         }
         vec.drain(..).for_each(|(i, cons)| c.constraints[i] = cons);
 
-        c.remove_constraints(to_remove);
+        c.remove_constraints(to_remove.iter().cloned().collect());
     }
 
     Ok(())

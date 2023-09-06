@@ -98,8 +98,11 @@ impl Replace for ActingProcessModelCollection {
                 ActingProcessModel::Resource(acq) => {
                     acq.request.replace(old, new);
                     acq.acquisition.replace(old, new);
-                    acq.quantity.replace(old, new);
                     acq.resource.replace(old, new);
+                    acq.quantity.replace(old, new);
+                    acq.condition_max_q.replace(old, new);
+                    acq.acquire.replace(old, new);
+                    acq.release.replace(old, new);
                 }
             }
         }
@@ -124,10 +127,11 @@ impl FlatBindings for ActingProcessModelCollection {
                 ActingProcessModel::Resource(acq) => {
                     acq.request.flat_bindings(st);
                     acq.acquisition.flat_bindings(st);
-                    acq.quantity.flat_bindings(st);
                     acq.resource.flat_bindings(st);
-                    acq.release.flat_bindings(st);
+                    acq.quantity.flat_bindings(st);
+                    acq.condition_max_q.flat_bindings(st);
                     acq.acquire.flat_bindings(st);
+                    acq.release.flat_bindings(st);
                 }
             }
         }
@@ -172,6 +176,7 @@ impl GetVariables for ActingProcessModel {
                 set.insert(acq.request);
                 set.insert(acq.resource);
                 set.insert(acq.quantity);
+                let set = set.union(acq.condition_max_q.get_variables());
                 set.union(
                     acq.acquire
                         .get_variables()
@@ -363,6 +368,7 @@ pub struct ResourceModel {
     pub quantity: VarId,
     pub request: VarId,
     pub acquisition: Interval,
+    pub condition_max_q: Condition,
     pub acquire: AcquireModel,
     pub release: ReleaseModel,
 }
@@ -373,6 +379,7 @@ impl ResourceModel {
         quantity: VarId,
         request: VarId,
         acquisition: Interval,
+        condition_max_q: Condition,
         acquire: AcquireModel,
         release: ReleaseModel,
     ) -> Self {
@@ -381,6 +388,7 @@ impl ResourceModel {
             quantity,
             request,
             acquisition,
+            condition_max_q,
             acquire,
             release,
         }

@@ -264,9 +264,6 @@ pub fn convert_into_chronicle(
                         let max_q_result = st.new_result();
                         st.set_domain(&st.get_domain_id(&max_q_result), quantity_domain.clone());
 
-                        let max_q_result_2 = st.new_result();
-                        st.set_domain(&st.get_domain_id(&max_q_result_2), quantity_domain.clone());
-
                         //let int_domain: Domain = Domain::Simple(TYPE_ID_INT);
 
                         let new_q_acquire = st.new_result();
@@ -304,16 +301,16 @@ pub fn convert_into_chronicle(
                         //Add all conditions
                         // Current quantity
 
+                        let condition_max_q = Condition {
+                            interval: Interval::new_instantaneous(interval.get_start()),
+                            sv: vec![max_q_symbol, resource],
+                            value: max_q_result,
+                        };
+
                         acquire.conditions.push(Condition {
                             interval: Interval::new_instantaneous(t_prime),
                             sv: vec![quantity_symbol, resource],
                             value: current_quantity,
-                        });
-
-                        acquire.conditions.push(Condition {
-                            interval: Interval::new_instantaneous(interval.get_start()),
-                            sv: vec![max_q_symbol, resource],
-                            value: max_q_result,
                         });
 
                         let quantity = if let Some(capacity) = acq.capacity {
@@ -358,12 +355,6 @@ pub fn convert_into_chronicle(
                             value: current_release_quantity,
                         });
 
-                        release.conditions.push(Condition {
-                            interval: Interval::new_instantaneous(t_release),
-                            sv: vec![max_q_symbol, resource],
-                            value: max_q_result_2,
-                        });
-
                         release.constraints.push(Constraint::eq(
                             new_q_release,
                             Computation::add(vec![current_release_quantity, quantity]),
@@ -379,7 +370,7 @@ pub fn convert_into_chronicle(
 
                         release
                             .constraints
-                            .push(Constraint::leq(new_q_release, max_q_result_2));
+                            .push(Constraint::leq(new_q_release, max_q_result));
 
                         release.effects.push(Effect {
                             interval: Interval::new(t_release, t_release_prime),
@@ -395,6 +386,7 @@ pub fn convert_into_chronicle(
                                     quantity,
                                     start,
                                     Interval::new(end, t_release),
+                                    condition_max_q,
                                     acquire,
                                     release,
                                 ),

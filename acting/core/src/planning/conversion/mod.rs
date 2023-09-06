@@ -6,7 +6,7 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::conversion::chronicle::convert_graph;
-use crate::planning::conversion::chronicle::post_processing::post_processing;
+use crate::planning::conversion::chronicle::post_processing::try_eval_apply;
 use crate::planning::conversion::context::ConversionContext;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::convert_lv;
@@ -121,7 +121,8 @@ pub async fn _convert(
 
     let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env, cv)?;
 
-    post_processing(&mut ch, &p_env.env).await?;
+    try_eval_apply(&mut ch, &p_env.env).await?;
+    //post_processing(&mut ch, &p_env.env).await?;
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
         println!("chronicle: {}", ch);
     }

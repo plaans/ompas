@@ -649,7 +649,12 @@ pub fn read_chronicle(
                 .get_symbol_table()
                 .types
                 .id_of(&str)
-                .unwrap_or_else(|| panic!("{str} should be defined in type hierarchy"));
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{str} should be defined in type hierarchy, encoded chronicle:\n{}",
+                        ch
+                    )
+                });
             let svar = ctx
                 .model
                 .new_optional_sym_var(t, prez, container / var_type);

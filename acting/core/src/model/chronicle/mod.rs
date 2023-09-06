@@ -14,7 +14,7 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use crate::planning::conversion::chronicle::post_processing::simplify_timepoints;
+use crate::planning::conversion::chronicle::post_processing::post_processing;
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use im::HashSet;
 use std::borrow::Borrow;
@@ -491,7 +491,7 @@ impl Chronicle {
 
         new.remove_instantiated_elements();
 
-        simplify_timepoints(&mut new).unwrap();
+        post_processing(&mut new).unwrap();
 
         new
     }
@@ -511,6 +511,7 @@ impl Chronicle {
                 }
             }
             ActingProcessModel::Resource(acq) => {
+                self.conditions.push(acq.condition_max_q);
                 self.absorb_acquire_model(acq.acquire);
                 self.absorb_acquire_model(acq.release);
             }

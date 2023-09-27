@@ -4,6 +4,8 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Copy, Clone)]
 pub enum SelectMode {
     Greedy,
+    Random,
+    Score,
     Planning(Planner),
     Heuristic,
     Learning,
@@ -89,6 +91,8 @@ impl Display for SelectMode {
                 SelectMode::Planning(p) => format!("{}", p),
                 SelectMode::Heuristic => HEURISTIC.to_string(),
                 SelectMode::Learning => LEARNING.to_string(),
+                SelectMode::Random => RANDOM.to_string(),
+                SelectMode::Score => SCORE.to_string(),
             }
         )
     }

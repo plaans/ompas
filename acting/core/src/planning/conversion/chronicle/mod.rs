@@ -4,7 +4,7 @@ use crate::model::chronicle::acting_process_model::{
 use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::condition::Condition;
 use crate::model::chronicle::constraint::Constraint;
-use crate::model::chronicle::effect::Effect;
+use crate::model::chronicle::effect::{Effect, EffectOperation};
 use crate::model::chronicle::interval::Interval;
 use crate::model::chronicle::lit::{Lit, LitSet};
 use crate::model::chronicle::subtask::SubTask;
@@ -18,6 +18,7 @@ use crate::model::sym_table::VarId;
 use crate::planning::conversion::flow_graph::flow::{FlowId, FlowKind};
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::conversion::ConvertParameters;
+use crate::{ResourceEncoding, OMPAS_RESOURCE_ENCODING};
 use function_name::named;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::sym_table::{COND, EPSILON};
@@ -251,7 +252,7 @@ pub fn convert_into_chronicle(
                         let max_q_symbol = st.new_symbol(MAX_Q);
                         let epsilon = st.new_symbol(EPSILON);
                         let resource = acq.resource;
-                        let t_prime = st.new_timepoint();
+                        let t_acquire_prime = st.new_timepoint();
                         let t_release_prime = st.new_timepoint();
                         let t_release = acq.release_time;
 
@@ -298,8 +299,11 @@ pub fn convert_into_chronicle(
                         let mut acquire = AcquireModel::default();
                         let mut release = ReleaseModel::default();
 
-                        //Add all conditions
-                        // Current quantity
+                        let quantity = if let Some(capacity) = acq.capacity {
+                            capacity
+                        } else {
+                            max_q_result
+                        };
 
                         let condition_max_q = Condition {
                             interval: Interval::new_instantaneous(interval.get_start()),
@@ -307,76 +311,162 @@ pub fn convert_into_chronicle(
                             value: max_q_result,
                         };
 
-                        acquire.conditions.push(Condition {
-                            interval: Interval::new_instantaneous(t_prime),
-                            sv: vec![quantity_symbol, resource],
-                            value: current_quantity,
-                        });
+                        // Add all conditions and effects
 
-                        let quantity = if let Some(capacity) = acq.capacity {
-                            capacity
-                        } else {
-                            max_q_result
-                        };
+                        match OMPAS_RESOURCE_ENCODING.get() {
+                            ResourceEncoding::Addition => {
+                                let start = interval.get_start();
+                                // start <= t_acq'
+                                acquire
+                                    .constraints
+                                    .push(Constraint::leq(start, t_acquire_prime));
 
-                        //Add all constraints on acquisition and release of constraint
-                        acquire
-                            .constraints
-                            .push(Constraint::leq(interval.get_start(), t_prime));
-                        acquire.constraints.push(Constraint::eq(
-                            interval.get_end(),
-                            Computation::add(vec![t_prime, epsilon]),
-                        ));
-                        acquire.constraints.push(Constraint::eq(
-                            new_q_acquire,
-                            Computation::sub(vec![current_quantity, quantity]),
-                        ));
-                        acquire
-                            .constraints
-                            .push(Constraint::leq(st.new_int(0), new_q_acquire));
-                        acquire
-                            .constraints
-                            .push(Constraint::leq(new_q_acquire, max_q_result));
+                                //t_acq = t_acq' + \eps
+                                let end = interval.get_end();
+                                acquire.constraints.push(Constraint::eq(
+                                    end,
+                                    Computation::add(vec![t_acquire_prime, epsilon]),
+                                ));
 
-                        acquire.effects.push(Effect {
-                            interval: Interval::new(t_prime, interval.get_end()),
-                            sv: vec![quantity_symbol, resource],
-                            value: new_q_acquire,
-                        });
+                                //[t_acq', t_acq] quantity(resource) -= quantity
+                                acquire.effects.push(Effect {
+                                    interval: Interval::new(t_acquire_prime, end),
+                                    sv: vec![quantity_symbol, resource],
+                                    operation: EffectOperation::decrease(quantity),
+                                });
 
-                        release.constraints.push(Constraint::eq(
-                            t_release_prime,
-                            Computation::add(vec![t_release, epsilon]),
-                        ));
+                                //[end] 0 <= quantity(resource) <= max_q(resource)
+                                {
+                                    acquire.conditions.push(Condition {
+                                        interval: Interval::new_instantaneous(end),
+                                        sv: vec![quantity_symbol, resource],
+                                        value: new_q_acquire,
+                                    });
 
-                        release.conditions.push(Condition {
-                            interval: Interval::new_instantaneous(t_release),
-                            sv: vec![quantity_symbol, resource],
-                            value: current_release_quantity,
-                        });
+                                    acquire
+                                        .constraints
+                                        .push(Constraint::leq(st.new_int(0), new_q_acquire));
 
-                        release.constraints.push(Constraint::eq(
-                            new_q_release,
-                            Computation::add(vec![current_release_quantity, quantity]),
-                        ));
+                                    // The quantity should be inferior to the maximum quantity
+                                    // new_q_acquire <= max_q
+                                    acquire
+                                        .constraints
+                                        .push(Constraint::leq(new_q_acquire, max_q_result));
+                                }
+                                // t_r' = t_r + \eps
+                                release.constraints.push(Constraint::eq(
+                                    t_release_prime,
+                                    Computation::add(vec![t_release, epsilon]),
+                                ));
 
-                        release
-                            .constraints
-                            .push(Constraint::leq(interval.get_end(), t_release));
+                                //[t_r, t_r'] quantity(resource)+=quantity
+                                {
+                                    release.effects.push(Effect {
+                                        interval: Interval::new(t_release, t_release_prime),
+                                        sv: vec![quantity_symbol, resource],
+                                        operation: EffectOperation::increase(quantity),
+                                    });
+                                }
+                                // [t_r'] 0 <= quantity(resource) <= max_q(resource)
+                                {
+                                    acquire.conditions.push(Condition {
+                                        interval: Interval::new_instantaneous(t_release_prime),
+                                        sv: vec![quantity_symbol, resource],
+                                        value: new_q_release,
+                                    });
 
-                        release
-                            .constraints
-                            .push(Constraint::leq(st.new_int(0), new_q_release));
+                                    acquire
+                                        .constraints
+                                        .push(Constraint::leq(st.new_int(0), new_q_release));
 
-                        release
-                            .constraints
-                            .push(Constraint::leq(new_q_release, max_q_result));
+                                    // The quantity should be inferior to the maximum quantity
+                                    // new_q_acquire <= max_q
+                                    acquire
+                                        .constraints
+                                        .push(Constraint::leq(new_q_release, max_q_result));
+                                }
+                            }
+                            ResourceEncoding::Assignment => {
+                                acquire
+                                    .constraints
+                                    .push(Constraint::leq(interval.get_start(), t_acquire_prime));
 
-                        release.effects.push(Effect {
-                            interval: Interval::new(t_release, t_release_prime),
-                            sv: vec![quantity_symbol, resource],
-                            value: new_q_release,
-                        });
+                                //t_acq = t_acq' + \eps
+                                acquire.constraints.push(Constraint::eq(
+                                    interval.get_end(),
+                                    Computation::add(vec![t_acquire_prime, epsilon]),
+                                ));
+
+                                acquire.conditions.push(Condition {
+                                    interval: Interval::new_instantaneous(t_acquire_prime),
+                                    sv: vec![quantity_symbol, resource],
+                                    value: current_quantity,
+                                });
+
+                                //Add all constraints on acquisition and release of constraint
+
+                                // Computation of the resulting quantity after the acquisition of the resource
+                                // new_q_acquire = current_quantity - quantity
+                                acquire.constraints.push(Constraint::eq(
+                                    new_q_acquire,
+                                    Computation::sub(vec![current_quantity, quantity]),
+                                ));
+
+                                // The quantity should be superior to 0
+                                // new_acquire >= 0
+
+                                acquire.effects.push(Effect {
+                                    interval: Interval::new(t_acquire_prime, interval.get_end()),
+                                    sv: vec![quantity_symbol, resource],
+                                    operation: EffectOperation::assign(new_q_acquire),
+                                });
+
+                                acquire
+                                    .constraints
+                                    .push(Constraint::leq(st.new_int(0), new_q_acquire));
+
+                                // The quantity should be inferior to the maximum quantity
+                                // new_q_acquire <= max_q
+                                acquire
+                                    .constraints
+                                    .push(Constraint::leq(new_q_acquire, max_q_result));
+
+                                release
+                                    .constraints
+                                    .push(Constraint::leq(st.new_int(0), new_q_release));
+
+                                release
+                                    .constraints
+                                    .push(Constraint::leq(new_q_release, max_q_result));
+
+                                release.conditions.push(Condition {
+                                    interval: Interval::new_instantaneous(t_release),
+                                    sv: vec![quantity_symbol, resource],
+                                    value: current_release_quantity,
+                                });
+
+                                release.constraints.push(Constraint::eq(
+                                    new_q_release,
+                                    Computation::add(vec![current_release_quantity, quantity]),
+                                ));
+
+                                release
+                                    .constraints
+                                    .push(Constraint::leq(interval.get_end(), t_release));
+
+                                release.effects.push(Effect {
+                                    interval: Interval::new(t_release, t_release_prime),
+                                    sv: vec![quantity_symbol, resource],
+                                    operation: EffectOperation::assign(new_q_release),
+                                });
+
+                                // t_r' = t_r + \eps
+                                release.constraints.push(Constraint::eq(
+                                    t_release_prime,
+                                    Computation::add(vec![t_release, epsilon]),
+                                ));
+                            }
+                        }
 
                         if let Some(label) = flow.label {
                             ch.acting_process_models.add_binding(
@@ -477,11 +567,11 @@ pub fn convert_into_chronicle(
                     }
                     Lit::Write(write) => {
                         let sv = write[0..write.len() - 1].to_vec();
-                        let value = *write.last().unwrap();
+                        let operation = EffectOperation::assign(*write.last().unwrap());
                         let effect = Effect {
                             interval,
                             sv,
-                            value,
+                            operation,
                         };
 
                         let args = write[1..].to_vec();

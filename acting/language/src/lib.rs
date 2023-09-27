@@ -150,8 +150,11 @@ pub mod exec {
         pub const ASSERT_SHORT: &str = "+>";
         pub const DOC_ASSERT_SHORT: &str = "Short version of assert.";
 
-        pub const TRANSITIVE_ASSERT: &str = "transitive-assert";
-        pub const DOC_TRANSITIVE_ASSERT: &str= "Update of a fact that takes a given duration. During the transition, the fact is considered as unknown.";
+        pub const EFFECT: &str = "effect";
+        pub const DOC_EFFECT: &str = "Same as assert.";
+
+        pub const TRANSITIVE_EFFECT: &str = "transitive-effect";
+        pub const DOC_TRANSITIVE_EFFECT: &str= "Update of a fact that takes a given duration. During the transition, the fact is considered as unknown.";
 
         pub const RETRACT: &str = "retract";
         pub const DOC_RETRACT: &str = "Remove a fact from the inner world.";
@@ -244,7 +247,7 @@ pub mod exec {
         pub const DOC_CTX_EXEC_TASK: &str = "Evaluates a task in an assigned context";
         pub const LAMBDA_CTX_EXEC_TASK: &str = "(lambda args
             (begin
-                (def-label 'subtask (car args))
+                (def-label 'task (car args))
                 (enr (cons exec-task (cdr args)))
             )
         )";
@@ -450,6 +453,9 @@ pub mod monitor {
         pub const ANNOTATE_TASK: &str = "annotate-task";
         pub const DOC_ANNOTATE_TASK: &str =
             "Pre eval a task and annotate each acting process with a unique id";
+
+        pub const TRANSLATE: &str = "translate";
+        pub const DOC_TRANSLATE: &str= "Converts an object of the domain, and output a markdown file with explanations of the conversion process.";
     }
 
     pub mod planning {
@@ -481,7 +487,7 @@ pub mod monitor {
         pub const DOC_NEW_TIMED_GOAL_TASK: &str =
             "Add a task in the planning problem. The last arg is the moment the task should start.";
         pub const DOC_NEW_TIMED_GOAL_TASK_VERBOSE: &str =
-            "Example: (new-timed-goal-task move r1 bedroom kitchen 10)";
+            "Example: (new-timed-goal-task 10 move r1 bedroom kitchen)";
 
         pub const GET_GOALS_EVENTS: &str = "get-goals-events";
         pub const DOC_GET_GOALS_EVENTS: &str =
@@ -860,13 +866,13 @@ pub mod monitor {
         pub const __DEBUG_OMPAS__: &str = "__debug_ompas__";
         pub const DOC___DEBUG_OMPAS___: &str= "Send an expression that will be executed in the execution environment and return its result.";
 
-        pub const TRIGGER_TASK: &str = "trigger-task";
-        pub const DOC_TRIGGER_TASK: &str = "Sends to the system a new task to address.";
-        pub const DOC_TRIGGER_TASK_VERBOSE: &str = "Example: (trigger-task t_dumber robot0)";
+        pub const EXEC_TASK: &str = "exec-task";
+        pub const DOC_EXEC_TASK: &str = "Sends to the system a new task to address.";
+        pub const DOC_EXEC_TASK_VERBOSE: &str = "Example: (exec-task t_dumber robot0)";
 
-        pub const ADD_TASK_TO_EXECUTE: &str = "add-task-to-execute";
+        /*pub const ADD_TASK_TO_EXECUTE: &str = "add-task-to-execute";
         pub const DOC_ADD_TASK_TO_EXECUTE: &str =
-            "Add a task in the list of tasks that will be sent to the system after it launches.";
+            "Add a task in the list of tasks that will be sent to the system after it launches.";*/
 
         pub const _WAIT_TASK: &str = "_wait_task";
         pub const DOC__WAIT_TASK: &str = "Wait on the result of a triggered task.";
@@ -966,11 +972,12 @@ pub mod supervisor {
     pub const STATUS_FAILURE: &str = "failure";
     pub const STATUS_CANCELLED: &str = "cancelled";
 
-    pub const ACTION: &str = "action";
+    pub const TASK: &str = "task";
     pub const ROOT_TASK: &str = "root_task";
     pub const METHOD: &str = "method";
     pub const ARBITRARY: &str = "arbitrary";
     pub const ACQUIRE: &str = "acquire";
+    pub const COMMAND: &str = "command";
 
     pub const ABSTRACT_MODEL: &str = "abstract_model";
 }
@@ -989,6 +996,8 @@ pub mod select {
     pub const PLANNING: &str = "planning";
     pub const HEURISTIC: &str = "heuristic";
     pub const LEARNING: &str = "learning";
+    pub const RANDOM: &str = "random";
+    pub const SCORE: &str = "score";
     pub const ARIES: &str = "aries";
     pub const ARIES_OPT: &str = "aries-opt";
     pub const UPOM: &str = "upom";

@@ -33,7 +33,7 @@ impl RefinementProcess {
         self.childs
             .iter()
             .filter_map(|(k, v)| {
-                if let Label::Action(_) = k {
+                if let Label::Task(_) = k {
                     Some(*v)
                 } else {
                     None

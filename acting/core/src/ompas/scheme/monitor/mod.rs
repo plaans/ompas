@@ -15,8 +15,6 @@ pub mod debug_conversion;
 pub mod log;
 pub mod model;
 pub mod planning;
-
-use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::manager::ompas::OMPASManager;
@@ -46,7 +44,6 @@ pub struct ModMonitor {
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::UnboundedSender<OMPASJob>>>>,
     pub(crate) platform: PlatformManager,
     pub(crate) empty_env: LEnv,
-    pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
 }
 
 impl From<ModMonitor> for LModule {

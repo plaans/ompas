@@ -22,6 +22,26 @@ static OMPAS_DEBUG_CONTINUOUS_PLANNING: EnvParam<bool> =
 static OMPAS_PLANNER_OUTPUT: EnvParam<bool> = EnvParam::new("OMPAS_PLANNER_OUTPUT", "false");
 
 pub static OMPAS_PATH: EnvParam<String> = EnvParam::new("OMPAS_PATH", "~/ompas");
+pub static OMPAS_RESOURCE_ENCODING: EnvParam<ResourceEncoding> =
+    EnvParam::new("OMPAS_RESOURCE_ENCODING", "assignment");
+
+#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub enum ResourceEncoding {
+    Addition,
+    Assignment,
+}
+
+impl FromStr for ResourceEncoding {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "addition" => Ok(Self::Addition),
+            "assignment" => Ok(Self::Assignment),
+            _ => Err(()),
+        }
+    }
+}
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum ChronicleDebug {

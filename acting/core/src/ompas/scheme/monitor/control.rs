@@ -1,7 +1,7 @@
 use crate::ompas::interface::job::Job;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
-use crate::ompas::interface::trigger_collection::{Response, TaskTrigger, TriggerCollection};
+use crate::ompas::interface::trigger_collection::{Response, TaskCollection, TaskHandle};
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::ActingManager;
@@ -24,7 +24,7 @@ use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC
 use ompas_language::select::*;
 use ompas_language::supervisor::*;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::ProcessInterface;
+use ompas_middleware::{ProcessInterface, OMPAS_WORKING_DIR};
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
 use sompas_modules::advanced_math::ModAdvancedMath;
@@ -38,8 +38,7 @@ use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use sompas_structs::{lruntimeerror, wrong_type};
-use std::mem;
+use sompas_structs::{lruntimeerror, string, wrong_type};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
@@ -50,8 +49,7 @@ pub struct ModControl {
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::UnboundedSender<OMPASJob>>>>,
     pub(crate) platform: PlatformManager,
-    pub(crate) tasks_to_execute: Arc<RwLock<Vec<Job>>>,
-    pub(crate) triggers: TriggerCollection,
+    pub(crate) tasks: TaskCollection,
 }
 
 impl ModControl {
@@ -62,8 +60,7 @@ impl ModControl {
             log: monitor.log.clone(),
             task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
-            tasks_to_execute: monitor.tasks_to_execute.clone(),
-            triggers: Default::default(),
+            tasks: Default::default(),
         }
     }
 
@@ -105,9 +102,8 @@ impl ModControl {
 
     pub async fn reboot(&self) {
         self.acting_manager.clear().await;
-        self.triggers.clear().await;
+        self.tasks.clear().await;
         *self.task_stream.write().await = None;
-        self.tasks_to_execute.write().await.clear();
     }
 }
 
@@ -129,15 +125,9 @@ impl From<ModControl> for LModule {
             false,
         );
         module.add_async_fn(
-            TRIGGER_TASK,
-            trigger_task,
-            (DOC_TRIGGER_TASK, DOC_TRIGGER_TASK_VERBOSE),
-            false,
-        );
-        module.add_async_fn(
-            ADD_TASK_TO_EXECUTE,
-            add_task_to_execute,
-            DOC_ADD_TASK_TO_EXECUTE,
+            EXEC_TASK,
+            exec_task,
+            (DOC_EXEC_TASK, DOC_EXEC_TASK_VERBOSE),
             false,
         );
         module.add_async_fn(_WAIT_TASK, _wait_task, DOC__WAIT_TASK, false);
@@ -210,11 +200,8 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let acting_manager = ctx.acting_manager.clone();
     //acting_manager.clock_manager.reset().await;
-    let mut tasks_to_execute: Vec<Job> = vec![];
-    mem::swap(
-        &mut *ctx.tasks_to_execute.write().await,
-        &mut tasks_to_execute,
-    );
+
+    let pendings = ctx.tasks.move_pendings().await;
 
     let (tx, rx) = mpsc::unbounded_channel();
 
@@ -236,14 +223,21 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
         rae(acting_manager, log, env, rx).await;
     });
 
-    for t in tasks_to_execute {
-        ctx.task_stream
-            .read()
-            .await
-            .as_ref()
-            .unwrap()
-            .send(t.into())
-            .expect("error sending job")
+    let sender = ctx.get_sender().await.unwrap();
+
+    for (id, task) in pendings {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let job = Job::new_task(tx, task);
+        let sender = sender.clone();
+        tokio::spawn(async move {
+            sender.send(job.into()).expect("could not send job to rae");
+        });
+        let trigger: Response = rx.recv().await.unwrap()?;
+        if let Response::Process(process) = trigger {
+            ctx.tasks.set_task_process(&id, process).await;
+        } else {
+            unreachable!("{EXEC_TASK} should receive a TaskProcess")
+        }
     }
 
     Ok(format!("OMPAS launched successfully. {}", start_result))
@@ -259,11 +253,7 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
     acting_manager
         .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
         .await;
-    let mut tasks_to_execute: Vec<Job> = vec![];
-    mem::swap(
-        &mut *ctx.tasks_to_execute.write().await,
-        &mut tasks_to_execute,
-    );
+    let pendings = ctx.tasks.move_pendings().await;
 
     let (tx, rx) = mpsc::unbounded_channel();
 
@@ -285,14 +275,21 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
         rae(acting_manager, log, env, rx).await;
     });
 
-    for t in tasks_to_execute {
-        ctx.task_stream
-            .read()
-            .await
-            .as_ref()
-            .unwrap()
-            .send(t.into())
-            .expect("error sending job")
+    let sender = ctx.get_sender().await.unwrap();
+
+    for (id, task) in pendings {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let job = Job::new_task(tx, task);
+        let sender = sender.clone();
+        tokio::spawn(async move {
+            sender.send(job.into()).expect("could not send job to rae");
+        });
+        let trigger: Response = rx.recv().await.unwrap()?;
+        if let Response::Process(process) = trigger {
+            ctx.tasks.set_task_process(&id, process).await;
+        } else {
+            unreachable!("{EXEC_TASK} should receive a TaskProcess")
+        }
     }
 
     Ok(format!("OMPAS launched successfully. {}", start_result))
@@ -340,74 +337,47 @@ pub async fn __debug_ompas__(env: &LEnv, arg: LValue) -> LResult {
 
 /// Sends via a channel a task to execute.
 #[async_scheme_fn]
-pub async fn trigger_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntimeError> {
+pub async fn exec_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntimeError> {
     let env = env.clone();
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let (tx, mut rx) = mpsc::unbounded_channel();
+
     let task = args[0].to_string();
     if !ctx.acting_manager.domain.is_task(&task).await {
         return Err(LRuntimeError::new(
-            TRIGGER_TASK,
+            EXEC_TASK,
             format!("{} is not a task.", task),
         ));
     }
 
-    let job = Job::new_task(tx, args.into());
-
     match ctx.get_sender().await {
-        None => Err(LRuntimeError::new(TRIGGER_TASK, "no sender to rae")),
+        None => Ok(ctx.tasks.add_pending_task(args.into()).await),
         Some(sender) => {
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let job = Job::new_task(tx, args.into());
+
             tokio::spawn(async move {
                 sender.send(job.into()).expect("could not send job to rae");
             });
             let trigger: Response = rx.recv().await.unwrap()?;
-            if let Response::Trigger(trigger) = trigger {
-                Ok(ctx.triggers.add_task(trigger).await)
+            if let Response::Process(process) = trigger {
+                Ok(ctx.tasks.add_process(process).await)
             } else {
-                unreachable!("trigger-task should receive a TaskTrigger struct.")
+                unreachable!("{EXEC_TASK} should receive a TaskTrigger struct.")
             }
         }
     }
 }
 
-/// Sends via a channel a task to execute.
-#[async_scheme_fn]
-pub async fn add_task_to_execute(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
-    let env = env.clone();
-
-    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let (tx, _) = mpsc::unbounded_channel();
-    let task = args[0].to_string();
-
-    if !ctx.acting_manager.domain.is_task(&task).await {
-        return Err(LRuntimeError::new(
-            ADD_TASK_TO_EXECUTE,
-            format!("{} is not a task.", task),
-        ));
-    }
-
-    let job = Job::new_task(tx, args.into());
-
-    match ctx.get_sender().await {
-        None => {
-            ctx.tasks_to_execute.write().await.push(job);
-        }
-        Some(sender) => {
-            tokio::spawn(async move {
-                sender.send(job.into()).expect("could not send job to rae");
-            });
-        }
-    };
-    Ok(())
-}
-
 #[async_scheme_fn]
 pub async fn _wait_task(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
+    let trigger: Option<TaskHandle> = ctx.tasks.get_task(task_id).await;
     match trigger {
-        Some(trigger) => Ok(LValue::Handle(trigger.get_handle())),
+        Some(TaskHandle::Process(process)) => Ok(LValue::Handle(process.get_handle())),
+        Some(TaskHandle::Pending(_)) => Ok(string!(format!(
+            "{task_id} is a pending task because ompas has been started yet."
+        ))),
         None => Err(LRuntimeError::new(
             WAIT_TASK,
             format!("{} is not the id of a triggered task", task_id),
@@ -418,9 +388,12 @@ pub async fn _wait_task(env: &LEnv, task_id: usize) -> LResult {
 #[async_scheme_fn]
 pub async fn get_task_id(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
+    let trigger: Option<TaskHandle> = ctx.tasks.get_task(task_id).await;
     match trigger {
-        Some(trigger) => Ok(format!("{:?}", trigger.get_ref()).into()),
+        Some(TaskHandle::Process(process)) => Ok(format!("{:?}", process.get_ref()).into()),
+        Some(TaskHandle::Pending(_)) => Ok(string!(format!(
+            "{task_id} is a pending task because ompas has been started yet."
+        ))),
         None => Err(LRuntimeError::new(
             WAIT_TASK,
             format!("{} is not the id of a triggered task", task_id),
@@ -431,9 +404,12 @@ pub async fn get_task_id(env: &LEnv, task_id: usize) -> LResult {
 #[async_scheme_fn]
 pub async fn cancel_task(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let trigger: Option<TaskTrigger> = ctx.triggers.get_task(task_id).await;
+    let trigger: Option<TaskHandle> = ctx.tasks.get_task(task_id).await;
     match trigger {
-        Some(trigger) => trigger.get_handle().interrupt().await,
+        Some(TaskHandle::Process(process)) => process.get_handle().interrupt().await,
+        Some(TaskHandle::Pending(_)) => Ok(string!(format!(
+            "Cannot cancel {task_id} because it is still a pending task"
+        ))),
         None => Err(LRuntimeError::new(
             WAIT_TASK,
             format!("{} is not the id of a triggered task", task_id),
@@ -568,7 +544,8 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
 
     for arg in args {
         match arg.to_string().as_str() {
-            ACTION => task_filter.task_type = Some(ProcessKind::Action),
+            TASK => task_filter.task_type = Some(ProcessKind::Task),
+            COMMAND => task_filter.task_type = Some(ProcessKind::Command),
             ARBITRARY => task_filter.task_type = Some(ProcessKind::Arbitrary),
             ACQUIRE => task_filter.task_type = Some(ProcessKind::Acquire),
             METHOD => task_filter.task_type = Some(ProcessKind::Method),
@@ -585,7 +562,7 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
                     GET_AGENDA,
                     format!(
                         "{} is not a valid filter option, expecting ({}, {}, {}, {}, {})",
-                        str, ACTION, STATUS_PENDING, STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILURE
+                        str, TASK, STATUS_PENDING, STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILURE
                     )
                 ))
             }
@@ -687,7 +664,9 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn dump_trace(env: &LEnv) -> Result<(), LRuntimeError> {
     env.get_context::<ModControl>(MOD_CONTROL)?
         .acting_manager
-        .dump_trace(None)
+        .dump_trace(Some(
+            format!("{}/traces", OMPAS_WORKING_DIR.get_ref()).into(),
+        ))
         .await;
 
     Ok(())

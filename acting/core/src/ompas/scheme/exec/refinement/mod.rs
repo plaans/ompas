@@ -8,7 +8,7 @@ use crate::ompas::interface::select_mode::{Planner, SelectMode};
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::interval::Interval;
-use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
+use crate::ompas::manager::acting::process::task::{RefinementTrace, Selected};
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::acting::{ActingManager, ActingProcessId, MethodModel};
 use crate::ompas::manager::clock::ClockManager;
@@ -20,7 +20,7 @@ use crate::ompas::scheme::exec::acting_context::ModActingContext;
 use crate::ompas::scheme::exec::refinement::aries::aries_select;
 use crate::ompas::scheme::exec::refinement::c_choice::c_choice_select;
 use crate::ompas::scheme::exec::refinement::rae_plan::rae_plan_select;
-use crate::ompas::scheme::exec::state::{instance, ModState};
+use crate::ompas::scheme::exec::state::{instances, ModState};
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
 use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
@@ -30,9 +30,7 @@ use ompas_middleware::logger::LogClient;
 use rand::prelude::SliceRandom;
 use sompas_core::eval;
 use sompas_core::modules::list::cons;
-use sompas_language::time::MOD_TIME;
 use sompas_macros::async_scheme_fn;
-use sompas_modules::time::ModTime;
 use sompas_modules::utils::enumerate;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
@@ -80,7 +78,7 @@ impl From<ModRefinement> for LModule {
             LAMBDA___GET_PRECONDITIONS__,
             DOC___GET_PRECONDITIONS__,
         );
-        module.add_lambda(__GET_SCORE__, LAMBDA___GET_SCORE__, DOC___GET_SCORE__);
+        /*module.add_lambda(__GET_SCORE__, LAMBDA___GET_SCORE__, DOC___GET_SCORE__);
         module.add_lambda(
             __GET_COMMAND_MODEL__,
             LAMBDA___GET_COMMAND_MODEL__,
@@ -111,7 +109,7 @@ impl From<ModRefinement> for LModule {
             __R_TEST_METHOD__,
             LAMBDA_R_TEST_METHOD,
             DOC___R_TEST_METHOD__,
-        );
+        );*/
 
         module
     }
@@ -133,8 +131,8 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         ProcessRef::Id(id) => {
             if acting_manager.get_kind(id).await == ProcessKind::Method {
                 acting_manager
-                    .new_action(
-                        Label::Action(acting_manager.get_number_subtask(*id).await),
+                    .new_task(
+                        Label::Task(acting_manager.get_number_subtask(*id).await),
                         id,
                         args,
                         debug,
@@ -153,9 +151,9 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
                 id
             }
             None => match labels[0] {
-                Label::Action(s) => {
+                Label::Task(s) => {
                     acting_manager
-                        .new_action(Label::Action(s), id, args, debug, ProcessOrigin::Execution)
+                        .new_task(Label::Task(s), id, args, debug, ProcessOrigin::Execution)
                         .await
                 }
                 _ => panic!(),
@@ -168,36 +166,35 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     log.debug(format!("({task_id}) Refine {debug} "));
 
     acting_manager.set_start(&task_id, None).await;
-    let sr: SelectResponse = select(task_id, env)
+
+    let rt: RefinementTrace = select(task_id, env)
         .await
         .map_err(|e: LRuntimeError| e.chain("select"))?;
 
-    check_select_response(env, ctx, &task_id, sr)
+    check_refinement_trace(env, ctx, &task_id, rt)
         .await
-        .map_err(|e| e.chain("check_select_response"))
+        .map_err(|e| e.chain("check_refinement_trace"))
 }
 
-async fn check_select_response(
+async fn check_refinement_trace(
     env: &LEnv,
     ctx: &ModRefinement,
     task_id: &ActingProcessId,
-    sr: SelectResponse,
+    mut rt: RefinementTrace,
 ) -> LResult {
     let log = ctx.log.clone();
     let acting_manager = &ctx.acting_manager;
     let debug = acting_manager.get_debug(task_id).await.unwrap();
-    let method_id = match sr {
-        SelectResponse::Planned(refinement_id) => {
+    let method_id = match &rt.selected {
+        Selected::Anticipated(refinement_id) => {
             let method_debug = acting_manager.get_debug(&refinement_id).await.unwrap();
             log.debug(format!(
                 "({task_id}) Chose planned refinement for {debug}: ({refinement_id}) {method_debug}"
             ));
-            refinement_id
+            *refinement_id
         }
-        SelectResponse::Generated(r) => {
-            let method = r.method_value.clone();
-
-            if method == LValue::Nil {
+        Selected::Generated(method, _) => {
+            if method == &LValue::Nil {
                 log.error(format!(
                     "({task_id}) No applicable method for task {debug}({task_id})"
                 ));
@@ -224,7 +221,7 @@ async fn check_select_response(
                         task_id,
                         debug,
                         args,
-                        MethodModel::Raw(method, p_env),
+                        MethodModel::Raw(method.clone(), p_env),
                         ProcessOrigin::Execution,
                     )
                     .await
@@ -232,8 +229,10 @@ async fn check_select_response(
         }
     };
 
+    rt.duration.set_end(acting_manager.clock_manager.now());
+
     acting_manager
-        .set_executed_refinement(task_id, &method_id)
+        .set_executed_refinement(task_id, &method_id, rt)
         .await;
 
     let program = acting_manager.get_om_lvalue(&method_id).await;
@@ -286,8 +285,8 @@ pub async fn _retry(env: &LEnv, err: LValue) -> LResult {
     log.error(format!("({task_id}) Failed {debug}: {}", err));
     if let Some(refinement_id) = acting_manager.get_last_executed_refinement(&task_id).await {
         acting_manager.set_failed_method(&refinement_id).await;
-        let sr: SelectResponse = select(task_id, env).await?;
-        check_select_response(env, ctx, &task_id, sr).await
+        let rt: RefinementTrace = select(task_id, env).await?;
+        check_refinement_trace(env, ctx, &task_id, rt).await
     } else {
         println!(
             "Attempt retry when there were no previous refinement for {}",
@@ -299,16 +298,15 @@ pub async fn _retry(env: &LEnv, err: LValue) -> LResult {
     }
 }
 
-pub enum SelectResponse {
-    Planned(ActingProcessId),
-    Generated(RefinementInner),
-}
-
-pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectResponse, LRuntimeError> {
+pub async fn select(
+    task_id: ActingProcessId,
+    env: &LEnv,
+) -> Result<RefinementTrace, LRuntimeError> {
     /*
     Each function return an ordered list of methods
      */
     let mod_refinement = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
+    let duration = Interval::new_instant(mod_refinement.clock_manager.now());
     let log = mod_refinement.log.clone();
     let acting_manager = &mod_refinement.acting_manager;
     let task: Vec<LValue> = acting_manager
@@ -317,90 +315,111 @@ pub async fn select(task_id: ActingProcessId, env: &LEnv) -> Result<SelectRespon
         .iter()
         .map(|cst| LValue::from(cst.clone()))
         .collect();
-    let debug: String = acting_manager.get_debug(&task_id).await.unwrap();
     let state: WorldStateSnapshot = mod_refinement.acting_manager.state.get_snapshot().await;
-    let select_mode: SelectMode = mod_refinement.options.get_select_mode().await;
+
+    let mut candidates = applicable(&state, &task, env).await?;
 
     let tried: Vec<LValue> = acting_manager.get_tried(&task_id).await;
 
-    let greedy_refinement: RefinementInner = greedy_select(&state, &tried, &task, env)
-        .await
-        .map_err(|e| e.chain("greedy_select"))?;
+    candidates.retain(|m| !tried.contains(m));
+
+    log.debug(format!(
+        "({}) Candidates = {}",
+        task_id,
+        LValue::from(&candidates),
+    ));
 
     let planned_refinement: Option<ActingProcessId> =
         acting_manager.get_last_planned_refinement(&task_id).await;
 
-    match planned_refinement {
-        Some(refinement) => {
-            let lv: LValue = acting_manager.get_refinement_lv(&refinement).await;
-            let possibilities = &greedy_refinement.possibilities;
+    let mut selected = if let Some(refinement) = planned_refinement {
+        let lv: LValue = acting_manager.get_refinement_lv(&refinement).await;
+        log.debug(format!(
+            "({task_id}) Select found planned refinement: ({refinement}) {};",
+            lv,
+        ));
+        if candidates.contains(&lv) {
             log.debug(format!(
-                "({task_id}) Select found planned refinement: ({refinement}) {}; possibilities: {}",
-                lv,
-                LValue::from(possibilities)
+                "({task_id}) Valid planned refinement ({refinement}) {lv}"
             ));
-            if possibilities.contains(&lv) {
-                log.debug(format!(
-                    "({task_id}) Valid planned refinement ({refinement}) {lv}"
-                ));
-                Ok(SelectResponse::Planned(refinement))
-            } else {
-                log.warn(format!(
-                    "({task_id}) Unvalid planned refinement ({refinement}) {lv}"
-                ));
-                Ok(SelectResponse::Generated(greedy_refinement))
-            }
+            Some(Selected::Anticipated(refinement))
+        } else {
+            log.warn(format!(
+                "({task_id}) Unvalid planned refinement ({refinement}) {lv}"
+            ));
+            None
         }
-        None => {
-            let rt: RefinementInner = match select_mode {
+    } else {
+        None
+    };
+
+    selected = if selected.is_none() {
+        let select_mode: SelectMode = mod_refinement.options.get_select_mode().await;
+
+        Some(Selected::Generated(
+            match select_mode {
                 SelectMode::Greedy => {
                     /*
                     Returns all applicable methods sorted by their score
                      */
-
-                    log.debug(format!("({task_id}) Select greedy",));
-                    greedy_refinement
+                    greedy_select(&candidates, &state, env)?
                 }
+                SelectMode::Random => random_select(&candidates, &state, env)?,
+                SelectMode::Score => score_select(&candidates, &state, env).await?,
                 SelectMode::Planning(Planner::Aries(bool)) => {
-                    log.debug(format!("({task_id}) Select with aries for {debug}"));
-                    aries_select(&state, greedy_refinement, env, bool)
+                    aries_select(&candidates, &state, env, bool)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
                 }
                 SelectMode::Planning(Planner::CChoice(config)) => {
-                    log.debug(format!("({task_id}) select with c-choice for {debug}"));
-                    c_choice_select(&state, greedy_refinement, env, config)
+                    c_choice_select(&candidates, &state, env, config)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
                 }
                 SelectMode::Planning(Planner::RAEPlan(config)) => {
-                    log.debug(format!("({task_id}) select with c-choice for {debug}"));
-                    rae_plan_select(&state, greedy_refinement, env, config)
+                    rae_plan_select(&candidates, &state, env, config)
                         .await
                         .map_err(|e| e.chain("planning_select"))?
                 }
-                _ => todo!(),
-            };
+                SelectMode::Heuristic
+                | SelectMode::Learning
+                | SelectMode::Planning(Planner::UPOM) => {
+                    todo!()
+                }
+            },
+            select_mode,
+        ))
+    } else {
+        selected
+    };
 
-            /*log.debug(format!(
-                "Sorted_methods for {}({}): {}",
-                debug,
-                task_id,
-                LValue::from(&rt.possibilities)
-            ))
-            .await;*/
+    let rt = RefinementTrace {
+        selected: selected.unwrap(),
+        candidates,
+        duration,
+    };
 
-            Ok(SelectResponse::Generated(rt))
-        }
-    }
+    log.debug(format!("({task_id}) selected: {}", rt.selected));
+
+    Ok(rt)
 }
 
-pub async fn greedy_select(
+pub async fn candidates(
     state: &WorldStateSnapshot,
     tried: &[LValue],
     task: &[LValue],
     env: &LEnv,
-) -> lruntimeerror::Result<RefinementInner> {
+) -> lruntimeerror::Result<Vec<LValue>> {
+    let mut applicable = applicable(state, task, env).await?;
+    applicable.retain(|m| !tried.contains(m));
+    Ok(applicable)
+}
+
+pub async fn applicable(
+    state: &WorldStateSnapshot,
+    task: &[LValue],
+    env: &LEnv,
+) -> lruntimeerror::Result<Vec<LValue>> {
     /*
     Steps:
     - Create a new entry in the agenda
@@ -410,16 +429,12 @@ pub async fn greedy_select(
     - Return (best_method, task_id)
      */
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
-    let time = env.get_context::<ModTime>(MOD_TIME)?;
-
-    //println!("task to test in greedy: {}", LValue::from(task.clone()));
-    let start = time.get_micros().await;
 
     let task_label = task[0].to_string();
     //let task_string = LValue::from(task.clone()).to_string();
     let params: Vec<LValue> = task[1..].iter().map(|lv| list![lv.clone()]).collect();
 
-    let mut applicable_methods: Vec<(LValue, i64)> = vec![];
+    let mut applicable_methods: Vec<LValue> = vec![];
 
     let mut env = env.clone();
 
@@ -437,33 +452,18 @@ pub async fn greedy_select(
             .parameters
             .get_types_as_lvalue()
             .try_into()?;
-        /*let types: Vec<LValue> = get(
-            env,
-            &[
-                env.get_symbol(RAE_METHOD_TYPES_MAP).unwrap(),
-                template.clone(),
-            ],
-        )?
-        .try_into()?;*/
 
-        let score_lambda = method_template.lambda_score.clone();
         let pre_conditions_lambda = method_template.lambda_pre_conditions.clone();
 
         let mut instances_template = vec![template.into()];
         instances_template.append(&mut params.clone());
 
         for t in &types[params.len()..] {
-            instances_template.push(instance(env, &[t.clone()]).await?);
+            instances_template.push(instances(env, &[t.clone()]).await?);
         }
 
         let mut instances_template: Vec<LValue> =
             enumerate(env, &instances_template)?.try_into()?;
-
-        /*println!(
-            "instances for template {}: {}",
-            template,
-            LValue::from(instances_template.clone())
-        );*/
 
         let iter = instances_template.drain(..);
 
@@ -479,43 +479,72 @@ pub async fn greedy_select(
             .await
             .map_err(|e: LRuntimeError| e.chain(format!("eval pre_conditions: {}", arg_debug)))?;
             if !matches!(lv, LValue::Err(_)) {
-                let arg = cons(env, &[score_lambda.clone(), i_vec[1..].into()])?;
-                let arg_debug = arg.to_string();
-                let score: i64 = eval(
-                    &list!(LPrimitive::Enr.into(), list!(LPrimitive::Quote.into(), arg)),
-                    &mut env.clone(),
-                    None,
-                )
-                .await
-                .map_err(|e: LRuntimeError| e.chain(format!("eval score: {}", arg_debug)))?
-                .try_into()?;
-                applicable_methods.push((i, score))
+                applicable_methods.push(i);
             }
         }
     }
 
-    /*
-    Sort the list
-     */
-    let (methods, chosen) = {
-        let mut rng = rand::thread_rng();
-        applicable_methods.shuffle(&mut rng);
-        applicable_methods.sort_by_key(|a| a.1);
-        applicable_methods.reverse();
-        let mut methods: Vec<_> = applicable_methods.drain(..).map(|a| a.0).collect();
-        methods.retain(|m| !tried.contains(m));
-        let chosen = methods.get(0).cloned().unwrap_or(LValue::Nil);
-        (methods, chosen)
-    };
-    let interval = Interval::new(start, Some(ctx.clock_manager.now()));
-    Ok(RefinementInner {
-        task_value: task.into(),
-        method_value: chosen,
-        interval,
-        possibilities: methods,
-        select: SelectTrace::RealTime(RTSelect {
-            refinement_type: SelectMode::Greedy,
-        }),
-        tried: tried.to_vec(),
-    })
+    Ok(applicable_methods)
+}
+
+pub async fn score_select(
+    candidates: &[LValue],
+    state: &WorldStateSnapshot,
+    env: &LEnv,
+) -> lruntimeerror::Result<LValue> {
+    let mut tuple: Vec<(&LValue, i64)> = vec![];
+
+    let domain = env.get_context::<ModExec>(MOD_EXEC)?.domain.clone();
+
+    let mut env = env.clone();
+    env.update_context(ModState::new_from_snapshot(state.clone()));
+
+    for candidate in candidates {
+        let LValue::List(list) = &candidate else {
+            unreachable!()
+        };
+
+        let score_lambda = domain
+            .get_method(&list[0].to_string())
+            .await
+            .unwrap()
+            .lambda_score
+            .clone();
+
+        let arg = cons(&env, &[score_lambda, list[1..].into()])?;
+        let arg_debug = arg.to_string();
+        let score: i64 = eval(
+            &list!(LPrimitive::Enr.into(), list!(LPrimitive::Quote.into(), arg)),
+            &mut env.clone(),
+            None,
+        )
+        .await
+        .map_err(|e: LRuntimeError| e.chain(format!("eval score: {}", arg_debug)))?
+        .try_into()?;
+
+        tuple.push((candidate, score));
+    }
+
+    tuple.sort_by_key(|(_, s)| *s);
+
+    Ok(tuple.last().map(|e| e.0.clone()).unwrap())
+}
+
+pub fn random_select(
+    candidates: &[LValue],
+    _: &WorldStateSnapshot,
+    _: &LEnv,
+) -> lruntimeerror::Result<LValue> {
+    let mut rng = rand::thread_rng();
+    let mut candidates: Vec<&LValue> = candidates.iter().map(|lv| lv).collect();
+    candidates.shuffle(&mut rng);
+    Ok(candidates.get(0).cloned().unwrap_or(&LValue::Nil).clone())
+}
+
+pub fn greedy_select(
+    candidates: &[LValue],
+    _: &WorldStateSnapshot,
+    _: &LEnv,
+) -> lruntimeerror::Result<LValue> {
+    Ok(candidates.get(0).cloned().unwrap_or(LValue::Nil))
 }

@@ -1,20 +1,17 @@
 use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
-use crate::ompas::interface::select_mode::{CChoiceConfig, Planner, SelectMode};
-use crate::ompas::manager::acting::process::task::{RTSelect, RefinementInner, SelectTrace};
+use crate::ompas::interface::select_mode::CChoiceConfig;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
-use crate::ompas::scheme::exec::refinement::greedy_select;
+use crate::ompas::scheme::exec::refinement::{applicable, greedy_select};
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::exec::ModExec;
 use ompas_language::exec::c_choice::*;
 use ompas_language::exec::state::MOD_STATE;
-use ompas_language::exec::MOD_EXEC;
 use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
 use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
-use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror;
@@ -200,9 +197,7 @@ pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE)?;
     let level = ctx.level.load(Ordering::Relaxed);
 
-    let mut methods: Vec<LValue> = greedy_select(&state, &ctx.tried, task, env)
-        .await?
-        .possibilities;
+    let mut methods: Vec<LValue> = applicable(&state, task, env).await?;
     if let Some(b) = ctx.config.get_b() {
         if b < methods.len() {
             async {
@@ -308,34 +303,36 @@ pub async fn c_choice_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
 }
 
 pub async fn c_choice_select(
+    candidates: &[LValue],
     state: &WorldStateSnapshot,
-    mut greedy: RefinementInner,
     env: &LEnv,
     config: CChoiceConfig,
-) -> lruntimeerror::Result<RefinementInner> {
+) -> lruntimeerror::Result<LValue> {
     let new_env = env.clone();
     let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE).unwrap();
+    //
+    // let mut new_env: LEnv = c_choice_env(new_env, &ctx.domain.get_inner().await).await;
+    // new_env.import_module(
+    //     ModCChoice::new_from_tried(greedy.tried.to_vec(), 0),
+    //     WithoutPrefix,
+    // );
+    // new_env.update_context(ModState::new_from_snapshot(state.clone()));
+    //
+    // greedy.select = SelectKind::RealTime(RTSelect {
+    //     refinement_type: SelectMode::Planning(Planner::CChoice(config)),
+    // });
+    // let method: LValue = eval(&greedy.task_value, &mut new_env, None).await?;
+    //
+    // let now = env
+    //     .get_context::<ModExec>(MOD_EXEC)
+    //     .unwrap()
+    //     .acting_manager
+    //     .clock_manager
+    //     .now();
+    // greedy.selected = method;
+    // greedy.duration.set_end(now);
+    //
+    // Ok(greedy)
 
-    let mut new_env: LEnv = c_choice_env(new_env, &ctx.domain.get_inner().await).await;
-    new_env.import_module(
-        ModCChoice::new_from_tried(greedy.tried.to_vec(), 0),
-        WithoutPrefix,
-    );
-    new_env.update_context(ModState::new_from_snapshot(state.clone()));
-
-    greedy.select = SelectTrace::RealTime(RTSelect {
-        refinement_type: SelectMode::Planning(Planner::CChoice(config)),
-    });
-    let method: LValue = eval(&greedy.task_value, &mut new_env, None).await?;
-
-    let now = env
-        .get_context::<ModExec>(MOD_EXEC)
-        .unwrap()
-        .acting_manager
-        .clock_manager
-        .now();
-    greedy.method_value = method;
-    greedy.interval.set_end(now);
-
-    Ok(greedy)
+    greedy_select(candidates, state, env)
 }

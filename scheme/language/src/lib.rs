@@ -636,8 +636,8 @@ pub mod set {
     pub const GET: &str = "get";
     pub const DOC_GET: &str= "Get an element in a list or a map. See get-list and get-map for specific behavior documentation.";
 
-    pub const EMPTY: &str = "empty";
-    pub const DOC_EMPTY: &str = "Return true if the a list or map is empty.";
+    pub const IS_EMPTY: &str = "empty?";
+    pub const DOC_IS_EMPTY: &str = "Return true if the a list or map is empty.";
 
     pub const LEN: &str = "len";
     pub const DOC_LEN: &str = "Return the number of element in a list or a map.";

@@ -14,7 +14,9 @@ use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::manager::state::{StateManager, StateType};
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::planning::conversion::context::ConversionContext;
+use ompas_language::exec::state::EFFECT;
 use ompas_language::monitor::model::*;
+use ompas_middleware::logger::LogClient;
 use sompas_core::modules::list::{car, cons, first};
 use sompas_core::{eval, expand, get_root_env, parse};
 use sompas_language::kind::*;
@@ -38,6 +40,7 @@ pub struct ModModel {
     empty_env: LEnv,
     domain_description: InitScheme,
     domain: DomainManager,
+    log: LogClient,
 }
 
 impl ModModel {
@@ -49,6 +52,7 @@ impl ModModel {
             empty_env: monitor.empty_env.clone(),
             domain_description: monitor.platform.domain().into(),
             domain: monitor.acting_manager.domain.clone(),
+            log: monitor.log.clone(),
         }
     }
 
@@ -405,7 +409,7 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
             let mut str_effects = "(do".to_string();
             if let LValue::List(effects) = effects {
                 for effect in effects.iter() {
-                    let cons = cons(env, &["assert".into(), effect.into()])?;
+                    let cons = cons(env, &[EFFECT.into(), effect.into()])?;
                     str_effects.push_str(cons.to_string().as_str());
                 }
                 str_effects.push(')');
@@ -653,13 +657,15 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
         .to_string();
     //Definition of the method
     let mut method = Method {
-        label,
+        label: label.to_string(),
         task_label,
         parameters: Parameters::try_from_lvalue(&parameters, &st).await?,
         ..Default::default()
     };
     let conds = match map.get(&PRE_CONDITIONS.into()) {
         None => {
+            ctx.log
+                .warn(format!("{} is undefined for {}", PRE_CONDITIONS, label));
             let test = generate_test_type_expr(env, &[parameters.clone()]).await?;
             let expr = format!(
                 "(lambda {} (do {}))",
@@ -692,6 +698,8 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
 
     let score = match map.get(&SCORE.into()) {
         None => {
+            ctx.log
+                .warn(format!("{} is undefined for {}", SCORE, label));
             let expr = format!("(lambda {} 0)", method.parameters.get_params_as_lvalue(),);
             eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
         }
@@ -1099,7 +1107,7 @@ mod test {
                             (:body
                                 (do
                                     (check (> (robot.battery ?r) 0.4))
-                                    (assert (robot.busy ?r) true))))",
+                                    (effect (robot.busy ?r) true))))",
             expected: "(add-command-model
                          (map '(
                             (:name pick) 
@@ -1107,7 +1115,7 @@ mod test {
                             (:params ((?obj object) (?room object) (?gripper object)))
                             (:body ((do 
                               (check (> (robot.battery ?r) 0.4)) 
-                              (assert (robot.busy ?r) true)))))))",
+                              (effect (robot.busy ?r) true)))))))",
             result: "nil",
         };
 

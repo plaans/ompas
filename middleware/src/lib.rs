@@ -19,7 +19,7 @@ use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 pub mod logger;
 const TOKIO_CHANNEL_SIZE: usize = 100;
 
-pub static OMPAS_OUTPUT_PATH: EnvParam<String> = EnvParam::new("OMPAS_OUTPUT_PATH", "/tmp/");
+pub static OMPAS_WORKING_DIR: EnvParam<String> = EnvParam::new("OMPAS_WORKING_DIR", "/tmp");
 
 lazy_static! {
     static ref MASTER: Master = Master::new();

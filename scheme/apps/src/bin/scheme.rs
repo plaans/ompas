@@ -32,7 +32,7 @@ async fn main() {
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
     if opt.debug {
-        Master::set_log_level(LogLevel::Debug).await
+        Master::set_log_level(LogLevel::Trace).await
     }
 
     //test_lib_model(&opt);

@@ -12,10 +12,11 @@ use crate::ompas::manager::acting::acting_var::{
 };
 use crate::ompas::manager::acting::interval::{Interval, Timepoint};
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
-use crate::ompas::manager::acting::process::action::ActionProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
+use crate::ompas::manager::acting::process::command::CommandProcess;
 use crate::ompas::manager::acting::process::refinement::RefinementProcess;
 use crate::ompas::manager::acting::process::root_task::RootProcess;
+use crate::ompas::manager::acting::process::task::{RefinementTrace, TaskProcess};
 use crate::ompas::manager::acting::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
 use crate::ompas::manager::acting::{AMId, ActingProcessId, MethodModel};
 use crate::ompas::manager::clock::ClockManager;
@@ -25,6 +26,7 @@ use crate::ompas::manager::planning::planner_manager_interface::PlannerManagerIn
 use crate::ompas::manager::planning::problem_update::{PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
+use crate::ompas::manager::state::action_status::ProcessStatus::Running;
 use crate::planning::conversion::_convert;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::p_eval;
@@ -36,7 +38,7 @@ use aries_planning::chronicles::{ChronicleOrigin, TaskId};
 use chrono::{DateTime, Utc};
 use im::HashSet;
 use ompas_language::supervisor::*;
-use ompas_middleware::OMPAS_OUTPUT_PATH;
+use ompas_middleware::OMPAS_WORKING_DIR;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::any::Any;
@@ -47,11 +49,6 @@ use std::fs::{File, OpenOptions};
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
 use tokio::sync::{broadcast, watch};
-
-const COLOR_PLANNING: &str = "grey";
-const COLOR_PLANNING_SUGGESTED: &str = "blue";
-const COLOR_EXECUTION: &str = "red";
-//const COLOR_DEFAULT: &str = "black";
 
 const TASK_NAME: &str = "task_name";
 const TASK_STATUS: &str = "task_status";
@@ -70,8 +67,9 @@ pub enum ProcessKind {
     Method,
     Acquire,
     Arbitrary,
-    Action,
-    RootTask,
+    Task,
+    Command,
+    Root,
     AbstractModel,
 }
 
@@ -81,11 +79,12 @@ impl Display for ProcessKind {
             f,
             "{}",
             match self {
-                ProcessKind::Action => ACTION,
+                ProcessKind::Task => TASK,
+                ProcessKind::Command => COMMAND,
                 ProcessKind::Method => METHOD,
                 ProcessKind::Acquire => ACQUIRE,
                 ProcessKind::Arbitrary => ARBITRARY,
-                ProcessKind::RootTask => ROOT_TASK,
+                ProcessKind::Root => ROOT_TASK,
                 ProcessKind::AbstractModel => ABSTRACT_MODEL,
             }
         )
@@ -137,7 +136,7 @@ impl InnerActingManager {
         ));
         self.acting_vars.set_execution_val(&start, now);
 
-        let root = ActingProcess::new(
+        let mut root = ActingProcess::new(
             0,
             0,
             None,
@@ -148,6 +147,7 @@ impl InnerActingManager {
             end,
             RootProcess::new(),
         );
+        root.status = Running(None);
         self.processes = vec![root];
         self.models = vec![model];
     }
@@ -209,7 +209,7 @@ impl InnerActingManager {
                 while let Some(label) = labels.pop() {
                     let obj = &self.processes[id];
                     match &label {
-                        Label::Action(s) => {
+                        Label::Task(s) => {
                             if id == 0 {
                                 id = obj.inner.as_root().unwrap().nth_task(*s)?;
                             } else {
@@ -254,6 +254,21 @@ impl InnerActingManager {
                         }
                         Label::AbstractModel => {
                             id = obj.inner.as_action().unwrap().abstract_model?;
+                        }
+                        Label::Command(_) => {
+                            id = if let Some(id) = obj
+                                .inner
+                                .as_method()
+                                .unwrap_or_else(|| {
+                                    panic!("{id} is not a method but a {}.", obj.inner.kind())
+                                })
+                                .childs
+                                .get(&label)
+                            {
+                                *id
+                            } else {
+                                return None;
+                            }
                         }
                     }
                 }
@@ -361,7 +376,7 @@ impl InnerActingManager {
         let end = self.processes[*id].end.clone();
         self.set_execution_val(&end, instant);
 
-        if self.get_kind(id) == ProcessKind::Action {
+        if self.get_kind(id) == ProcessKind::Task {
             if let Some(refinement) = self.processes[*id]
                 .inner
                 .as_action()
@@ -411,7 +426,7 @@ impl InnerActingManager {
 
     pub fn set_status(&mut self, id: &ActingProcessId, status: ProcessStatus) {
         self.processes[*id].set_status(status);
-        if self.get_kind(id) == ProcessKind::Action {
+        if self.get_kind(id) == ProcessKind::Task {
             if let Some(refinement) = self.processes[*id]
                 .inner
                 .as_action()
@@ -450,7 +465,7 @@ impl InnerActingManager {
         let rank = root.n_task();
         root.add_top_level_task(id);
 
-        let label = Label::Action(rank);
+        let label = Label::Task(rank);
         self.processes.push(ActingProcess::new(
             id,
             0,
@@ -460,15 +475,14 @@ impl InnerActingManager {
             Some(debug),
             start,
             end,
-            ActionProcess::new(new_args),
+            TaskProcess::new(new_args),
         ));
         self.notify_planner(PlannerUpdate::ProblemUpdate(id));
 
         ProcessRef::Relative(0, vec![label])
     }
 
-    //Task methods
-    pub fn new_action(
+    pub fn new_command(
         &mut self,
         label: Label,
         parent: &ActingProcessId,
@@ -524,7 +538,79 @@ impl InnerActingManager {
             Some(debug),
             start,
             end,
-            ActionProcess::new(name),
+            CommandProcess::new(name),
+        ));
+
+        self.processes[*parent]
+            .inner
+            .as_mut_method()
+            .unwrap()
+            .add_process(label, id);
+        if origin != ProcessOrigin::Planner {
+            /*self.notify_planner(ActingUpdateNotification::NewProcess(id))
+            .await;*/
+        }
+        id
+    }
+
+    //Task methods
+    pub fn new_task(
+        &mut self,
+        label: Label,
+        parent: &ActingProcessId,
+        mut args: Vec<Option<Cst>>,
+        debug: String,
+        origin: ProcessOrigin,
+    ) -> ActingProcessId {
+        let id = self.processes.len();
+
+        let om_id = self.processes[*parent].am_id();
+        let model = &self.models[om_id];
+        let (start, end, name) = if let Some(chronicle) = &model.chronicle {
+            let binding = chronicle
+                .acting_process_models
+                .get_process_model(label)
+                .unwrap()
+                .as_action()
+                .unwrap()
+                .clone();
+            let name = binding.task.name;
+            let start = self.new_acting_var_with_ref(&binding.task.interval.get_start(), &om_id);
+            let end = self.new_acting_var_with_ref(&binding.task.interval.get_end(), &om_id);
+            let mut new_name = vec![];
+
+            for (cst, var_id) in args.drain(..).zip(name) {
+                let arg = self.new_acting_var_with_ref(&var_id, &om_id);
+                if let Some(val) = cst {
+                    self.set_val(&arg, val, origin);
+                }
+                new_name.push(arg)
+            }
+            (start, end, new_name)
+        } else {
+            let start = self.new_acting_var();
+            let end = self.new_acting_var();
+            let mut new_name = vec![];
+            for cst in args {
+                let arg = self.new_acting_var();
+                if let Some(val) = cst {
+                    self.set_val(&arg, val, origin);
+                }
+                new_name.push(arg)
+            }
+            (start, end, new_name)
+        };
+
+        self.processes.push(ActingProcess::new(
+            id,
+            *parent,
+            Some(label),
+            origin,
+            om_id,
+            Some(debug),
+            start,
+            end,
+            TaskProcess::new(name),
         ));
 
         self.processes[*parent]
@@ -621,13 +707,18 @@ impl InnerActingManager {
         self.new_refinement(&parent);
     }
 
-    pub fn set_executed_refinement(&mut self, action: &ActingProcessId, method: &ActingProcessId) {
+    pub fn set_executed_refinement(
+        &mut self,
+        action: &ActingProcessId,
+        method: &ActingProcessId,
+        refinement_trace: RefinementTrace,
+    ) {
         let refinement_label = self.processes[*method].inner.as_method().unwrap().label;
         self.processes[*action]
             .inner
             .as_mut_action()
             .unwrap()
-            .set_executed(refinement_label.refinement_id, method);
+            .set_executed(refinement_label.refinement_id, method, refinement_trace);
         let instant = self.clock_manager.now();
         if self.get_status(action) != ProcessStatus::Pending {
             self.set_status(action, ProcessStatus::Running(None));
@@ -844,7 +935,7 @@ impl InnerActingManager {
             (start, end, new_name)
         };
 
-        let action: &mut ActionProcess = self.processes[*parent].inner.as_mut_action().unwrap();
+        let action: &mut TaskProcess = self.processes[*parent].inner.as_mut_action().unwrap();
 
         action.add_method(label, &id);
         self.processes.push(ActingProcess::new(
@@ -1351,7 +1442,7 @@ impl InnerActingManager {
                         refinement_label,
                     );
                 }
-                ActingProcessInner::Action(a) => {
+                ActingProcessInner::Task(a) => {
                     //Verify if we take the model of the action or the refinement
                     if let Some(abstract_model) = &a.abstract_model {
                         //An abstract model is used, meaning that no subtask is present.
@@ -1403,38 +1494,86 @@ impl InnerActingManager {
         chronicles
     }
 
+    fn get_shape(ap: &ActingProcess) -> String {
+        let mut str = "shape=rectangle,".to_string();
+        match ap.status {
+            ProcessStatus::Pending | ProcessStatus::Planned => {
+                write!(str, "fillcolor=\"#ceceff\",")
+            }
+            Running(_) | ProcessStatus::Accepted => {
+                write!(str, "fillcolor=\"#ffffce\",")
+            }
+            ProcessStatus::Success => {
+                write!(str, "fillcolor=\"#ceffce\",")
+            }
+            ProcessStatus::Failure | ProcessStatus::Cancelled(_) | ProcessStatus::Rejected => {
+                write!(str, "fillcolor = \"#ffcece\",")
+            }
+        }
+        .unwrap();
+        match ap.inner {
+            ActingProcessInner::RootTask(_) => {
+                write!(
+                    str,
+                    "style=\"rounded, dashed, filled\", fillcolor=\"#cecece\""
+                )
+            }
+            ActingProcessInner::Task(_) => {
+                write!(str, "style=\"rounded, filled, dashed\"")
+            }
+            ActingProcessInner::AbstractModel(_) => {
+                todo!()
+            }
+            ActingProcessInner::Method(_) => {
+                write!(str, "style = \"dashed, filled\", peripheries=2")
+            }
+            ActingProcessInner::Arbitrary(_) => {
+                write!(str, "style=\"filled\"")
+            }
+            ActingProcessInner::Acquire(_) => {
+                write!(str, "style=\"filled\", peripheries=2")
+            }
+            ActingProcessInner::Command(_) => {
+                write!(str, "style=\"rounded, filled\"")
+            }
+        }
+        .unwrap();
+        str
+    }
+
     pub fn export_trace_dot_graph(&self) -> Dot {
         let mut dot: Dot = "digraph {\n".to_string();
-        let mut queue = vec![(0, COLOR_EXECUTION)];
+        let mut queue = vec![0];
 
-        while let Some((id, color)) = queue.pop() {
+        while let Some(id) = queue.pop() {
             let ap = &self.processes[id];
+            let shape = Self::get_shape(ap);
             let label = format_acting_process(&self.acting_vars, ap);
 
-            writeln!(dot, "P{id} [label = \"{label}\", color = {color}];").unwrap();
+            writeln!(dot, "P{id} [label = \"{label}\", {shape}];").unwrap();
             match &ap.inner {
                 ActingProcessInner::RootTask(rt) => {
                     for st in &rt.tasks {
                         writeln!(dot, "P{id} -> P{st};").unwrap();
-                        queue.push((*st, color))
+                        queue.push(*st)
                     }
                 }
-                ActingProcessInner::Action(t) => {
+                ActingProcessInner::Task(t) => {
                     for (_i, r) in t.refinements.iter().enumerate() {
                         if let Some(executed) = r.get_executed() {
                             writeln!(dot, "P{id} -> P{};", executed).unwrap();
-                            queue.push((*executed, color))
+                            queue.push(*executed)
                         } else {
                             let mut possibilites = r.get_possibilities();
                             if let Some(s) = r.get_suggested() {
                                 possibilites.retain(|&p| p != s);
                                 writeln!(dot, "P{id} -> P{};", s).unwrap();
-                                queue.push((*s, COLOR_PLANNING_SUGGESTED));
+                                queue.push(*s);
                             }
 
                             for p in possibilites {
                                 writeln!(dot, "P{id} -> P{};", p).unwrap();
-                                queue.push((*p, COLOR_PLANNING))
+                                queue.push(*p)
                             }
                         }
                     }
@@ -1442,11 +1581,12 @@ impl InnerActingManager {
                 ActingProcessInner::Method(m) | ActingProcessInner::AbstractModel(m) => {
                     for sub in m.childs.values() {
                         writeln!(dot, "P{id} -> P{sub};").unwrap();
-                        queue.push((*sub, color))
+                        queue.push(*sub)
                     }
                 }
                 ActingProcessInner::Arbitrary(_) => {}
                 ActingProcessInner::Acquire(_) => {}
+                ActingProcessInner::Command(_) => {}
             }
         }
 
@@ -1454,24 +1594,24 @@ impl InnerActingManager {
         dot
     }
 
-    pub fn dump_trace(&self, path: Option<PathBuf>) {
+    pub fn dump_acting_tree(&self, path: Option<PathBuf>) {
         let mut path = match path {
             None => "/tmp".into(),
             Some(p) => p,
         };
         let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
         let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-        path.push(format!("supervisor-trace_{}", string_date));
+        path.push(format!("acting_tree_{}", string_date));
         fs::create_dir_all(&path).unwrap();
 
         let mut path_dot = path.clone();
-        let dot_file_name = "trace.dot";
+        let dot_file_name = "acting_tree.dot";
         path_dot.push(dot_file_name);
         let mut file = File::create(&path_dot).unwrap();
         let dot = self.export_trace_dot_graph();
         file.write_all(dot.as_bytes()).unwrap();
         set_current_dir(&path).unwrap();
-        let trace = "trace.png";
+        let trace = "acting_tree.png";
         std::process::Command::new("dot")
             .args(["-Tpng", dot_file_name, "-o", trace])
             .spawn()
@@ -1480,7 +1620,7 @@ impl InnerActingManager {
             .unwrap();
 
         let mut md_path = path.clone();
-        let md_file_name = "trace.md";
+        let md_file_name = "acting_tree.md";
         md_path.push(md_file_name);
         let mut md_file = File::create(&md_path).unwrap();
         let md: String = format!(
@@ -1563,9 +1703,7 @@ impl InnerActingManager {
                                 self.processes[id].origin = ProcessOrigin::Planner;
                                 id
                             }
-                            _ => {
-                                self.new_action(label, &parent, args, debug, ProcessOrigin::Planner)
-                            }
+                            _ => self.new_task(label, &parent, args, debug, ProcessOrigin::Planner),
                         }
                     }
                 };
@@ -1615,7 +1753,7 @@ impl InnerActingManager {
                                     let debug = name.format(&st, true);
                                     let args: Vec<_> =
                                         name.iter().map(|var_id| st.var_as_cst(var_id)).collect();
-                                    let _id = self.new_action(
+                                    let _id = self.new_task(
                                         label,
                                         &method,
                                         args,
@@ -1714,7 +1852,7 @@ impl InnerActingManager {
                 dir_path.push(OMPAS_STATS);
                 dir_path
             }
-            None => format!("{}{}", OMPAS_OUTPUT_PATH.get_ref(), OMPAS_STATS).into(),
+            None => format!("{}/stats/{}", OMPAS_WORKING_DIR.get_ref(), OMPAS_STATS).into(),
         };
 
         fs::create_dir_all(&dir_path).expect("could not create stats directory");
@@ -1770,7 +1908,7 @@ fn format_acting_process(
     let mut f = String::new();
     write!(
         f,
-        "({}, {})[{},{}]",
+        "{}: ({}) [{},{}]",
         acting_process.id(),
         acting_process.status,
         planner_manager.format_acting_var(&acting_process.start),
@@ -1786,10 +1924,9 @@ fn format_acting_process(
         ActingProcessInner::RootTask(_) => {
             write!(f, "root").unwrap();
         }
-        ActingProcessInner::Action(_) => {
-            write!(f, "{}", debug).unwrap();
-        }
-        ActingProcessInner::Method(_) => {
+        ActingProcessInner::Task(_)
+        | ActingProcessInner::Method(_)
+        | ActingProcessInner::Command(_) => {
             write!(f, "{}", debug).unwrap();
         }
         ActingProcessInner::Arbitrary(arb) => {

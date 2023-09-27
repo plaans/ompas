@@ -532,7 +532,6 @@ pub async fn eval(
                         let mut r = results.pop_n(b.n);
                         scopes.revert_scope();
                         results.push(r.pop().unwrap());
-                        //debug.log_last_result(&results).await;
                     }
                     CoreOperatorFrame::Do(_) => {
                         scopes.revert_scope();
@@ -681,6 +680,7 @@ pub async fn eval(
                                 }
                                 LPrimitive::Quote => {
                                     results.push(args[0].clone());
+                                    debug.log_last_result(&results);
                                 }
                                 LPrimitive::Err => {
                                     results.push(LValue::Err(args[0].clone().into_ref()));
@@ -1030,6 +1030,7 @@ pub async fn eval(
                     scopes.revert_scope();
                 }
                 CoreOperatorFrame::Lambda => {
+                    debug.log_last_result(&results);
                     scopes.revert_scope();
                     scopes.revert_scope();
                 }
@@ -1085,7 +1086,6 @@ pub async fn eval(
                     };
                 }
                 CoreOperatorFrame::Eval => {
-                    //debug.print_last_result(&results);
                     queue.push(StackFrame::new(
                         CoreOperatorFrame::EvalEnd,
                         interruptibility,

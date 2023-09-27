@@ -18,7 +18,9 @@ pub enum ProcessStatus {
     Running(Option<f64>), //Progress of the action
     Success,              //True the action is a success, false the action is a failure
     Failure,
-    Cancelled(bool), //True the action has been successfully stopped, false it was a failure to cancel
+    Cancelled(bool),
+    Planned,
+    //True the action has been successfully stopped, false it was a failure to cancel
 }
 
 impl Display for ProcessStatus {
@@ -38,6 +40,7 @@ impl Display for ProcessStatus {
             ProcessStatus::Rejected => write!(f, "rejected"),
             ProcessStatus::Failure => write!(f, "failure"),
             ProcessStatus::Pending => write!(f, "pending"),
+            ProcessStatus::Planned => write!(f, "planned"),
         }
     }
 }

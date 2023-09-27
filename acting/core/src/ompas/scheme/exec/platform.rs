@@ -86,8 +86,8 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
         let command_id: ActingProcessId = match &pr {
             ProcessRef::Id(id) => {
                 acting_manager
-                    .new_action(
-                        Label::Action(acting_manager.get_number_subtask(*id).await),
+                    .new_command(
+                        Label::Command(acting_manager.get_number_subtask(*id).await),
                         id,
                         args,
                         debug,
@@ -100,7 +100,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                 Some(id) => id,
                 None => {
                     acting_manager
-                        .new_action(
+                        .new_command(
                             *labels.last().unwrap(),
                             id,
                             args,
@@ -111,6 +111,8 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                 }
             },
         };
+
+        acting_manager.set_start(&command_id, None).await;
 
         let mut rx: watch::Receiver<ProcessStatus> = acting_manager.subscribe(&command_id).await;
 
@@ -155,13 +157,6 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                                     .await;
                                 return Ok(RaeExecError::ActionFailure.into());
                             }
-                            ProcessStatus::Accepted => {}
-                            ProcessStatus::Pending => {
-                                //println!("not triggered");
-                            }
-                            ProcessStatus::Running(_) => {
-                                //println!("running");
-                            }
                             ProcessStatus::Failure => {
                                 log.error(format!("Command {command_id} is a failure."));
                                 mod_platform
@@ -186,6 +181,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
                                     .await;
                                 return Ok(true.into());
                             }
+                            _ => {}
                         }
                     }
                     Err(LRuntimeError::new(

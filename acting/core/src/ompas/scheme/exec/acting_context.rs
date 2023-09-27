@@ -39,10 +39,10 @@ pub async fn def_process_id(env: &mut LEnv, id: ActingProcessId) {
     env.update_context(ModActingContext::new(ProcessRef::Id(id)))
 }
 
-pub const ARBITRARY: &str = ompas_language::exec::ARBITRARY;
-pub const ACQUIRE: &str = ompas_language::exec::resource::ACQUIRE;
-pub const COMMAND: &str = "command";
-pub const SUBTASK: &str = "subtask";
+pub const ARBITRARY: &str = ompas_language::supervisor::ARBITRARY;
+pub const ACQUIRE: &str = ompas_language::supervisor::ACQUIRE;
+pub const COMMAND: &str = ompas_language::supervisor::COMMAND;
+pub const TASK: &str = ompas_language::supervisor::TASK;
 
 #[async_scheme_fn]
 pub async fn def_label(env: &mut LEnv, kind: String, id: usize) {
@@ -53,7 +53,8 @@ pub async fn def_label(env: &mut LEnv, kind: String, id: usize) {
     let label = match kind.as_str() {
         ARBITRARY => Label::Arbitrary(id),
         ACQUIRE => Label::ResourceAcquisition(id),
-        COMMAND | SUBTASK => Label::Action(id),
+        COMMAND => Label::Command(id),
+        TASK => Label::Task(id),
         _ => panic!("wrong label definition"),
     };
 
@@ -62,7 +63,7 @@ pub async fn def_label(env: &mut LEnv, kind: String, id: usize) {
         ProcessRef::Relative(id, labels) => {
             let mut new_labels = labels.clone();
             match labels.last().unwrap() {
-                Label::Refinement(..) | Label::Action(_) => {
+                Label::Refinement(..) | Label::Task(_) => {
                     new_labels.push(label);
                 }
                 _ => {

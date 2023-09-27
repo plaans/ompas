@@ -3,10 +3,11 @@ use crate::ompas::manager::acting::acting_var::{ActingVarCollection, ActingVarRe
 use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
-use crate::ompas::manager::acting::process::action::ActionProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
+use crate::ompas::manager::acting::process::command::CommandProcess;
 use crate::ompas::manager::acting::process::refinement::RefinementProcess;
 use crate::ompas::manager::acting::process::root_task::RootProcess;
+use crate::ompas::manager::acting::process::task::TaskProcess;
 use crate::ompas::manager::acting::{AMId, ActingProcessId};
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::action_status::ProcessStatus::Pending;
@@ -16,8 +17,8 @@ use tokio::sync::watch;
 
 pub mod acquire;
 
-pub mod action;
 pub mod arbitrary;
+pub mod command;
 pub mod refinement;
 pub mod root_task;
 pub mod task;
@@ -74,7 +75,8 @@ impl ActingProcess {
             }
             ActingProcessInner::Method(_)
             | ActingProcessInner::AbstractModel(_)
-            | ActingProcessInner::Action(_) => {
+            | ActingProcessInner::Task(_)
+            | ActingProcessInner::Command(_) => {
                 write!(f, "{}", debug).unwrap();
             }
             ActingProcessInner::Arbitrary(arb) => {
@@ -179,7 +181,8 @@ impl ActingProcess {
 
 pub enum ActingProcessInner {
     RootTask(RootProcess),
-    Action(ActionProcess),
+    Task(TaskProcess),
+    Command(CommandProcess),
     AbstractModel(RefinementProcess),
     Method(RefinementProcess),
     Arbitrary(ArbitraryProcess),
@@ -190,12 +193,15 @@ impl Display for ActingProcessInner {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ActingProcessInner::RootTask(r) => write!(f, "{r}"),
-            ActingProcessInner::Action(r) => write!(f, "{r}"),
+            ActingProcessInner::Task(r) => write!(f, "{r}"),
             ActingProcessInner::Method(r) => write!(f, "{r}"),
             ActingProcessInner::Arbitrary(r) => write!(f, "{r}"),
             ActingProcessInner::Acquire(r) => write!(f, "{r}"),
             ActingProcessInner::AbstractModel(r) => {
                 write!(f, "{r}")
+            }
+            ActingProcessInner::Command(c) => {
+                write!(f, "{c}")
             }
         }
     }
@@ -204,12 +210,13 @@ impl Display for ActingProcessInner {
 impl ActingProcessInner {
     pub fn kind(&self) -> ProcessKind {
         match self {
-            ActingProcessInner::RootTask(_) => ProcessKind::RootTask,
-            ActingProcessInner::Action(_) => ProcessKind::Action,
+            ActingProcessInner::RootTask(_) => ProcessKind::Root,
+            ActingProcessInner::Task(_) => ProcessKind::Task,
             ActingProcessInner::Method(_) => ProcessKind::Method,
             ActingProcessInner::Arbitrary(_) => ProcessKind::Arbitrary,
             ActingProcessInner::Acquire(_) => ProcessKind::Acquire,
             ActingProcessInner::AbstractModel(_) => ProcessKind::AbstractModel,
+            ActingProcessInner::Command(_) => ProcessKind::Command,
         }
     }
 
@@ -277,16 +284,16 @@ impl ActingProcessInner {
         }
     }
 
-    pub fn as_action(&self) -> Option<&ActionProcess> {
-        if let Self::Action(action) = self {
+    pub fn as_action(&self) -> Option<&TaskProcess> {
+        if let Self::Task(action) = self {
             Some(action)
         } else {
             None
         }
     }
 
-    pub fn as_mut_action(&mut self) -> Option<&mut ActionProcess> {
-        if let Self::Action(action) = self {
+    pub fn as_mut_action(&mut self) -> Option<&mut TaskProcess> {
+        if let Self::Task(action) = self {
             Some(action)
         } else {
             None

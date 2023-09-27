@@ -3,7 +3,7 @@ use crate::ompas::error::RaeExecError;
 use crate::ompas::interface::job::JobType;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::trigger_collection::Response;
-use crate::ompas::interface::trigger_collection::TaskTrigger;
+use crate::ompas::interface::trigger_collection::TaskProcess;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
@@ -136,7 +136,7 @@ pub async fn rae(
 
                         let response: Response = match job_type {
                             JobType::Task => {
-                                Response::Trigger(TaskTrigger::new(pr, async_handle))
+                                Response::Process(TaskProcess::new(pr, async_handle))
                             }
                             JobType::Debug => {
                                 Response::Handle(async_handle)

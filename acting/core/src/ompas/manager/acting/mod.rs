@@ -6,6 +6,7 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
+use crate::ompas::manager::acting::process::task::RefinementTrace;
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
@@ -97,7 +98,7 @@ impl ActingManager {
     }
 
     pub async fn dump_trace(&self, path: Option<PathBuf>) {
-        self.inner.read().await.dump_trace(path)
+        self.inner.read().await.dump_acting_tree(path)
     }
 
     pub async fn format_task_network(&self) -> String {
@@ -156,7 +157,7 @@ impl ActingManager {
     }
 
     //Task methods
-    pub async fn new_action(
+    pub async fn new_task(
         &self,
         label: Label,
         parent: &ActingProcessId,
@@ -167,7 +168,21 @@ impl ActingManager {
         self.inner
             .write()
             .await
-            .new_action(label, parent, args, debug, origin)
+            .new_task(label, parent, args, debug, origin)
+    }
+
+    pub async fn new_command(
+        &self,
+        label: Label,
+        parent: &ActingProcessId,
+        args: Vec<Option<Cst>>,
+        debug: String,
+        origin: ProcessOrigin,
+    ) -> ActingProcessId {
+        self.inner
+            .write()
+            .await
+            .new_command(label, parent, args, debug, origin)
     }
 
     pub async fn new_refinement(&self, parent: &ActingProcessId) -> usize {
@@ -246,11 +261,12 @@ impl ActingManager {
         &self,
         action: &ActingProcessId,
         method: &ActingProcessId,
+        refinement_trace: RefinementTrace,
     ) {
         self.inner
             .write()
             .await
-            .set_executed_refinement(action, method)
+            .set_executed_refinement(action, method, refinement_trace)
     }
 
     pub async fn get_last_planned_refinement(
@@ -296,7 +312,7 @@ impl ActingManager {
             .unwrap()
             .childs
             .keys()
-            .filter(|p| matches!(p, Label::Action(_)))
+            .filter(|p| matches!(p, Label::Task(_)))
             .count()
     }
 

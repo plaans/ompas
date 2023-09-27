@@ -1,10 +1,11 @@
+use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::planning::conversion::context::ConversionContext;
-use crate::planning::conversion::convert_acting_domain;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, PLEnv};
 use crate::planning::conversion::flow_graph::algo::p_eval::{p_eval, P_EVAL};
+use crate::planning::conversion::{convert_acting_domain, debug_with_markdown};
 use crate::planning::planner::problem::PlanningDomain;
 use chrono::{DateTime, Utc};
 use ompas_language::exec::refinement::EXEC_TASK;
@@ -43,8 +44,29 @@ impl From<ModDebugConversion> for LModule {
         m.add_async_fn(PRE_EVAL_TASK, pre_eval_task, DOC_PRE_EVAL_TASK, false);
         m.add_async_fn(PRE_EVAL_EXPR, pre_eval_expr, DOC_PRE_EVAL_EXPR, false);
         m.add_async_fn(ANNOTATE_TASK, annotate_task, DOC_ANNOTATE_TASK, false);
+        m.add_async_fn(TRANSLATE, translate, DOC_TRANSLATE, false);
         m
     }
+}
+
+#[async_scheme_fn]
+pub async fn translate(env: &LEnv, obj: String) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
+    let context: ConversionContext = ctx.get_conversion_context().await;
+    let pd: PlanningDomain = convert_acting_domain(&context).await?;
+
+    let ch = pd
+        .templates
+        .iter()
+        .find(|&ch| {
+            let ch = ch.chronicle.as_ref().unwrap();
+            let st = &ch.st;
+            ch.get_name().format(&st, true).contains(&obj)
+        })
+        .unwrap();
+    debug_with_markdown(&obj, &ch, "/tmp/".into(), true);
+
+    Ok(())
 }
 
 #[async_scheme_fn]

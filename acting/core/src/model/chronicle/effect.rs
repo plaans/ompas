@@ -8,7 +8,49 @@ use im::HashSet;
 pub struct Effect {
     pub interval: Interval,
     pub sv: Vec<VarId>,
-    pub value: VarId,
+    pub operation: EffectOperation,
+}
+
+#[derive(Copy, Clone)]
+pub struct EffectOperation {
+    pub var_id: VarId,
+    pub inner: EffectOperationInner,
+}
+#[derive(Copy, Clone)]
+pub enum EffectOperationInner {
+    Assign,
+    Increase,
+    Decrease,
+}
+
+impl EffectOperation {
+    pub fn get_ref(&self) -> &VarId {
+        &self.var_id
+    }
+    pub fn get_mut(&mut self) -> &mut VarId {
+        &mut self.var_id
+    }
+
+    pub fn assign(var_id: VarId) -> Self {
+        Self {
+            var_id,
+            inner: EffectOperationInner::Assign,
+        }
+    }
+
+    pub fn increase(var_id: VarId) -> Self {
+        Self {
+            var_id,
+            inner: EffectOperationInner::Increase,
+        }
+    }
+
+    pub fn decrease(var_id: VarId) -> Self {
+        Self {
+            var_id,
+            inner: EffectOperationInner::Decrease,
+        }
+    }
 }
 
 impl Effect {
@@ -26,11 +68,24 @@ impl FormatWithSymTable for Effect {
         let sf = &self.sv[0];
         let params = &self.sv[1..];
         format!(
-            "{} {}{} <- {}",
+            "{} {}{} {}",
             self.interval.format(st, sym_version),
             sf.format(st, sym_version),
             params.format(st, sym_version),
-            self.value.format(st, sym_version),
+            {
+                let EffectOperation { var_id, inner } = self.operation;
+                match inner {
+                    EffectOperationInner::Assign => {
+                        format!(":= {}", var_id.format(st, sym_version))
+                    }
+                    EffectOperationInner::Increase => {
+                        format!("+= {}", var_id.format(st, sym_version))
+                    }
+                    EffectOperationInner::Decrease => {
+                        format!("-= {}", var_id.format(st, sym_version))
+                    }
+                }
+            }
         )
     }
 }
@@ -39,7 +94,7 @@ impl FlatBindings for Effect {
     fn flat_bindings(&mut self, st: &RefSymTable) {
         self.interval.flat_bindings(st);
         self.sv.flat_bindings(st);
-        self.value.flat_bindings(st);
+        self.operation.get_mut().flat_bindings(st);
     }
 }
 
@@ -49,7 +104,7 @@ impl GetVariables for Effect {
         self.sv.iter().for_each(|a| {
             union.insert(*a);
         });
-        union.insert(self.value);
+        union.insert(*self.operation.get_ref());
         union
     }
 }
@@ -57,7 +112,7 @@ impl GetVariables for Effect {
 impl Replace for Effect {
     fn replace(&mut self, old: &VarId, new: &VarId) {
         self.sv.replace(old, new);
-        self.value.replace(old, new);
+        self.operation.get_mut().replace(old, new);
         self.interval.replace(old, new);
     }
 }

@@ -1,6 +1,7 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::constraint::Constraint;
+use crate::model::chronicle::effect::EffectOperationInner;
 use crate::model::chronicle::lit::Lit;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::sym_domain::basic_type::{
@@ -28,11 +29,10 @@ use aries::model::types::TypeHierarchy;
 use aries::utils::input::Sym;
 use aries_planning::chronicles::constraints::{Constraint as aConstraint, ConstraintType};
 use aries_planning::chronicles::printer::Printer;
-use aries_planning::chronicles::EffectOp::Assign;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleKind as aChronicleKind,
-    ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect, Fluent, StateVar,
-    SubTask, VarType, TIME_SCALE,
+    ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect, EffectOp, Fluent,
+    StateVar, SubTask, VarType, TIME_SCALE,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use function_name::named;
@@ -341,7 +341,8 @@ fn convert_constraint(
 
                 match terms.len() {
                     0 => aConstraint::eq(aAtom::from(cst), aAtom::from(cst)),
-                    1 => {
+                    1 => todo!(),
+                    /*1 => {
                         let a = terms[0];
                         let (a, b): (aAtom, aAtom) = if factor == 1 {
                             let a = a.var().into();
@@ -353,8 +354,8 @@ fn convert_constraint(
                             (a, b)
                         };
                         aConstraint::eq(a, b)
-                    }
-                    2 => {
+                    }*/
+                    /*2 => {
                         let a = terms[0];
                         let b = terms[1];
 
@@ -370,7 +371,7 @@ fn convert_constraint(
                         };
 
                         aConstraint::eq(a, b)
-                    }
+                    }*/
                     _ => {
                         let mut lsum = LinearSum::zero();
                         for term in terms {
@@ -381,7 +382,10 @@ fn convert_constraint(
                     }
                 }
             }
-            _ => Err(LRuntimeError::default().chain("constraint::eq"))?,
+            _ => Err(LRuntimeError::new(
+                "constraint::eq",
+                format!("cannot encode constraint {}", c.format(&st, false)),
+            ))?,
         },
         Constraint::Not(a) => {
             let a: VarId = a.try_into().expect("");
@@ -750,15 +754,41 @@ pub fn read_chronicle(
             .collect();
         let sv = StateVar { fluent, args };
 
-        let value = get_atom(&e.value, ctx);
+        let value = get_atom(&e.operation.var_id, ctx);
+        let operation = match &e.operation.inner {
+            EffectOperationInner::Assign => EffectOp::Assign(value),
+            EffectOperationInner::Increase => {
+                if let Atom::Int(IAtom {
+                    var: IVar::ZERO,
+                    shift,
+                }) = value
+                {
+                    EffectOp::Increase(shift)
+                } else {
+                    panic!("Increase of variables is not supported yet");
+                }
+            }
+            EffectOperationInner::Decrease => {
+                if let Atom::Int(IAtom {
+                    var: IVar::ZERO,
+                    shift,
+                }) = value
+                {
+                    EffectOp::Increase(-shift)
+                } else {
+                    panic!("Increase of variables is not supported yet");
+                }
+            }
+        };
         let start: FAtom = get_atom(&e.get_start(), ctx).try_into()?;
         let end: FAtom = get_atom(&e.get_end(), ctx).try_into()?;
+
         let effect = Effect {
             transition_start: start, // + FAtom::EPSILON,
             persistence_start: end,  // + FAtom::EPSILON,
             min_persistence_end: vec![],
             state_var: sv,
-            operation: Assign(value),
+            operation,
         };
         effects.push(effect);
     }

@@ -62,9 +62,10 @@ impl InstanceCollection {
         let parents = if let Some(parent) = p {
             let parent_id = match self.st.get_type_id(parent) {
                 Some(id) => id,
-                None => self
-                    .st
-                    .add_type(parent, vec![self.st.get_type_id(TYPE_OBJECT).unwrap()]),
+                None => {
+                    self.add_type(parent, None);
+                    self.st.get_type_id(parent).unwrap()
+                }
             };
             vec![parent_id]
         } else {
@@ -94,7 +95,6 @@ impl InstanceCollection {
     }
 
     pub fn is_of_type(&self, i: &str, t: &str) -> bool {
-        //println!("instance {i} {t}");
         let lattice = self.st.get_lattice();
         let type_id = if let Some(id) = lattice.get_type_id(t) {
             id

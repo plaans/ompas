@@ -1,12 +1,13 @@
-use crate::ompas::manager::acting::process::task::RefinementInner;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
+use crate::ompas::scheme::exec::refinement::greedy_select;
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::planner::problem::PlanningDomain;
 use ompas_middleware::logger::LogClient;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror;
+use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -30,12 +31,12 @@ impl CtxAries {
 
 //Returns the method to do.
 pub async fn aries_select(
+    _candidates: &[LValue],
     _state: &WorldStateSnapshot,
-    greedy: RefinementInner,
     _env: &LEnv,
     _optimize: bool,
-) -> lruntimeerror::Result<RefinementInner> {
-    Ok(greedy)
+) -> lruntimeerror::Result<LValue> {
+    greedy_select(_candidates, _state, _env)
     /*let ctx = env.get_context::<CtxAries>(CTX_ARIES)?;
     let log = ctx.log.clone();
 

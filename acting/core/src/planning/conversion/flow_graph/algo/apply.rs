@@ -20,8 +20,8 @@ use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::RELEASE;
 use ompas_language::exec::state::{
-    ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, READ_STATIC_STATE, TRANSITIVE_ASSERT,
-    WAIT_FOR,
+    ASSERT, ASSERT_SHORT, EFFECT, INSTANCE, INSTANCES, READ_STATE, READ_STATIC_STATE,
+    TRANSITIVE_EFFECT, WAIT_FOR,
 };
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
@@ -66,7 +66,8 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(EXEC_TASK, convert_exec);
         d.add_conversion(ASSERT, convert_assert);
         d.add_conversion(ASSERT_SHORT, convert_assert);
-        d.add_conversion(TRANSITIVE_ASSERT, convert_transitive_assert);
+        d.add_conversion(EFFECT, convert_assert);
+        d.add_conversion(TRANSITIVE_EFFECT, convert_transitive_effect);
         d.add_conversion(READ_STATE, convert_read_state);
         d.add_conversion(READ_STATIC_STATE, convert_read_state);
         d.add_conversion(EQ, convert_eq);
@@ -198,7 +199,7 @@ fn convert_assert(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LR
     Ok(fl.new_seq(seq))
 }
 
-fn convert_transitive_assert(
+fn convert_transitive_effect(
     fl: &mut FlowGraph,
     mut seq: Vec<FlowId>,
 ) -> Result<FlowId, LRuntimeError> {
@@ -579,7 +580,7 @@ fn convert_ctx_exec_command(
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
     let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_exec, Label::Action(index));
+    fl.set_label(&flow_exec, Label::Command(index));
     Ok(flow_id)
 }
 
@@ -590,7 +591,7 @@ fn convert_ctx_exec_task(
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
     let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_exec, Label::Action(index));
+    fl.set_label(&flow_exec, Label::Task(index));
     Ok(flow_id)
 }
 

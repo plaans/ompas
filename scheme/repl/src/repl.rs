@@ -3,7 +3,7 @@
 //!
 //! It contains only one function (for the moment): run that takes two arguments.
 use chrono::{DateTime, Utc};
-use ompas_middleware::OMPAS_OUTPUT_PATH;
+use ompas_middleware::OMPAS_WORKING_DIR;
 use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -61,7 +61,7 @@ async fn log(
             dir_path.push("lisp_logs");
             dir_path
         }
-        None => format!("{}lisp_logs", OMPAS_OUTPUT_PATH.get_ref()).into(),
+        None => format!("{}lisp", OMPAS_WORKING_DIR.get_ref()).into(),
     };
 
     fs::create_dir_all(&dir_path).expect("could not create logs directory");

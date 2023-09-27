@@ -57,10 +57,11 @@ impl From<ModState> for LModule {
         let mut module = LModule::new(m, MOD_STATE, DOC_MOD_STATE);
         module.add_async_fn(ASSERT, assert, DOC_ASSERT, false);
         module.add_async_fn(ASSERT_SHORT, assert, DOC_ASSERT_SHORT, false);
+        module.add_async_fn(EFFECT, effect, DOC_EFFECT, false);
         module.add_async_fn(
-            TRANSITIVE_ASSERT,
-            transitive_assert,
-            DOC_TRANSITIVE_ASSERT,
+            TRANSITIVE_EFFECT,
+            transitive_effect,
+            DOC_TRANSITIVE_EFFECT,
             false,
         );
         module.add_async_fn(RETRACT, retract, DOC_RETRACT, false);
@@ -111,10 +112,33 @@ async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
 }
 
 #[async_scheme_fn]
-async fn transitive_assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+async fn effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    if args.len() < 2 {
+        Err(LRuntimeError::wrong_number_of_args(
+            EFFECT,
+            args,
+            2..usize::MAX,
+        ))?
+    }
+    let state = env.get_context::<ModState>(MOD_STATE)?;
+    let key: LValue = if args.len() > 2 {
+        args[0..args.len() - 1].into()
+    } else {
+        args[0].clone()
+    };
+    let value = args.last().unwrap();
+    state
+        .state
+        .add_fact(key.try_into()?, Fact::from(&value.try_into()?))
+        .await;
+    Ok(())
+}
+
+#[async_scheme_fn]
+async fn transitive_effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     if args.len() < 3 {
         return Err(LRuntimeError::wrong_number_of_args(
-            TRANSITIVE_ASSERT,
+            TRANSITIVE_EFFECT,
             args,
             3..usize::MAX,
         ));
@@ -162,8 +186,11 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
         args[0].clone()
     };
 
-    let facts: LValue = get_facts(env, &[]).await?;
-    get_map(env, &[facts, key])
+    let LValue::Map(map) = get_facts(env, &[]).await? else {
+        unreachable!()
+    };
+
+    Ok(map.get(&key).cloned().unwrap_or(UNKNOWN.into()))
 }
 
 #[async_scheme_fn]
@@ -190,7 +217,11 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
         args[0].clone()
     };
 
-    get_map(env, &[state, key])
+    let LValue::Map(map) = state else {
+        unreachable!()
+    };
+
+    Ok(map.get(&key).cloned().unwrap_or(LValue::from(UNKNOWN)))
 }
 
 ///2 args: check if an instance is of a certain type

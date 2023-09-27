@@ -39,64 +39,6 @@ pub struct OMPASDomain {
 
 impl OMPASDomain {
     pub fn init(&mut self, st: &RefSymTable) {
-        /*{
-            let sym = symbol_table
-                .id(INSTANCE)
-                .ok_or_else(|| anyhow!("{} undefined", INSTANCE))?;
-            let mut args = Vec::with_capacity(2);
-            args.push(aType::Sym(
-                symbol_table
-                    .types
-                    .id_of(TYPE_OBJECT)
-                    .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-            ));
-            args.push(aType::Sym(
-                symbol_table
-                    .types
-                    .id_of(TYPE_OBJECT_TYPE)
-                    .ok_or_else(|| anyhow!("{} undefined", TYPE_OBJECT_TYPE))?,
-            ));
-            state_functions.push(StateFun { sym, tpe: args })
-                }
-
-        /*
-         * Add state function for type.
-         * quantity(?<resource>) -> float
-         */
-        {
-            let sym = symbol_table
-                .id(QUANTITY)
-                .ok_or_else(|| anyhow!("{} undefined", QUANTITY))?;
-            let mut args = Vec::with_capacity(2);
-            args.push(aType::Sym(
-                symbol_table
-                    .types
-                    .id_of(TYPE_OBJECT_TYPE)
-                    .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-            ));
-            args.push(aType::Int);
-            state_functions.push(StateFun { sym, tpe: args })
-        }
-
-        /*
-         * Add state function for type.
-         * quantity(?<resource>) -> float
-         */
-        {
-            let sym = symbol_table
-                .id(MAX_Q)
-                .ok_or_else(|| anyhow!("{} undefined", QUANTITY))?;
-            let mut args = Vec::with_capacity(2);
-            args.push(aType::Sym(
-                symbol_table
-                    .types
-                    .id_of(TYPE_OBJECT_TYPE)
-                    .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-            ));
-            args.push(aType::Int);
-            state_functions.push(StateFun { sym, tpe: args })
-        }*/
-
         self.add_state_function(
             QUANTITY.to_string(),
             StateFunction::new(
@@ -108,7 +50,7 @@ impl OMPASDomain {
                         st.get_type_as_domain(TYPE_OBJECT).unwrap(),
                     ),
                 )]),
-                Domain::Simple(TYPE_ID_INT),
+                Domain::IntRange(0, 1),
                 TYPE_INT.to_string(),
                 None,
             ),

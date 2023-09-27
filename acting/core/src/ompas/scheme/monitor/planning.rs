@@ -1,6 +1,7 @@
 use crate::model::acting_domain::model::{Event, Goal, NewTask};
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::add_domain_symbols;
+use crate::model::chronicle::Instantiation;
 use crate::model::sym_domain::cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
@@ -152,10 +153,27 @@ pub async fn __plan(
     state.absorb(resource_state);
     let ep: ExecutionProblem = ExecutionProblem {
         state,
-        chronicles: vec![new_problem_chronicle_instance(&st, tasks, goals, events)],
+        chronicles: vec![new_problem_chronicle_instance(
+            &st,
+            tasks.clone(),
+            goals,
+            events,
+        )],
     };
 
-    let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
+    let mut pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
+
+    //hack
+    for (i, task) in tasks.iter().enumerate() {
+        if let Some(start) = task.start {
+            let ch = &mut pp.instances[i + 1].instantiated_chronicle;
+            *ch = ch.instantiate(vec![Instantiation::new(
+                ch.interval.get_start(),
+                st.new_cst(start.as_cst().unwrap()),
+            )]);
+        }
+    }
+
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
         for (origin, chronicle) in pp
             .instances
@@ -247,7 +265,7 @@ pub async fn new_timed_goal_task(env: &LEnv, task_args: &[LValue]) -> Result<(),
 
     let mut args = vec![];
 
-    for arg in &task_args[1..args.len()] {
+    for arg in &task_args[1..task_args.len()] {
         if let Some(cst) = arg.as_cst() {
             args.push(cst);
         } else {

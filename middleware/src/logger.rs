@@ -1,4 +1,4 @@
-use crate::OMPAS_OUTPUT_PATH;
+use crate::OMPAS_WORKING_DIR;
 use crate::{LogLevel, LOG_TOPIC_ROOT, MASTER, MASTER_LABEL, TOKIO_CHANNEL_SIZE, TOPIC_ALL_ID};
 use chrono::{DateTime, Utc};
 use log::Level;
@@ -18,7 +18,7 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::time::sleep;
 
 fn default_log_directory() -> String {
-    format!("{}ompas_logs", OMPAS_OUTPUT_PATH.get_ref())
+    format!("{}/logs", OMPAS_WORKING_DIR.get_ref())
 }
 const DEFAULT_MAX_LOG_LEVEL: Level = Level::Info;
 pub const END_SIGNAL: EndSignal = EndSignal {};

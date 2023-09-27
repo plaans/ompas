@@ -101,7 +101,8 @@ pub enum MethodLabel {
 pub enum Label {
     AbstractModel,
     Refinement(RefinementLabel),
-    Action(usize),
+    Task(usize),
+    Command(usize),
     ResourceAcquisition(usize),
     Arbitrary(usize),
 }
@@ -112,8 +113,11 @@ impl Display for Label {
             Label::Refinement(refinement_label) => {
                 write!(f, "{}", refinement_label)
             }
-            Label::Action(id) => {
-                write!(f, "action({id})")
+            Label::Task(id) => {
+                write!(f, "task({id})")
+            }
+            Label::Command(id) => {
+                write!(f, "command({id})")
             }
             Label::ResourceAcquisition(acq) => {
                 write!(f, "acquire({acq})")

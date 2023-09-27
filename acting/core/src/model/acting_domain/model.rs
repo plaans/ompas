@@ -2,7 +2,7 @@ use crate::model::chronicle;
 use crate::model::chronicle::acting_process_model::ActionModel;
 use crate::model::chronicle::condition::Condition;
 use crate::model::chronicle::constraint::Constraint;
-use crate::model::chronicle::effect::Effect;
+use crate::model::chronicle::effect::{Effect, EffectOperation};
 use crate::model::chronicle::subtask::SubTask;
 use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation, RuntimeInfo};
 use crate::model::process_ref::Label;
@@ -20,8 +20,8 @@ pub(crate) const ROOT: &str = "ROOT";
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ModelKind {
     PlantModel,
-    PlanModel,
     SimModel,
+    PlanModel,
     CostModel,
 }
 
@@ -36,7 +36,16 @@ impl ModelCollection {
     }
 
     pub fn get(&self, kind: &ModelKind) -> Option<LValue> {
-        self.inner.get(kind).cloned()
+        let r = self.inner.get(kind).cloned();
+        if r.is_none() {
+            match kind {
+                ModelKind::PlantModel => self.get(&ModelKind::SimModel),
+                ModelKind::SimModel => self.get(&ModelKind::PlanModel),
+                ModelKind::PlanModel | ModelKind::CostModel => None,
+            }
+        } else {
+            r
+        }
     }
 }
 
@@ -168,7 +177,7 @@ impl ActingModel {
         let effect = Effect {
             interval,
             sv: event.sv.drain(..).map(|cst| st.new_cst(cst)).collect(),
-            value: st.new_cst(event.value),
+            operation: EffectOperation::assign(st.new_cst(event.value)),
         };
 
         chronicle.add_constraint(Constraint::leq(
@@ -238,7 +247,7 @@ impl ActingModel {
         let name: Vec<VarId> = task.args.drain(..).map(|cst| st.new_cst(cst)).collect();
 
         let n_subtask = chronicle.get_subtasks().len();
-        let label = Label::Action(n_subtask);
+        let label = Label::Task(n_subtask);
 
         let subtask = SubTask {
             interval,

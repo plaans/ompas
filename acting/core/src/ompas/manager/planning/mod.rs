@@ -2,7 +2,7 @@ use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::add_domain_symbols;
 use crate::model::chronicle::acting_process_model::{ActingProcessModel, ActingProcessModelLabel};
-use crate::model::chronicle::effect::Effect;
+use crate::model::chronicle::effect::{Effect, EffectOperation};
 use crate::model::chronicle::interval::Interval;
 use crate::model::chronicle::ChronicleKind;
 use crate::model::process_ref::{Label, MethodLabel, ProcessRef, RefinementLabel};
@@ -672,7 +672,7 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
         effects.push(Effect {
             interval: Interval::new_instantaneous(t),
             sv,
-            value,
+            operation: EffectOperation::assign(value),
         });
     }
 

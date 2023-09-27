@@ -6,8 +6,7 @@ use crate::ompas::manager::platform::platform_config::PlatformConfig;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use async_trait::async_trait;
 use lisp_domain::LispDomain;
-use ompas_language::interface::LOG_TOPIC_PLATFORM;
-use ompas_language::process::PROCESS_TOPIC_OMPAS;
+use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::ProcessInterface;
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
@@ -112,31 +111,40 @@ impl PlatformManager {
             let process: ProcessInterface = ProcessInterface::new(
                 format!("PROCESS_COMMAND_SIM_{}", command_id),
                 PROCESS_TOPIC_OMPAS,
-                LOG_TOPIC_PLATFORM,
+                LOG_TOPIC_OMPAS,
             )
             .await;
             env.insert(label, model);
-            match eval(&command, &mut env, Some(rx)).await {
+            let result = eval(&command, &mut env, Some(rx)).await;
+            match &result {
                 Err(err) => {
                     supervisor
                         .set_status(&command_id, ProcessStatus::Failure)
                         .await;
-                    process.log_error(format!("Eval error executing command {}: {}", command, err));
+                    process.log_error(format!(
+                        "Runtime error executing command model of {}: {}",
+                        command, err
+                    ));
                     process.kill(PROCESS_TOPIC_OMPAS);
                 }
-                Ok(LValue::Err(err)) => {
-                    supervisor
-                        .set_status(&command_id, ProcessStatus::Failure)
-                        .await;
-                    process.log_error(format!(
-                        "Execution of {}({}) returned an error: {}",
-                        command, command_id, err
-                    ));
-                }
-                Ok(_) => {
-                    supervisor
-                        .set_status(&command_id, ProcessStatus::Success)
-                        .await
+                Ok(lv) => {
+                    if let LValue::Err(_) = lv {
+                        supervisor
+                            .set_status(&command_id, ProcessStatus::Failure)
+                            .await;
+                        process.log_error(format!(
+                            "Execution of {}({}) is a failure : {}",
+                            command, command_id, lv,
+                        ));
+                    } else {
+                        process.log_info(format!(
+                            "Execution of {}({}) is a success: {}",
+                            command, command_id, lv,
+                        ));
+                        supervisor
+                            .set_status(&command_id, ProcessStatus::Success)
+                            .await
+                    }
                 }
             };
             interrupters.write().await.remove(&command_id);

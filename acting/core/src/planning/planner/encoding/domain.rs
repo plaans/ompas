@@ -36,7 +36,6 @@ use aries_planning::chronicles::{
 };
 use aries_planning::parsing::pddl::TypedSymbol;
 use function_name::named;
-use num_integer::Integer;
 use ompas_language::sym_table::*;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;

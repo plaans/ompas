@@ -19,7 +19,8 @@ sompas-language = {path = "../language"}
 sompas-repl = {path = "../repl"}
 sompas-modules = {path = "../modules"}
 ompas-middleware = {path = "../../middleware"}
-im = "15.0.0"
-structopt = { version = "0.3", default-features = false }
-tokio = { version = "1.17.0", features = ["full", "time"] }
-chrono = "0.4.19"
+
+im = {workspace = true}
+structopt = {workspace = true}
+tokio = {workspace = true}
+chrono = {workspace = true}

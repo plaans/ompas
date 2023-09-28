@@ -13,16 +13,17 @@ ompas-utils = {path= "../../utils" }
 ompas-middleware=  {path = "../../middleware"}
 ompas-language = {path = "../language"}
 
-async-trait = "0.1.51"
-tokio = { version = "1.17.0", features = ["full", "time"] }
+tonic = {workspace = true}
+async-stream = {workspace = true}
+tokio-stream = { workspace = true }
 
-prost = { default-features = false, version = "0.11" }
-tonic = "0.8"
-async-stream = "0.3.3"
+async-trait = {workspace = true}
+tokio = { workspace = true }
+prost = { workspace = true }
 
-tokio-stream = { default-features = false, version = "0.1" }
-map-macro = "0.2.4"
+map-macro = {workspace = true}
 
+yaml-rust = "0.4"
 
 [build-dependencies]
-tonic-build = "0.8"
+tonic-build = {workspace = true}

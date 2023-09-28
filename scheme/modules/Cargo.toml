@@ -6,16 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 ompas-utils = {path = "../../utils" }
+ompas-middleware = {path = "../../middleware"}
+
 sompas-structs = {path = "../structs"}
 sompas-core = {path = "../core"}
 sompas-language = {path = "../language"}
 sompas-macros = {path = "../macros"}
+
 aries = {path = "../../aries/solver"}
-im = "15.0.0"
-tokio = { version = "1.17.0", features = ["full", "time"] }
-rand = "0.8.4"
-macro_rules_attribute = "0.0.2"
-futures = "0.3.17"
-ompas-middleware = {path = "../../middleware"}
-chrono = "0.4.23"
+
+im = {workspace = true}
+tokio = {workspace = true}
+rand = {workspace = true}
+macro_rules_attribute = {workspace = true}
+futures = {workspace = true}
+chrono = {workspace = true}
 

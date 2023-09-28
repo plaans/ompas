@@ -20,10 +20,33 @@ members = [
     "acting/interface",
     "ompas-gobot-sim",
     "benchmark",
-
+    "generator"
 ]
 
 exclude = ["aries"]
+
+[workspace.dependencies]
+structopt = "0.3.26"
+tokio = { version = "1.17.0", features = ["full", "time"] }
+yaml-rust = "0.4.5"
+chrono = "0.4.24"
+im = "15.1.0"
+anyhow = "1.0.75"
+itertools = { default-features = false, version = "0.11" }
+rand = "0.8.5"
+tonic = "0.10.1"
+async-stream = "0.3.3"
+tokio-stream = { default-features = false, version = "0.1" }
+async-trait = "0.1.51"
+prost = { default-features = false, version = "0.12.1" }
+map-macro = "0.2.6"
+macro_rules_attribute = "0.2.0"
+async-recursion = "1.0.4"
+function_name = "0.3.0"
+futures = "0.3.28"
+lazy_static = "1.4.0"
+tonic-build = "0.10.1"
+serde = {version = "1.0.188", features = ["derive"]}
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

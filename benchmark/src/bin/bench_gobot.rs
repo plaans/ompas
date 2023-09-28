@@ -4,7 +4,7 @@ use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use ompas_middleware::logger::{FileDescriptor, LogClient};
-use ompas_middleware::{LogLevel, Master, OMPAS_OUTPUT_PATH};
+use ompas_middleware::{LogLevel, Master, OMPAS_WORKING_DIR};
 use sompas_modules::advanced_math::ModAdvancedMath;
 use sompas_modules::io::ModIO;
 use sompas_modules::string::ModString;
@@ -88,7 +88,7 @@ pub async fn lisp_interpreter(opt: Opt) {
     let log = if let Some(pb) = &opt.log {
         pb.clone()
     } else {
-        let home = OMPAS_OUTPUT_PATH.get_ref();
+        let home = OMPAS_WORKING_DIR.get_ref();
         PathBuf::from(format!("{}/ompas_benchmark", home))
     };
 
@@ -118,7 +118,7 @@ pub async fn lisp_interpreter(opt: Opt) {
     let mut log = if let Some(pb) = &opt.log {
         pb.clone()
     } else {
-        let home = OMPAS_OUTPUT_PATH.get_ref();
+        let home = OMPAS_WORKING_DIR.get_ref();
         PathBuf::from(format!("{}/ompas_benchmark", home))
     };
 

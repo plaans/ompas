@@ -12,12 +12,12 @@ sompas-language = {path = "../language"}
 sompas-macros = {path = "../macros"}
 ompas-middleware = {path = "../../middleware"}
 aries_planning = {path = "../../aries/planning/planning"}
-async-trait = "0.1.53"
-async-recursion = "0.3.2"
-anyhow = "1.0.40"
-tokio = { version = "1.17.0", features = ["full", "time"] }
-im = "15.0.0"
-lazy_static = "1.4.0"
-macro_rules_attribute = "0.0.2"
-function_name = "0.2.0"
-futures = "0.3.17"
+async-trait = {workspace = true}
+async-recursion = {workspace = true}
+anyhow = {workspace = true}
+tokio = {workspace = true}
+im = {workspace = true}
+lazy_static = {workspace = true}
+macro_rules_attribute = {workspace = true}
+function_name = {workspace = true}
+futures = {workspace = true}

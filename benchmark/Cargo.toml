@@ -15,13 +15,13 @@ ompas-gobotsim = {path = "../ompas-gobot-sim"}
 ompas-language = {path = "../acting/language"}
 ompas-middleware = {path = "../middleware"}
 ompas-interface = {path = "../acting/interface"}
-chrono = "0.4.24"
 
+chrono = {workspace = true}
+tokio = {workspace = true}
+structopt = { workspace = true }
+yaml-rust = {workspace = true}
 
-tokio = { version = "1.17.0", features = ["full", "time"] }
 lettre = "0.10"
-yaml-rust = "0.4"
-structopt = { version = "0.3", default-features = false }
 indicatif = "0.17.0"
 colored = "2.0.0"
 

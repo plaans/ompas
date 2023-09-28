@@ -3,7 +3,7 @@ use im::HashMap;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::{Master, ProcessInterface, OMPAS_WORKING_DIR, PROCESS_TOPIC_ALL};
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::DefaultEditor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_language::PROCESS_TOPIC_INTERPRETER;
@@ -330,7 +330,7 @@ async fn repl(mut com: ChannelToLispInterpreter) {
         LOG_TOPIC_INTERPRETER,
     )
     .await;
-    let mut rl = Editor::<()>::new();
+    let mut rl = DefaultEditor::new().unwrap();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
@@ -341,7 +341,7 @@ async fn repl(mut com: ChannelToLispInterpreter) {
 
             match readline {
                 Ok(string) => {
-                    rl.add_history_entry(string.clone());
+                    rl.add_history_entry(string.clone()).unwrap();
                     com.send(string).await.expect("couldn't send lisp command");
                     let buffer = match com.recv_string().await {
                         None => {

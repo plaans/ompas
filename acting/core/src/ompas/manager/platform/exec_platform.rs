@@ -166,7 +166,7 @@ impl ExecPlatform {
                                                 key.into()
                                             };
 
-                                            match StateVariableType::from_i32(sv.r#type).unwrap() {
+                                            match StateVariableType::try_from(sv.r#type).unwrap() {
                                                 StateVariableType::Static => {
                                                     r#static.insert(key.clone(), Fact::new((&sv.value.unwrap()).try_into().unwrap_or_else(|_| panic!("error on state variable {:#?}", key)), None))
                                                 }
@@ -184,14 +184,14 @@ impl ExecPlatform {
                                             None => {}
                                             Some(event::Event::Resource(resource)) => {
                                                 let label = resource.label;
-                                                let capacity: Capacity = match ResourceKind::from_i32(resource.resource_kind) {
-                                                    Some(ResourceKind::Unary) => {
+                                                let capacity: Capacity = match ResourceKind::try_from(resource.resource_kind) {
+                                                    Ok(ResourceKind::Unary) => {
                                                         1
                                                     }
-                                                    Some(ResourceKind::Divisible) => {
+                                                    Ok(ResourceKind::Divisible) => {
                                                         resource.quantity as usize
                                                     }
-                                                    None => {
+                                                    Err(_) => {
                                                         panic!()
                                                     }
                                                 };

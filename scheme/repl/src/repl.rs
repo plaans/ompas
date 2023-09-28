@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use ompas_middleware::OMPAS_WORKING_DIR;
 use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::DefaultEditor;
 use sompas_language::kind::NIL;
 use std::fs;
 use std::fs::OpenOptions;
@@ -110,7 +110,7 @@ async fn log(
 /// Used for synchronization.
 #[warn(deprecated)]
 async fn repl(sender: UnboundedSender<String>, mut receiver: UnboundedReceiver<String>) {
-    let mut rl = Editor::<()>::new();
+    let mut rl = DefaultEditor::new().unwrap();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
@@ -120,7 +120,7 @@ async fn repl(sender: UnboundedSender<String>, mut receiver: UnboundedReceiver<S
 
         match readline {
             Ok(string) => {
-                rl.add_history_entry(string.clone());
+                rl.add_history_entry(string.clone()).unwrap();
                 sender
                     .send(format!("repl:{}", string))
                     .expect("couldn't send lisp command");

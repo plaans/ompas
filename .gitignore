@@ -10,3 +10,4 @@ Cargo.lock
 *.log
 *.yml
 gobot-bin
+ompas_config_local.bash

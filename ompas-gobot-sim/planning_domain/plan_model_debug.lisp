@@ -53,7 +53,7 @@
           (:body
                  (do
                      (wait-for `(< (robot.battery ,?r) 0.5))
-                     (define h (acquire ?r '(:priority 1000)))
+                     (define h (acquire ?r 1 '(:priority 1000)))
                      (go_charge ?r)
                      (wait-for `(> (robot.battery ,?r) 0.9))
                      (release h)
@@ -96,11 +96,12 @@
                                (package.all_processes ?p)))
                             (define last_task
                                  `(do
-                                     ;(define ?r (arbitrary (instances robot) rand-element))
-                                     (define ?r 'robot0)
-                                     (define h_r (acquire ?r))
+                                     (define ?r (arbitrary (instances robot) rand-element))
+                                     ;(define ?r 'robot0)
+                                     (define h_r (acquire ?r 1))
                                      ;(sleep 1)
-                                     ;(t_carry_to_machine ?r ,?p ,(find_output_machine))
+                                     (t_carry_to_machine ?r ,?p ,(find_output_machine))
+                                     ;nil
                                      ))
                             (define tasks (append tasks (list last_task)))
                             `(apply seq ',tasks)))
@@ -110,19 +111,18 @@
 
 
     (def-task test (:params))
-    (def-task-om-model test
-        (:params)
-        (:body
-            (do
-                (begin
-                    ;(define ?r (arbitrary (instances robot) rand-element))
-                    (define ?r 'robot0)
-                    (define h2 (acquire ?r 1)))
-                ;(sleep 1)
-                (define ?r (arbitrary (instances robot) rand-element))
-                (define ?r 'robot0)
-                (define h_r (acquire ?r))
-                )))
+    (def-method m_test 
+        (:task test)
+        (:params (?r robot))
+        (:pre-conditions true)
+        (:body 
+            (begin
+                (define ?r 'robot1)
+                (define rh (acquire ?r 1))
+                (sleep 1)
+                (release rh)
+                )
+        ))
 
 
     (def-task t_process_on_machine (:params (?p package) (?m machine) (?d int)))
@@ -134,11 +134,13 @@
         (:score 0)
         (:body 
             (do
+                ;(define ?r (car (instances robot)))
                 (define ?r (arbitrary (instances robot) rand-element))
-                (define h1 (acquire ?m))
-                (define h2 (acquire ?r))
+                (define h1 (acquire ?m 1))
+                ;(define ?r 'robot1)
+                (define h2 (acquire ?r 1))
                 (t_carry_to_machine ?r ?p ?m)
-                (release h2)
+                ;(release h2)
                 (t_process ?m ?p ?d)
             )))
 

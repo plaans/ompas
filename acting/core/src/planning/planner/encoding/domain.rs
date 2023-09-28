@@ -195,9 +195,7 @@ fn convert_constraint(
             }
             (Lit::Atom(value), Lit::Computation(c)) => {
                 let value = get_atom(value, ctx);
-                let mut factor: IntCst = 1;
                 let mut variables = vec![(-1, value)];
-                let mut terms = vec![];
                 match c.deref() {
                     Computation::Add(add) => {
                         for var in add {
@@ -312,75 +310,27 @@ fn convert_constraint(
                     }
                 }
 
-                //Compute the common factor between all terms
-                for (_, var) in &variables {
-                    if let aAtom::Fixed(f) = var {
-                        factor = factor.lcm(&f.denom);
-                    }
-                }
-
-                let mut cst: IntCst = 0;
+                let mut sum = LinearSum::zero();
 
                 for (sign, var) in variables {
-                    let factor = sign * factor;
-
-                    let (factor, var, shift) = match var {
-                        aAtom::Int(i) => (factor, i.var, i.shift),
-                        aAtom::Fixed(f) => {
-                            let factor = factor / f.denom;
-                            (factor, f.num.var, f.num.shift)
+                    match var {
+                        Atom::Int(IAtom { var, shift }) => {
+                            sum += LinearTerm::int(sign, var, prez);
+                            sum += LinearTerm::constant_int(shift, prez);
+                        }
+                        Atom::Fixed(FAtom {
+                            num: IAtom { var, shift },
+                            denom,
+                        }) => {
+                            sum += LinearTerm::rational(sign, var, denom, prez);
+                            sum += LinearTerm::constant_rational(shift, denom, prez);
                         }
                         _ => unreachable!(),
                     };
-                    cst += factor * shift;
-                    match var {
-                        IVar::ZERO => {}
-                        _ => terms.push(LinearTerm::new(factor, var, prez, 1)),
-                    }
                 }
 
-                match terms.len() {
-                    0 => aConstraint::eq(aAtom::from(cst), aAtom::from(cst)),
-                    1 => todo!(),
-                    /*1 => {
-                        let a = terms[0];
-                        let (a, b): (aAtom, aAtom) = if factor == 1 {
-                            let a = a.var().into();
-                            let b: aAtom = cst.into();
-                            (a, b)
-                        } else {
-                            let a = FAtom::new(a.var().into(), factor).into();
-                            let b = FAtom::new(IVar::ZERO + cst, factor).into();
-                            (a, b)
-                        };
-                        aConstraint::eq(a, b)
-                    }*/
-                    /*2 => {
-                        let a = terms[0];
-                        let b = terms[1];
-
-                        let (a, b): (aAtom, aAtom) = if factor == 1 {
-                            let a = a.var().into();
-                            let b = b.var() + cst;
-                            let b = b.var.into();
-                            (a, b)
-                        } else {
-                            let a = FAtom::new(a.var().into(), factor).into();
-                            let b = FAtom::new(b.var() + cst, factor).into();
-                            (a, b)
-                        };
-
-                        aConstraint::eq(a, b)
-                    }*/
-                    _ => {
-                        let mut lsum = LinearSum::zero();
-                        for term in terms {
-                            lsum += term;
-                        }
-                        lsum += cst;
-                        aConstraint::linear_eq_zero(lsum)
-                    }
-                }
+                sum.simplify();
+                aConstraint::linear_eq_zero(sum)
             }
             _ => Err(LRuntimeError::new(
                 "constraint::eq",

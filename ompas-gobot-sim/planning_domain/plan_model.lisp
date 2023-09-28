@@ -53,7 +53,7 @@
           (:body
                  (do
                      (wait-for `(< (robot.battery ,?r) 0.5))
-                     (define h (acquire ?r '(:priority 1000)))
+                     (define h (acquire ?r 1 '(:priority 1000)))
                      (go_charge ?r)
                      (wait-for `(> (robot.battery ,?r) 0.9))
                      (release h)
@@ -102,7 +102,7 @@
                             (define last_task
                                  `(begin
                                      (define ?r (arbitrary (instances robot)))
-                                     (define h_r (acquire ?r))
+                                     (define h_r (acquire ?r 1))
                                      (t_carry_to_machine ?r ,?p ,(find_output_machine))))
                             (define tasks (append tasks (list last_task)))
                             `(apply seq ',tasks)))
@@ -118,8 +118,8 @@
         (:body 
             (begin
                 (define ?r (arbitrary (instances robot) rand-element))
-                (define h1 (acquire ?m))
-                (define h2 (acquire ?r))
+                (define h1 (acquire ?m 1))
+                (define h2 (acquire ?r 1))
                 (t_carry_to_machine ?r ?p ?m)
                 (release h2)
                 (t_process ?m ?p ?d)

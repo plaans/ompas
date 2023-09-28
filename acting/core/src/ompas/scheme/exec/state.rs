@@ -9,7 +9,6 @@ use futures::FutureExt;
 use ompas_language::exec::resource::LOCKED;
 use ompas_language::exec::state::*;
 use sompas_core::eval;
-use sompas_core::modules::map::get_map;
 use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::interrupted;

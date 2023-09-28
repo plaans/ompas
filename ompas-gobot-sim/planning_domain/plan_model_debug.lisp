@@ -117,7 +117,7 @@
         (:pre-conditions true)
         (:body 
             (begin
-                (define ?r 'robot1)
+                ;(define ?r 'robot1)
                 (define rh (acquire ?r 1))
                 (sleep 1)
                 (release rh)

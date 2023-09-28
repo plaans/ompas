@@ -4,14 +4,22 @@
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 # echo "Script directory: $SCRIPT_DIR"
 
-# print the generates chronicles
-export OMPAS_CHRONICLE_DEBUG=full
+# choice of how resources are encoded in the planner
+# - assignment: default encoding using linear constraints, conditions and effects
+# export OMPAS_RESOURCE_ENCODING=assignment
+# - addition: new CSP encoding using increase and decrease effects operators
+export OMPAS_RESOURCE_ENCODING=addition
 
+# print the generates chronicles
+export OMPAS_CHRONICLE_DEBUG=off
+
+# Frequency at which continuous planning will be updated
 export OMPAS_DELIBERATION_FREQUENCY=1
 
 # print the plan formatted for the acting tree
 export OMPAS_PLAN_OUTPUT=true
 
+# print the continuous planning deliberation phases
 export OMPAS_DEBUG_CONTINUOUS_PLANNING=true
 
 # activate the debug of OMPAS

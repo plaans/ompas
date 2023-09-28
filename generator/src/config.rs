@@ -1,7 +1,5 @@
-use crate::domain::gripper::GripperProblem;
-use crate::{Generator, Problem};
+use crate::Generator;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 use std::collections::HashMap;
 use std::path::PathBuf;
 

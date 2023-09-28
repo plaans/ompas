@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 sompas-structs = {path = "../scheme/structs"}
 ompas-core = {path = "../acting/core"}
-
+ompas-middleware = {path = "../middleware"}
 ompas-language = {path = "../acting/language"}
 
 rand = {workspace = true}

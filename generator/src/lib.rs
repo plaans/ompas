@@ -12,15 +12,15 @@ use sompas_structs::lvalue::LValue;
 pub type Task = Vec<String>;
 
 pub struct Report {
-    content: String,
-    extension: String,
+    pub content: String,
+    pub extension: String,
 }
 
 impl Default for Report {
     fn default() -> Self {
         Self {
             content: "".to_string(),
-            extension: ".txt".to_string(),
+            extension: "txt".to_string(),
         }
     }
 }

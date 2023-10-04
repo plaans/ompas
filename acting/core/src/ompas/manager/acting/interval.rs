@@ -2,8 +2,9 @@ use core::fmt::{Display, Formatter};
 use core::option::Option;
 use core::option::Option::{None, Some};
 use num_integer::Integer;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::ops::{Add, AddAssign, Sub};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 pub type Instant = u128;
 
@@ -146,13 +147,17 @@ impl Interval {
         self.end = Some(end)
     }
 }
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum Duration {
     Finite(u64, u128),
     Inf,
 }
 
 impl Duration {
+    pub fn zero() -> Self {
+        Self::Finite(0, 1)
+    }
+
     pub fn as_millis(&self) -> f64 {
         match self {
             Self::Finite(f, u) => (*u * 1000) as f64 / *f as f64,
@@ -212,5 +217,11 @@ impl Sub for Duration {
 impl AddAssign for Duration {
     fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
+    }
+}
+
+impl SubAssign for Duration {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
     }
 }

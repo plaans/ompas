@@ -3,7 +3,7 @@ use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
 use crate::ompas::interface::trigger_collection::{Response, TaskCollection, TaskHandle};
 use crate::ompas::manager::acting::filter::ProcessFilter;
-use crate::ompas::manager::acting::inner::ProcessKind;
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::manager::monitor::task_check_wait_for;
 use crate::ompas::manager::ompas::OMPASManager;
@@ -20,11 +20,12 @@ use crate::planning::planner::solver::PMetric;
 use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
 use ompas_language::monitor::control::*;
 use ompas_language::monitor::model::MOD_MODEL;
+use ompas_language::output::{JSON_FORMAT, OMPAS_STATS, YAML_FORMAT};
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_language::select::*;
 use ompas_language::supervisor::*;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::{ProcessInterface, OMPAS_WORKING_DIR};
+use ompas_middleware::{Master, ProcessInterface, OMPAS_WORKING_DIR};
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
 use sompas_modules::advanced_math::ModAdvancedMath;
@@ -39,6 +40,10 @@ use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, string, wrong_type};
+use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
@@ -187,6 +192,8 @@ impl From<ModControl> for LModule {
         );
         module.add_async_fn(GET_STATS, get_stats, DOC_GET_STATS, false);
         module.add_async_fn(EXPORT_STATS, export_stats, DOC_EXPORT_STATS, false);
+        module.add_async_fn(EXPORT_TO_CSV, export_to_csv, DOC_EXPORT_TO_CSV, false);
+
         module.add_async_fn(DUMP_TRACE, dump_trace, DOC_DUMP_TRACE, false);
         module.add_macro(DEBUG_OMPAS, MACRO_DEBUG_OMPAS, DOC_DEBUG_OMPAS);
 
@@ -544,11 +551,11 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
 
     for arg in args {
         match arg.to_string().as_str() {
-            TASK => task_filter.task_type = Some(ProcessKind::Task),
-            COMMAND => task_filter.task_type = Some(ProcessKind::Command),
-            ARBITRARY => task_filter.task_type = Some(ProcessKind::Arbitrary),
-            ACQUIRE => task_filter.task_type = Some(ProcessKind::Acquire),
-            METHOD => task_filter.task_type = Some(ProcessKind::Method),
+            TASK => task_filter.task_type = Some(ActingProcessKind::Task),
+            COMMAND => task_filter.task_type = Some(ActingProcessKind::Command),
+            ARBITRARY => task_filter.task_type = Some(ActingProcessKind::Arbitrary),
+            ACQUIRE => task_filter.task_type = Some(ActingProcessKind::Acquire),
+            METHOD => task_filter.task_type = Some(ActingProcessKind::Method),
             STATUS_PENDING => task_filter.status = Some(ProcessStatus::Pending),
             STATUS_ACCEPTED => task_filter.status = Some(ProcessStatus::Accepted),
             STATUS_REJECTED => task_filter.status = Some(ProcessStatus::Rejected),
@@ -649,14 +656,112 @@ pub async fn get_stats(env: &LEnv) -> LValue {
 }
 
 #[async_scheme_fn]
-pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
+pub async fn export_to_csv(env: &LEnv, args: &[LValue]) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     let file = if args.len() == 1 {
         Some(args[0].to_string())
     } else {
         None
     };
-    ctx.acting_manager.export_to_csv(None, file).await;
+    let content = ctx.acting_manager.export_to_csv().await;
+
+    let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    path.push(OMPAS_STATS);
+
+    fs::create_dir_all(&path).expect("could not create stats directory");
+
+    path.push(match file {
+        Some(f) => format!("{}", f),
+        None => format!("{}_{}.csv", OMPAS_STATS, Master::get_string_date()),
+    });
+
+    let mut file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&path)
+        .expect("error creating stat file");
+
+    if file.metadata().unwrap().len() == 0 {
+        file.write_all(ActingManager::get_header_stat().as_bytes())
+            .expect("could not write to stat file");
+    }
+    file.write_all(content.as_bytes())
+        .unwrap_or_else(|e| panic!("could not write to {}: {}", path.to_str().unwrap(), e));
+
+    Ok(LValue::Nil)
+}
+
+#[async_scheme_fn]
+pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
+    let mut format = YAML_FORMAT;
+    let mut file_name = None;
+    match args.len() {
+        0 => {}
+        1 => {
+            let arg: String = (&args[0]).try_into().map_err(|e: LRuntimeError| {
+                e.chain(format!(
+                    "Expected either a format or a file name, e.g. \"stat.yml\""
+                ))
+            })?;
+            match arg.as_str() {
+                YAML_FORMAT => {
+                    format = YAML_FORMAT;
+                }
+                JSON_FORMAT => {
+                    format = JSON_FORMAT;
+                }
+                str => {
+                    if str.contains(YAML_FORMAT) {
+                        format = YAML_FORMAT;
+                        file_name = Some(arg);
+                    } else if str.contains(JSON_FORMAT) {
+                        format = JSON_FORMAT;
+                        file_name = Some(arg);
+                    } else {
+                        return Err(LRuntimeError::new(
+                            EXPORT_STATS,
+                            format!("Expected either a format or a file name, e.g. \"stat.yml\""),
+                        ));
+                    }
+                }
+            }
+        }
+        _ => {
+            return Err(LRuntimeError::new(
+                EXPORT_STATS,
+                format!("expected only one argument, got {}", LValue::from(args)),
+            ))
+        }
+    }
+
+    let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    path.push(OMPAS_STATS);
+
+    fs::create_dir_all(&path).expect("could not create stats directory");
+
+    path.push(match file_name {
+        Some(f) => format!("{}", f),
+        None => format!("{}_{}.csv", OMPAS_STATS, Master::get_string_date()),
+    });
+
+    let stat = ctx.acting_manager.get_run_stat().await;
+
+    let content = match format {
+        YAML_FORMAT => serde_yaml::to_string(&stat).unwrap(),
+        JSON_FORMAT => serde_json::to_string(&stat).unwrap(),
+        _ => unreachable!(),
+    };
+
+    let mut file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&path)
+        .expect("error creating stat file");
+
+    file.write_all(content.as_bytes())
+        .unwrap_or_else(|e| panic!("could not write to {}: {}", path.to_str().unwrap(), e));
+
     Ok(LValue::Nil)
 }
 

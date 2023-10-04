@@ -4,6 +4,7 @@ use ompas_core::model::sym_domain::domain_test::DomainTest;
 use ompas_core::model::sym_domain::domain_test::DomainTest::*;
 use ompas_core::model::sym_domain::type_lattice::TypeLattice;
 use ompas_language::sym_table::TYPE_OBJECT;
+use ompas_middleware::Master;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;
@@ -77,9 +78,7 @@ fn main() {
 
 fn output_domain_collection(path: PathBuf, dc: &TypeLattice, view: bool) {
     let mut path = path;
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-    path.push(format!("type_network_{}", string_date));
+    path.push(format!("type_network_{}", Master::get_string_date()));
     fs::create_dir_all(&path).unwrap();
     let mut path_dot = path.clone();
     let dot_file_name = "type_network.dot";

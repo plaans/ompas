@@ -1,7 +1,8 @@
 pub mod config;
-pub mod domain;
+pub mod generator;
 
 use std::fmt::Write;
+use std::path::PathBuf;
 
 use crate::config::Recipe;
 use ompas_language::monitor::control::EXEC_TASK;
@@ -10,20 +11,6 @@ use sompas_structs::list;
 use sompas_structs::lvalue::LValue;
 
 pub type Task = Vec<String>;
-
-pub struct Report {
-    pub content: String,
-    pub extension: String,
-}
-
-impl Default for Report {
-    fn default() -> Self {
-        Self {
-            content: "".to_string(),
-            extension: "txt".to_string(),
-        }
-    }
-}
 
 pub trait Problem {
     fn generate(recipe: &Recipe) -> Result<Self, String>
@@ -67,8 +54,8 @@ pub trait Problem {
         write!(str, ")\n").unwrap();
         str
     }
-    fn report(&self) -> Report {
-        Report::default()
+    fn report(&self, _: PathBuf) -> PathBuf {
+        todo!()
     }
 }
 

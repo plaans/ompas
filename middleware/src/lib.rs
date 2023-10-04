@@ -3,6 +3,7 @@ extern crate core;
 use crate::logger::{
     EndSignal, FileDescriptor, LogClient, LogMessage, LogTopicId, Logger, END_SIGNAL,
 };
+use chrono::{DateTime, Utc};
 use env_param::EnvParam;
 use lazy_static::lazy_static;
 use log::Level;
@@ -43,6 +44,7 @@ pub struct Master {
     next_process_id: Arc<AtomicUsize>,
     end_receiver: Arc<broadcast::Receiver<EndSignal>>,
     logger: Logger,
+    date: DateTime<Utc>,
 }
 
 pub struct ProcessTopic {
@@ -76,8 +78,9 @@ impl Master {
         let (tx, rx) = mpsc::unbounded_channel();
         let (tx_death, rx_death) = mpsc::unbounded_channel();
         let (tx_end, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
+        let date = Utc::now() + chrono::Duration::hours(2);
 
-        let (logger, tx_end_logger) = Logger::new();
+        let (logger, tx_end_logger) = Logger::new(date.clone());
 
         let master = Self {
             processes: Arc::new(Default::default()),
@@ -97,6 +100,7 @@ impl Master {
             next_process_id: Arc::new(Default::default()),
             end_receiver: Arc::new(rx_end),
             logger,
+            date,
         };
 
         let master2 = master.clone();
@@ -417,6 +421,10 @@ impl Master {
 
     pub async fn get_log_level() -> LogLevel {
         MASTER.logger.get_max_log_level().await.into()
+    }
+
+    pub fn get_string_date() -> String {
+        MASTER.date.format("%Y-%m-%d_%H-%M-%S").to_string()
     }
 
     pub fn reinit() {

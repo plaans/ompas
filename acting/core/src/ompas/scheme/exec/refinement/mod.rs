@@ -6,7 +6,7 @@ use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::error::RaeExecError;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
 use crate::ompas::manager::acting::acting_var::AsCst;
-use crate::ompas::manager::acting::inner::ProcessKind;
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Interval;
 use crate::ompas::manager::acting::process::task::{RefinementTrace, Selected};
 use crate::ompas::manager::acting::process::ProcessOrigin;
@@ -129,7 +129,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         .process_ref;
     let task_id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
-            if acting_manager.get_kind(id).await == ProcessKind::Method {
+            if acting_manager.get_kind(id).await == ActingProcessKind::Method {
                 acting_manager
                     .new_task(
                         Label::Task(acting_manager.get_number_subtask(*id).await),

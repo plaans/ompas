@@ -53,10 +53,8 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
 
         //Add the sender of the channel.
         if let Some(pb) = &log {
-            let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-            let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
             let mut file_pb = pb.clone();
-            file_pb.push(format!("log_{}.txt", string_date));
+            file_pb.push(format!("log_{}.txt", Master::get_string_date()));
             ctx_io.set_log_output(LogOutput::File(file_pb));
         }
 

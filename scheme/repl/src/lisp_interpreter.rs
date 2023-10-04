@@ -256,21 +256,22 @@ async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
         LOG_TOPIC_INTERPRETER,
     )
     .await;
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-
     let dir_path: PathBuf = match working_dir {
         Some(wd) => {
             let mut dir_path = wd;
             dir_path.push("lisp_logs");
             dir_path
         }
-        None => format!("{}/lisp", OMPAS_WORKING_DIR.get_ref()).into(),
+        None => {
+            let mut path = OMPAS_WORKING_DIR.get_ref().into();
+            path.push("lisp");
+            path
+        }
     };
 
     fs::create_dir_all(&dir_path).expect("could not create logs directory");
     let mut file_path = dir_path.clone();
-    file_path.push(format!("log_{}", string_date));
+    file_path.push(format!("log_{}", Master::get_string_date()));
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)

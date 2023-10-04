@@ -3,8 +3,8 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "gripper-generator",
-    about = "Generation of problems for gripper domain"
+    name = "test_yaml",
+    about = "Test Yaml serialize and deserialize for config of generator"
 )]
 struct Opt {}
 

@@ -37,6 +37,10 @@ path = "src/bin/bench_gobot.rs"
 name = "bench"
 path = "src/bin/bench.rs"
 
+[[bin]]
+name = "stat"
+path = "src/bin/stat.rs"
+
 
 
 

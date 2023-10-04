@@ -56,16 +56,15 @@ pub struct Logger {
 }
 
 impl Logger {
-    pub fn new() -> (Self, mpsc::Sender<EndSignal>) {
-        let start = Utc::now() + chrono::Duration::hours(2);
-        let current_log_dir = start.format("%Y-%m-%d_%H-%M-%S").to_string();
+    pub fn new(date: DateTime<Utc>) -> (Self, mpsc::Sender<EndSignal>) {
+        let current_log_dir = date.format("%Y-%m-%d_%H-%M-%S").to_string();
 
         let (tx, rx) = mpsc::unbounded_channel();
         let (tx_end_logger, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
 
         let logger = Self {
             collection: Default::default(),
-            absolute_start: start,
+            absolute_start: date,
             system_start: SystemTime::now(),
             current_log_dir,
             max_log_level: Arc::new(RwLock::new(DEFAULT_MAX_LOG_LEVEL)),

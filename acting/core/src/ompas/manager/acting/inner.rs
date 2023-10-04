@@ -7,13 +7,16 @@ use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::VarId;
+use crate::ompas::interface::stat::OMPASRunStat;
+use crate::ompas::manager::acting::acting_stat::ActingStat;
 use crate::ompas::manager::acting::acting_var::{
     ActingVal, ActingValUpdate, ActingVarCollection, ActingVarId, ActingVarRef, AsCst, PlanVarRef,
 };
-use crate::ompas::manager::acting::interval::{Interval, Timepoint};
+use crate::ompas::manager::acting::interval::{Duration, Interval, Timepoint};
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
 use crate::ompas::manager::acting::process::command::CommandProcess;
+use crate::ompas::manager::acting::process::process_stat::ActingProcessStat;
 use crate::ompas::manager::acting::process::refinement::RefinementProcess;
 use crate::ompas::manager::acting::process::root_task::RootProcess;
 use crate::ompas::manager::acting::process::task::{RefinementTrace, TaskProcess};
@@ -35,17 +38,18 @@ use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processin
 use crate::planning::conversion::flow_graph::graph::Dot;
 use crate::planning::planner::problem::ChronicleInstance;
 use aries_planning::chronicles::{ChronicleOrigin, TaskId};
-use chrono::{DateTime, Utc};
 use im::HashSet;
+use map_macro::hash_map;
 use ompas_language::supervisor::*;
-use ompas_middleware::OMPAS_WORKING_DIR;
+use ompas_middleware::Master;
+use serde::{Deserialize, Serialize};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::any::Any;
 use std::env::set_current_dir;
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::fs;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
 use tokio::sync::{broadcast, watch};
@@ -53,7 +57,6 @@ use tokio::sync::{broadcast, watch};
 const TASK_NAME: &str = "task_name";
 const TASK_STATUS: &str = "task_status";
 const TASK_EXECUTION_TIME: &str = "task_exec_time";
-const OMPAS_STATS: &str = "ompas_stats";
 
 struct Reservation {
     id: ActingProcessId,
@@ -62,8 +65,8 @@ struct Reservation {
     priority: WaiterPriority,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ProcessKind {
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ActingProcessKind {
     Method,
     Acquire,
     Arbitrary,
@@ -73,19 +76,19 @@ pub enum ProcessKind {
     AbstractModel,
 }
 
-impl Display for ProcessKind {
+impl Display for ActingProcessKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                ProcessKind::Task => TASK,
-                ProcessKind::Command => COMMAND,
-                ProcessKind::Method => METHOD,
-                ProcessKind::Acquire => ACQUIRE,
-                ProcessKind::Arbitrary => ARBITRARY,
-                ProcessKind::Root => ROOT_TASK,
-                ProcessKind::AbstractModel => ABSTRACT_MODEL,
+                ActingProcessKind::Task => TASK,
+                ActingProcessKind::Command => COMMAND,
+                ActingProcessKind::Method => METHOD,
+                ActingProcessKind::Acquire => ACQUIRE,
+                ActingProcessKind::Arbitrary => ARBITRARY,
+                ActingProcessKind::Root => ROOT_TASK,
+                ActingProcessKind::AbstractModel => ABSTRACT_MODEL,
             }
         )
     }
@@ -277,7 +280,7 @@ impl InnerActingManager {
         }
     }
 
-    pub fn get_kind(&self, id: &ActingProcessId) -> ProcessKind {
+    pub fn get_kind(&self, id: &ActingProcessId) -> ActingProcessKind {
         self.processes[*id].inner.kind()
     }
 
@@ -307,11 +310,6 @@ impl InnerActingManager {
         for PlanVarRef { var_id, am_id } in
             self.acting_vars.set_execution_val(acting_var_ref, val_t)
         {
-            /*println!(
-                "set_execution_val: {} => {}",
-                var_id.format(&self.st, true),
-                val
-            );*/
             self.models[am_id]
                 .runtime_info
                 .add_instantiation(Instantiation::new(var_id, self.st.new_cst(cst.clone())));
@@ -376,7 +374,7 @@ impl InnerActingManager {
         let end = self.processes[*id].end.clone();
         self.set_execution_val(&end, instant);
 
-        if self.get_kind(id) == ProcessKind::Task {
+        if self.get_kind(id) == ActingProcessKind::Task {
             if let Some(refinement) = self.processes[*id]
                 .inner
                 .as_action()
@@ -426,7 +424,7 @@ impl InnerActingManager {
 
     pub fn set_status(&mut self, id: &ActingProcessId, status: ProcessStatus) {
         self.processes[*id].set_status(status);
-        if self.get_kind(id) == ProcessKind::Task {
+        if self.get_kind(id) == ActingProcessKind::Task {
             if let Some(refinement) = self.processes[*id]
                 .inner
                 .as_action()
@@ -1129,7 +1127,7 @@ impl InnerActingManager {
     }
 
     pub fn get_lv(&self, id: &ActingProcessId) -> LValue {
-        if self.get_kind(id) == ProcessKind::Method {
+        if self.get_kind(id) == ActingProcessKind::Method {
             let om_id = self.get_am_id(id);
             self.models[om_id].lv.clone()
         } else {
@@ -1146,7 +1144,7 @@ impl InnerActingManager {
     }
 
     pub fn get_om(&self, id: &ActingProcessId) -> LValue {
-        if self.get_kind(id) == ProcessKind::Method {
+        if self.get_kind(id) == ActingProcessKind::Method {
             let om_id = self.get_am_id(id);
             self.models[om_id].lv_om.clone()
         } else {
@@ -1599,9 +1597,7 @@ impl InnerActingManager {
             None => "/tmp".into(),
             Some(p) => p,
         };
-        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-        path.push(format!("acting_tree_{}", string_date));
+        path.push(format!("acting_tree_{}", Master::get_string_date()));
         fs::create_dir_all(&path).unwrap();
 
         let mut path_dot = path.clone();
@@ -1842,62 +1838,148 @@ impl InnerActingManager {
         self.set_planner_vals(updates)
     }
 
-    pub async fn export_to_csv(&self, working_dir: Option<PathBuf>, file: Option<String>) {
-        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+    pub fn get_acting_stat(&self) -> ActingStat {
+        ActingStat {
+            n_root_task: self.processes[0].inner.as_root().unwrap().tasks.len() as u32,
+        }
+    }
 
-        let dir_path: PathBuf = match working_dir {
-            Some(wd) => {
-                let mut dir_path = wd;
-                dir_path.push(OMPAS_STATS);
-                dir_path
+    pub async fn get_run_stats(&self) -> OMPASRunStat {
+        let mut stats = OMPASRunStat::new();
+        self.processes[0]
+            .inner
+            .as_root()
+            .unwrap()
+            .tasks
+            .iter()
+            .for_each(|id| stats.add_stat(self.get_acting_process_stat(id)));
+        stats.add_stat(self.get_acting_stat());
+        if let Some(planner) = &self.planner_manager_interface {
+            stats.add_stat(planner.get_stat().await)
+        }
+        stats
+    }
+
+    pub fn get_acting_process_stat(&self, id: &ActingProcessId) -> ActingProcessStat {
+        let process = &self.processes[*id];
+
+        ActingProcessStat {
+            id: *id,
+            kind: process.inner.kind(),
+            label: process.debug().clone().unwrap(),
+            execution_time: self.get_execution_time(id),
+            deliberation_time: self.get_deliberation_time(id),
+            number_subprocesses: self.get_number_subprocesses(id),
+        }
+    }
+
+    pub fn get_execution_time(&self, id: &ActingProcessId) -> Duration {
+        let process = &self.processes[*id];
+        Interval::new(
+            self.get_acting_var_val(&process.start).unwrap(),
+            self.get_acting_var_val(&process.end),
+        )
+        .duration()
+    }
+
+    pub fn get_deliberation_time(&self, id: &ActingProcessId) -> Duration {
+        let mut duration = Duration::zero();
+        let mut queue = vec![*id];
+
+        while let Some(id) = queue.pop() {
+            match &self.processes[id].inner {
+                ActingProcessInner::RootTask(_) => {}
+                ActingProcessInner::Task(t) => {
+                    for r in &t.refinements {
+                        if let Some(trace) = &r.refinement_trace {
+                            duration += trace.duration.duration()
+                        }
+                    }
+                }
+                ActingProcessInner::Command(_) => {}
+                ActingProcessInner::AbstractModel(_) => {}
+                ActingProcessInner::Method(_) => {}
+                ActingProcessInner::Arbitrary(_) => {}
+                ActingProcessInner::Acquire(_) => {}
             }
-            None => format!("{}/stats/{}", OMPAS_WORKING_DIR.get_ref(), OMPAS_STATS).into(),
-        };
+        }
 
-        fs::create_dir_all(&dir_path).expect("could not create stats directory");
-        let mut file_path = dir_path;
-        file_path.push(match file {
-            Some(f) => format!("{}.csv", f),
-            None => format!("{}{}.csv", OMPAS_STATS, string_date),
-        });
-        let mut file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&file_path)
-            .expect("error creating stat file");
-        let header = format!(
+        duration
+    }
+
+    pub fn get_number_subprocesses(
+        &self,
+        id: &ActingProcessId,
+    ) -> std::collections::HashMap<ActingProcessKind, u32> {
+        let mut map = hash_map! {
+            ActingProcessKind::AbstractModel => 0,
+            ActingProcessKind::Acquire => 0,
+            ActingProcessKind::Arbitrary => 0,
+            ActingProcessKind::Method => 0,
+            ActingProcessKind::Command => 0,
+            ActingProcessKind::Task => 0,
+            ActingProcessKind::Root => 0,
+        };
+        let mut queue = vec![*id];
+
+        while let Some(id) = queue.pop() {
+            let process = &self.processes[id];
+            *map.get_mut(&process.inner.kind()).unwrap() += 1;
+            match &self.processes[id].inner {
+                ActingProcessInner::RootTask(r) => queue.append(&mut r.tasks.clone()),
+                ActingProcessInner::Task(t) => {
+                    for r in &t.refinements {
+                        if let Some(m) = r.get_executed() {
+                            queue.push(*m);
+                        }
+                    }
+                }
+                ActingProcessInner::AbstractModel(_) => {
+                    unreachable!()
+                }
+                ActingProcessInner::Method(m) => m.childs.values().for_each(|&id| queue.push(id)),
+                ActingProcessInner::Arbitrary(_)
+                | ActingProcessInner::Acquire(_)
+                | ActingProcessInner::Command(_) => {}
+            }
+        }
+
+        map
+    }
+
+    pub fn get_header_stat() -> String {
+        format!(
             "\"{}\";\"{}\";\"{}\"\n",
             TASK_NAME, TASK_STATUS, TASK_EXECUTION_TIME,
-        );
-        if file.metadata().unwrap().len() == 0 {
-            file.write_all(header.as_bytes())
-                .expect("could not write to stat file");
-        }
+        )
+    }
+
+    pub fn export_to_csv(&self) -> String {
+        let mut str = "".to_string();
+
         let parent: Vec<ActingProcessId> = self.processes[0].inner.as_root().unwrap().tasks.clone();
         for p in &parent {
             let process = &self.processes[*p];
-            file.write_all(
-                format!(
-                    "\"{}\";\"{}\";\"{}\"\n", //";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
-                    process.debug().clone().unwrap(),
-                    process.status,
-                    {
-                        let start = self.get_acting_var_val(&process.start).unwrap();
-                        let end = self.get_acting_var_val(&process.end);
-                        let interval = Interval::new(start, end);
-                        let duration = interval.duration();
-                        if duration.is_finite() {
-                            duration.as_secs().to_string()
-                        } else {
-                            duration.to_string()
-                        }
-                    },
-                )
-                .as_bytes(),
+            write!(
+                str,
+                "\"{}\";\"{}\";\"{}\"\n",
+                process.debug().clone().unwrap(),
+                process.status,
+                {
+                    let start = self.get_acting_var_val(&process.start).unwrap();
+                    let end = self.get_acting_var_val(&process.end);
+                    let interval = Interval::new(start, end);
+                    let duration = interval.duration();
+                    if duration.is_finite() {
+                        duration.as_secs().to_string()
+                    } else {
+                        duration.to_string()
+                    }
+                },
             )
-            .expect("could not write to stat file")
+            .expect("could not write to stat file");
         }
+        str
     }
 }
 
@@ -1948,235 +2030,3 @@ fn format_acting_process(
     }
     f
 }
-
-/*
-impl InnerSupervisor {
-    pub async fn clear(&self) {
-        *self.trc.inner.write().await = Default::default();
-        *self.tn.subtasks.write().await = Default::default();
-        loop {
-            let id = self.next_id.load(Ordering::Relaxed);
-            if self
-                .next_id
-                .compare_exchange(id, id + 1, Ordering::Acquire, Ordering::Relaxed) //Equivalent to compare_and_swap
-                .is_ok()
-            {
-                break;
-            }
-        }
-    }
-
-    /*
-    GETTERS
-     */
-    pub async fn get_refinement_method(&self, id: &ActionId) -> Option<SelectMode> {
-        if let ActionMetaData::Task(task) = self.trc.get(id).await {
-            let r = task.get_last_refinement();
-            r.map(|ok| ok.refinement_type)
-        } else {
-            None
-        }
-    }
-
-    pub async fn get_execution_time(&self, id: &ActionId) -> Duration {
-        let task: TaskMetaData = self.trc.get(id).await.try_into().unwrap();
-        task.get_duration()
-    }
-
-    pub async fn get_number_of_subtasks(&self, id: &ActionId) -> usize {
-        self.tn.get_subtasks(id).await.len()
-    }
-
-    pub async fn get_number_of_subtasks_recursive(&self, id: &ActionId) -> usize {
-        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
-        let mut n = 0;
-        while let Some(c) = subtasks.pop() {
-            n += 1;
-            subtasks.append(&mut self.tn.get_subtasks(&c).await);
-        }
-
-        n
-    }
-
-    pub async fn get_number_of_abstract_tasks(&self, id: &ActionId) -> usize {
-        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
-        let mut n = 0;
-        while let Some(c) = subtasks.pop() {
-            if self.trc.is_task(id).await {
-                n += 1;
-                subtasks.append(&mut self.tn.get_subtasks(&c).await);
-            }
-        }
-        n
-    }
-
-    pub async fn get_number_of_actions(&self, id: &ActionId) -> usize {
-        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
-        let mut n = 0;
-        while let Some(c) = subtasks.pop() {
-            if self.trc.is_command(&c).await {
-                n += 1;
-            } else {
-                subtasks.append(&mut self.tn.get_subtasks(&c).await);
-            }
-        }
-        n
-    }
-
-    pub async fn get_total_number_of_refinement(&self, id: &ActionId) -> usize {
-        let task: TaskMetaData = self.trc.get(id).await.try_into().unwrap();
-        let mut n = task.get_number_of_refinement();
-        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
-        while let Some(c) = subtasks.pop() {
-            if self.trc.is_task(&c).await {
-                let task: TaskMetaData = self.trc.get(&c).await.try_into().unwrap();
-                subtasks.append(&mut self.tn.get_subtasks(&c).await);
-                n += task.get_number_of_refinement();
-            }
-        }
-        n
-    }
-
-    pub async fn get_total_refinement_time(&self, id: &ActionId) -> Duration {
-        let mut total_time: Duration = Duration::Finite(0);
-        let task: TaskMetaData = self.trc.get(id).await.try_into().unwrap();
-        total_time += task.get_total_refinement_time();
-        let mut subtasks: Vec<ActionId> = self.tn.get_subtasks(id).await;
-        while let Some(c) = subtasks.pop() {
-            if self.trc.is_task(&c).await {
-                let task: TaskMetaData = self.trc.get(&c).await.try_into().unwrap();
-                subtasks.append(&mut self.tn.get_subtasks(&c).await);
-                total_time += task.get_total_refinement_time();
-            }
-        }
-        total_time
-    }
-
-    pub async fn get_stats(&self) -> LValue {
-        let mut map: im::HashMap<LValue, LValue> = Default::default();
-        let task_collection: im::HashMap<ActionId, ActionMetaData> =
-            self.trc.inner.read().await.clone();
-        let parent: Vec<ActionId> = self.tn.get_parents().await;
-        for p in &parent {
-            let mut task_stats: im::HashMap<LValue, LValue> = Default::default();
-            task_stats.insert(
-                string!(REFINEMENT_METHOD),
-                match self.get_refinement_method(p).await {
-                    Some(s) => s.to_string(),
-                    None => "none".to_string(),
-                }
-                    .into(),
-            );
-            task_stats.insert(
-                string!(REFINEMENT_NUMBER),
-                self.get_total_number_of_refinement(p).await.into(),
-            );
-            task_stats.insert(
-                string!(SUBTASK_NUMBER),
-                self.get_number_of_subtasks_recursive(p).await.into(),
-            );
-            task_stats.insert(
-                string!(TASK_EXECUTION_TIME),
-                self.get_execution_time(p).await.to_string().into(),
-            );
-            task_stats.insert(
-                string!(TASK_STATUS),
-                self.get_status(p).await.to_string().into(),
-            );
-            task_stats.insert(
-                string!(ACTION_NUMBER),
-                self.get_number_of_actions(p).await.into(),
-            );
-            task_stats.insert(
-                string!(TOTAL_REFINEMENT_TIME),
-                self.get_total_refinement_time(p).await.to_string().into(),
-            );
-            map.insert(
-                task_collection.get(p).unwrap().get_label(),
-                task_stats.into(),
-            );
-        }
-
-        map.into()
-    }
-
-    pub async fn export_to_csv(&self, working_dir: Option<PathBuf>, file: Option<String>) {
-        let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-        let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-
-        let dir_path: PathBuf = match working_dir {
-            Some(wd) => {
-                let mut dir_path = wd;
-                dir_path.push(RAE_STATS);
-                dir_path
-            }
-            None => format!(
-                "{}/ompas/{}",
-                match env::var("HOME") {
-                    Ok(val) => val,
-                    Err(_) => ".".to_string(),
-                },
-                RAE_STATS
-            )
-                .into(),
-        };
-
-        fs::create_dir_all(&dir_path).expect("could not create stats directory");
-        let mut file_path = dir_path.clone();
-        file_path.push(match file {
-            Some(f) => format!("{}.csv", f),
-            None => format!("{}{}.csv", RAE_STATS, string_date),
-        });
-        let mut file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&file_path)
-            .expect("error creating stat file");
-        let header = format!(
-            "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
-            TASK_NAME,
-            TASK_STATUS,
-            TASK_EXECUTION_TIME,
-            REFINEMENT_METHOD,
-            REFINEMENT_NUMBER,
-            TOTAL_REFINEMENT_TIME,
-            SUBTASK_NUMBER,
-            ACTION_NUMBER
-        );
-        if file.metadata().unwrap().len() == 0 {
-            file.write_all(header.as_bytes())
-                .expect("could not write to stat file");
-        }
-        let task_collection: im::HashMap<ActionId, ActionMetaData> =
-            self.trc.inner.read().await.clone();
-        let parent: Vec<ActionId> = self.tn.get_parents().await;
-        for p in &parent {
-            file.write_all(
-                format!(
-                    "\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\";\"{}\"\n",
-                    task_collection.get(p).unwrap().get_label(),
-                    self.get_status(p).await,
-                    {
-                        let u: Duration = self.get_execution_time(p).await;
-                        if u.is_finite() {
-                            u.as_secs().to_string()
-                        } else {
-                            u.to_string()
-                        }
-                    },
-                    match self.get_refinement_method(p).await {
-                        Some(s) => s.to_string(),
-                        None => "none".to_string(),
-                    },
-                    self.get_total_number_of_refinement(p).await,
-                    self.get_total_refinement_time(p).await.as_secs(),
-                    self.get_number_of_subtasks_recursive(p).await,
-                    self.get_number_of_actions(p).await,
-                )
-                    .as_bytes(),
-            )
-                .expect("could not write to stat file")
-        }
-    }
-    }
- */

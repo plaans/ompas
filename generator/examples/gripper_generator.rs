@@ -1,5 +1,5 @@
 use generator::config::Recipe;
-use generator::domain::gripper::{GripperConfig, GripperGenerator, GripperProblem};
+use generator::generator::gripper::GripperGenerator;
 use generator::{Generator, Problem};
 use structopt::StructOpt;
 

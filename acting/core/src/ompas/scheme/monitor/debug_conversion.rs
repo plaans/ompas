@@ -7,11 +7,11 @@ use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, P
 use crate::planning::conversion::flow_graph::algo::p_eval::{p_eval, P_EVAL};
 use crate::planning::conversion::{convert_acting_domain, debug_with_markdown};
 use crate::planning::planner::problem::PlanningDomain;
-use chrono::{DateTime, Utc};
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::debug_conversion::*;
 use ompas_language::monitor::model::MOD_MODEL;
 use ompas_middleware::logger::LogClient;
+use ompas_middleware::{Master, OMPAS_WORKING_DIR};
 use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
@@ -84,19 +84,18 @@ pub async fn export_type_lattice(env: &LEnv) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let ctx: ConversionContext = ctx.get_conversion_context().await;
 
-    let mut path: PathBuf = "/tmp".into();
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-    path.push(format!("type_network_{}", string_date));
+    let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    path.push("lattice_of_type");
+    path.push(format!("lattice_of_type_{}", Master::get_string_date()));
     fs::create_dir_all(&path).unwrap();
     let mut path_dot = path.clone();
-    let dot_file_name = "type_network.dot";
+    let dot_file_name = "lattice.dot";
     path_dot.push(dot_file_name);
     let mut file = File::create(&path_dot).unwrap();
     let dot = ctx.st.get_lattice().export_dot();
     file.write_all(dot.as_bytes()).unwrap();
     set_current_dir(&path).unwrap();
-    let graph_file_name = "type_network.png";
+    let graph_file_name = "lattice.png";
     Command::new("dot")
         .args(["-Tpng", dot_file_name, "-o", graph_file_name])
         .spawn()
@@ -104,7 +103,7 @@ pub async fn export_type_lattice(env: &LEnv) -> Result<(), LRuntimeError> {
         .wait()
         .unwrap();
     let mut md_path = path.clone();
-    let md_file_name = "type_network.md";
+    let md_file_name = "lattice.md";
     md_path.push(md_file_name);
     let mut md_file = File::create(&md_path).unwrap();
     let md: String = format!(

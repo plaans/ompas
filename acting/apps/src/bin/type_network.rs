@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use ompas_core::model::sym_domain::domain_test::DomainTest;
 use ompas_core::model::sym_domain::domain_test::DomainTest::*;
 use ompas_core::model::sym_domain::type_lattice::TypeLattice;
+use ompas_middleware::Master;
 use std::env::set_current_dir;
 use std::fs;
 use std::fs::File;
@@ -61,52 +62,9 @@ fn test_union(tn: &TypeLattice, ta: DomainTest, tb: DomainTest) {
     println!("{} | {} = {}", ta, tb, r)
 }
 
-/*fn output_domain_collection(path: PathBuf, dc: &DomainCollection, view: bool) {
-    let mut path = path;
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-    path.push(format!("type_network_{}", string_date));
-    fs::create_dir_all(&path).unwrap();
-    let mut path_dot = path.clone();
-    let dot_file_name = "type_network.dot";
-    path_dot.push(&dot_file_name);
-    let mut file = File::create(&path_dot).unwrap();
-    let dot = dc.export_dot();
-    file.write_all(dot.as_bytes()).unwrap();
-    set_current_dir(&path).unwrap();
-    let graph_file_name = "type_network.png";
-    Command::new("dot")
-        .args(["-Tpng", &dot_file_name, "-o", &graph_file_name])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
-    let mut md_path = path.clone();
-    let md_file_name = "type_network.md";
-    md_path.push(&md_file_name);
-    let mut md_file = File::create(&md_path).unwrap();
-    let md: String = format!(
-        "# Type Network : \n
-![]({})
-    ",
-        graph_file_name,
-    );
-
-    md_file.write_all(md.as_bytes()).unwrap();
-
-    if view {
-        Command::new("google-chrome")
-            .arg(&md_file_name)
-            .spawn()
-            .unwrap();
-    }
-}*/
-
 fn output_markdown(path: PathBuf, network: &TypeLattice, view: bool) {
     let mut path = path;
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-    path.push(format!("type_network_{}", string_date));
+    path.push(format!("type_network_{}", Master::get_string_date()));
     fs::create_dir_all(&path).unwrap();
     let mut path_dot = path.clone();
     let dot_file_name = "type_network.dot";

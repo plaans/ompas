@@ -17,11 +17,11 @@ use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processin
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::planner::problem::PlanningDomain;
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG};
-use chrono::{DateTime, Utc};
 #[allow(unused)]
 use debug_print::debug_println;
 use env_param::EnvParam;
 use ompas_language::exec::MOD_EXEC;
+use ompas_middleware::Master;
 use sompas_structs::llambda::{LLambda, LambdaArgs};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -440,9 +440,7 @@ pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: b
     let ch = om.chronicle.as_ref().unwrap();
     let label = label.replace('/', "_");
     let mut path = path;
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-    path.push(format!("graph-flow-output_{}", string_date));
+    path.push(format!("graph-flow-output_{}", Master::get_string_date()));
     fs::create_dir_all(&path).unwrap();
 
     let mut path_dot = path.clone();

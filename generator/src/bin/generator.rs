@@ -1,8 +1,9 @@
 use generator::config::GeneratorConfig;
-use generator::domain::gripper::GripperGenerator;
+use generator::generator::gripper::GripperGenerator;
+use generator::generator::gripper_door::GripperDoorGenerator;
 use ompas_middleware::OMPAS_WORKING_DIR;
 use std::fs;
-use std::fs::File;
+use std::fs::{create_dir_all, File};
 use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -28,6 +29,11 @@ pub fn main() -> Result<(), String> {
     config
         .generators
         .insert("gripper".to_string(), Box::new(GripperGenerator::default()));
+
+    config.generators.insert(
+        "gripper-door".to_string(),
+        Box::new(GripperDoorGenerator::default()),
+    );
 
     println!("{} to do...", config.jobs.len());
     let mut path = config
@@ -60,11 +66,10 @@ pub fn main() -> Result<(), String> {
                 let mut file = File::create(file_path).unwrap();
                 file.write_all(pb.to_sompas().as_bytes()).unwrap();
                 if config.generate_report {
-                    let report = pb.report();
                     let mut report_path = path.clone();
-                    report_path.push(format!("{}_report.{}", name, report.extension));
-                    let mut file = File::create(report_path).unwrap();
-                    file.write_all(report.content.as_bytes()).unwrap();
+                    report_path.push(format!("{}_report", name));
+                    create_dir_all(report_path.clone()).unwrap();
+                    let _ = pb.report(report_path);
                 }
             }
         }

@@ -3,8 +3,9 @@ use crate::model::acting_domain::OMPASDomain;
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
+use crate::ompas::interface::stat::OMPASRunStat;
 use crate::ompas::manager::acting::filter::ProcessFilter;
-use crate::ompas::manager::acting::inner::ProcessKind;
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::task::RefinementTrace;
 use crate::ompas::manager::acting::process::ProcessOrigin;
@@ -30,6 +31,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{broadcast, watch, RwLock};
 
+pub mod acting_stat;
 pub mod acting_var;
 pub mod filter;
 pub mod inner;
@@ -113,17 +115,16 @@ impl ActingManager {
         todo!()
     }
 
-    pub async fn export_to_csv(
-        &self,
-        working_dir: Option<PathBuf>,
-        file: Option<String>,
-    ) -> LValue {
-        self.inner
-            .read()
-            .await
-            .export_to_csv(working_dir, file)
-            .await;
-        LValue::Nil
+    pub fn get_header_stat() -> String {
+        InnerActingManager::get_header_stat()
+    }
+
+    pub async fn export_to_csv(&self) -> String {
+        self.inner.read().await.export_to_csv()
+    }
+
+    pub async fn get_run_stat(&self) -> OMPASRunStat {
+        self.inner.read().await.get_run_stats().await
     }
 
     pub async fn st(&self) -> RefSymTable {
@@ -142,7 +143,7 @@ impl ActingManager {
         self.inner.read().await.get_origin(id)
     }
 
-    pub async fn get_kind(&self, id: &ActingProcessId) -> ProcessKind {
+    pub async fn get_kind(&self, id: &ActingProcessId) -> ActingProcessKind {
         self.inner.read().await.get_kind(id)
     }
 

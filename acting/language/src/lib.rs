@@ -949,8 +949,12 @@ pub mod monitor {
         pub const GET_STATS: &str = "get-stats";
         pub const DOC_GET_STATS: &str = "Return the statistics of the execution of the system";
 
-        pub const EXPORT_STATS: &str = "export-stats";
-        pub const DOC_EXPORT_STATS: &str = "Export the statistics in csv format in a given file.";
+        pub const EXPORT_STATS: &str = "export_stats";
+        pub const DOC_EXPORT_STATS: &str =
+            "Export the stats of the current run in either yaml or json format";
+
+        pub const EXPORT_TO_CSV: &str = "export_to_csv";
+        pub const DOC_EXPORT_TO_CSV: &str = "Export the statistics in csv format in a given file.";
 
         pub const DUMP_TRACE: &str = "dump_trace";
         pub const DOC_DUMP_TRACE: &str =
@@ -1062,4 +1066,11 @@ pub mod sym_table {
     pub const TYPE_RESOURCE_HANDLE: &str = "*ResourceHandle*";
 
     pub const EPSILON: &str = "*eps*";
+}
+
+pub mod output {
+    pub const OMPAS_STATS: &str = "stats";
+    pub const CSV_FORMAT: &str = "csv";
+    pub const YAML_FORMAT: &str = "yml";
+    pub const JSON_FORMAT: &str = "json";
 }

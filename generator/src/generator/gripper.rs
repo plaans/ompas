@@ -1,16 +1,30 @@
 use crate::config::Recipe;
-use crate::domain::gripper::GripperTask::Place;
-use crate::domain::gripper::Object::{Ball, Robby};
+use crate::generator::gripper::GripperTask::Place;
+use crate::generator::gripper::Object::{Ball, Robby};
 use crate::{Generator, Problem, Task};
+use petgraph::dot::Dot;
 use petgraph::Graph;
 use rand::prelude::IteratorRandom;
 use sompas_structs::list;
 use sompas_structs::lvalue::LValue;
 use std::collections::HashSet;
+use std::fmt::Write;
+use std::fmt::{Display, Formatter};
+use std::fs::File;
+use std::io::Write as OtherWrite;
+use std::path::PathBuf;
+use std::process::Command;
 
-const BALL: &str = "ball";
-const ROOM: &str = "room";
+//Types
+pub const BALL: &str = "ball";
+pub const ROOM: &str = "room";
 
+//State functions
+pub const POS: &str = "pos";
+pub const AT_ROBBY: &str = "at-robby";
+
+//Tasks
+pub const PLACE: &str = "place";
 #[derive(Default)]
 pub struct GripperGenerator {}
 
@@ -31,9 +45,47 @@ pub enum GripperTask {
     Place(u32, u32),
 }
 
-#[derive(Default)]
-pub struct Connected {}
+impl From<&GripperTask> for Task {
+    fn from(value: &GripperTask) -> Self {
+        match value {
+            Place(b, r) => {
+                vec![
+                    PLACE.to_string(),
+                    Ball(*b).get_label(),
+                    Room::new(*r).get_label(),
+                ]
+            }
+        }
+    }
+}
 
+impl Display for GripperTask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Place(b, r) => write!(
+                f,
+                "{}({},{})",
+                PLACE,
+                Ball(*b).get_label(),
+                Room::new(*r).get_label(),
+            ),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Connected {
+    None,
+    Door(DoorStatus),
+}
+
+#[derive(Debug)]
+pub enum DoorStatus {
+    Opened,
+    Closed,
+}
+
+#[derive(Debug)]
 pub enum Object {
     Robby,
     Ball(u32),
@@ -42,15 +94,16 @@ pub enum Object {
 impl Object {
     pub fn get_label(&self) -> String {
         match self {
-            Self::Robby => "robby".to_string(),
-            Self::Ball(i) => format!("{BALL}_{i}"),
+            Robby => "robby".to_string(),
+            Ball(i) => format!("{BALL}_{i}"),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct Room {
-    id: u32,
-    contains: Vec<Object>,
+    pub id: u32,
+    pub contains: Vec<Object>,
 }
 
 impl Room {
@@ -164,18 +217,7 @@ impl Problem for GripperProblem {
     }
 
     fn get_tasks(&self) -> Vec<Task> {
-        self.tasks
-            .iter()
-            .map(|t| match t {
-                Place(b, r) => {
-                    vec![
-                        "place".to_string(),
-                        Ball(*b).get_label(),
-                        Room::new(*r).get_label(),
-                    ]
-                }
-            })
-            .collect()
+        self.tasks.iter().map(|t| t.into()).collect()
     }
 
     fn get_dynamic_facts(&self) -> Vec<(LValue, LValue)> {
@@ -184,9 +226,9 @@ impl Problem for GripperProblem {
             let room_lv: LValue = node.get_label().into();
             for o in &node.contains {
                 match o {
-                    Robby => facts.push((list!["at-robby".into()], room_lv.clone())),
+                    Robby => facts.push((list![AT_ROBBY.into()], room_lv.clone())),
                     Ball(_) => {
-                        facts.push((list!("pos".into(), o.get_label().into()), room_lv.clone()))
+                        facts.push((list!(POS.into(), o.get_label().into()), room_lv.clone()))
                     }
                 }
             }
@@ -196,5 +238,66 @@ impl Problem for GripperProblem {
 
     fn get_static_facts(&self) -> Vec<(LValue, LValue)> {
         vec![]
+    }
+
+    fn report(&self, path: PathBuf) -> PathBuf {
+        let dot = Dot::with_attr_getters(
+            &self.graph,
+            &[],
+            &|_, _| -> String { "".to_string() },
+            &|_, (_, nr)| -> String {
+                let mut label = nr.get_label();
+                write!(label, "\n\t-contains:").unwrap();
+                for o in &nr.contains {
+                    write!(label, "\n\t\t-{}", o.get_label()).unwrap();
+                }
+                format!("label=\"{}\", shape=rectangle, style=rounded", label)
+            },
+        );
+
+        let mut dot_file_name = path.clone();
+        dot_file_name.push("topology.dot");
+        let mut dot_file = File::create(dot_file_name.clone()).unwrap();
+
+        dot_file.write_all(format!("{:?}", dot).as_bytes()).unwrap();
+
+        let mut img_file_name = path.clone();
+        let name = "topology.png";
+        img_file_name.push(name);
+
+        let mut content = "## Tasks\n".to_string();
+        for t in &self.tasks {
+            write!(content, "-{}", t.to_string()).unwrap();
+        }
+
+        write!(content, "\n## TOPOLOGY\n ![]({})", name).unwrap();
+        write!(
+            content,
+            "\n## PROBLEM FILE \n ```lisp\n\
+        {}\n\
+        ```",
+            self.to_sompas()
+        )
+        .unwrap();
+
+        Command::new("dot")
+            .args([
+                "-Tpng",
+                dot_file_name.to_str().unwrap(),
+                "-o",
+                img_file_name.to_str().unwrap(),
+            ])
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        let mut report_file_name = path.clone();
+        report_file_name.push("report.md");
+        let mut md_file = File::create(&report_file_name).unwrap();
+
+        md_file.write_all(content.as_bytes()).unwrap();
+
+        report_file_name
     }
 }

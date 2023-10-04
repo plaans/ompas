@@ -1,6 +1,6 @@
 use crate::model::process_ref::Label;
 use crate::ompas::manager::acting::acting_var::{ActingVarCollection, ActingVarRef};
-use crate::ompas::manager::acting::inner::ProcessKind;
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
@@ -19,6 +19,7 @@ pub mod acquire;
 
 pub mod arbitrary;
 pub mod command;
+pub mod process_stat;
 pub mod refinement;
 pub mod root_task;
 pub mod task;
@@ -208,15 +209,15 @@ impl Display for ActingProcessInner {
 }
 
 impl ActingProcessInner {
-    pub fn kind(&self) -> ProcessKind {
+    pub fn kind(&self) -> ActingProcessKind {
         match self {
-            ActingProcessInner::RootTask(_) => ProcessKind::Root,
-            ActingProcessInner::Task(_) => ProcessKind::Task,
-            ActingProcessInner::Method(_) => ProcessKind::Method,
-            ActingProcessInner::Arbitrary(_) => ProcessKind::Arbitrary,
-            ActingProcessInner::Acquire(_) => ProcessKind::Acquire,
-            ActingProcessInner::AbstractModel(_) => ProcessKind::AbstractModel,
-            ActingProcessInner::Command(_) => ProcessKind::Command,
+            ActingProcessInner::RootTask(_) => ActingProcessKind::Root,
+            ActingProcessInner::Task(_) => ActingProcessKind::Task,
+            ActingProcessInner::Method(_) => ActingProcessKind::Method,
+            ActingProcessInner::Arbitrary(_) => ActingProcessKind::Arbitrary,
+            ActingProcessInner::Acquire(_) => ActingProcessKind::Acquire,
+            ActingProcessInner::AbstractModel(_) => ActingProcessKind::AbstractModel,
+            ActingProcessInner::Command(_) => ActingProcessKind::Command,
         }
     }
 

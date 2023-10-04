@@ -1,5 +1,5 @@
 use crate::model::process_ref::{Label, ProcessRef};
-use crate::ompas::manager::acting::inner::ProcessKind;
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
 use crate::ompas::manager::domain::DomainManager;
@@ -106,7 +106,7 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
 
     let id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
-            if supervisor.get_kind(id).await == ProcessKind::Method {
+            if supervisor.get_kind(id).await == ActingProcessKind::Method {
                 supervisor
                     .new_arbitrary(
                         Label::Arbitrary(supervisor.get_number_arbitrary(*id).await),

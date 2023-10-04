@@ -11,10 +11,12 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::acting::acting_var::AsCst;
+use crate::ompas::manager::acting::interval::Duration;
 use crate::ompas::manager::acting::RefInnerActingManager;
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::plan_update::*;
+use crate::ompas::manager::planning::planner_stat::{PlannerStat, PlanningInstanceStat};
 use crate::ompas::manager::planning::problem_update::{ExecutionProblem, PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{ResourceManager, WaiterPriority};
 use crate::ompas::manager::state::state_update_manager::StateRule;
@@ -52,11 +54,12 @@ use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, RwLock};
 
 pub mod acting_var_ref_table;
 pub mod plan_update;
 pub mod planner_manager_interface;
+pub mod planner_stat;
 pub mod problem_update;
 
 const PROCESS_PLANNER_MANAGER: &str = "__PROCESS_PLANNER_MANAGER__";
@@ -70,6 +73,7 @@ struct PlannerManagerConfig {
     env: LEnv,
     opt: Option<PMetric>,
     rx_update: mpsc::UnboundedReceiver<PlannerUpdate>,
+    stats: Arc<RwLock<PlannerStat>>,
 }
 
 pub struct PlannerManager {}
@@ -84,8 +88,8 @@ impl PlannerManager {
         opt: Option<PMetric>,
     ) -> PlannerManagerInterface {
         let (tx_update, rx_update) = mpsc::unbounded_channel();
-
-        let pmi = PlannerManagerInterface::new(tx_update);
+        let stat: Arc<RwLock<PlannerStat>> = Default::default();
+        let pmi = PlannerManagerInterface::new(tx_update, stat.clone());
         let resource_manager = acting_manager.read().await.resource_manager.clone();
         let clock_manager = acting_manager.read().await.clock_manager.clone();
         tokio::spawn(Self::continuous_planning(PlannerManagerConfig {
@@ -98,16 +102,17 @@ impl PlannerManager {
             env,
             opt,
             rx_update,
+            stats: stat,
         }));
         pmi
     }
 
     async fn wait_plan(
-        plan_receiver: &mut Option<oneshot::Receiver<ActingTreeUpdate>>,
-    ) -> Option<ActingTreeUpdate> {
+        plan_receiver: &mut Option<oneshot::Receiver<PlannerResult>>,
+    ) -> Option<PlannerResult> {
         if let Some(plan_receiver) = plan_receiver {
             match plan_receiver.await {
-                Ok(pu) => Some(pu),
+                Ok(pr) => Some(pr),
                 Err(_) => None,
             }
         } else {
@@ -115,10 +120,16 @@ impl PlannerManager {
         }
     }
 
-    fn interrupt(interrupter: &mut Option<oneshot::Sender<bool>>) {
+    async fn interrupt(
+        interrupter: &mut Option<oneshot::Sender<bool>>,
+        plan_receiver: &mut Option<oneshot::Receiver<PlannerResult>>,
+    ) -> Option<PlannerResult> {
         let interrupter = interrupter.take();
         if let Some(interrupter) = interrupter {
             let _ = interrupter.send(true);
+            Self::wait_plan(plan_receiver).await
+        } else {
+            None
         }
     }
 
@@ -133,6 +144,7 @@ impl PlannerManager {
             env,
             opt,
             mut rx_update,
+            stats,
         } = config;
 
         add_domain_symbols(&st, &domain);
@@ -142,28 +154,35 @@ impl PlannerManager {
             LOG_TOPIC_OMPAS,
         )
         .await;
+        let mut next_id = 0;
 
         let mut planning = false;
         let mut interrupter: Option<oneshot::Sender<bool>> = None;
         let mut _updater: Option<mpsc::UnboundedSender<VarUpdate>> = None;
-        let mut plan_receiver: Option<oneshot::Receiver<ActingTreeUpdate>> = None;
+        let mut plan_receiver: Option<oneshot::Receiver<PlannerResult>> = None;
 
         let mut state_update_subscriber = state_manager.new_subscriber(StateRule::All).await;
 
         let mut clock = clock_manager.subscribe_to_clock().await;
-
-        //TODO: Remove
         let mut state: Option<WorldStateSnapshot>;
         'main: loop {
             tokio::select! {
-                Some(pu) = Self::wait_plan(&mut plan_receiver) => {
+                Some(PlannerResult {
+                    stat,
+                    update
+                }) = Self::wait_plan(&mut plan_receiver) => {
                     plan_receiver = None;
                     interrupter = None;
                     _updater = None;
-                    acting_manager.write().await.update_acting_tree(pu).await;
+                    stats.write().await.add_stat(stat);
+                    if let Some(update) =update {
+                        acting_manager.write().await.update_acting_tree(update).await;
+                    }
                 }
                 _ = process.recv() => {
-                    Self::interrupt(&mut interrupter);
+                    if let Some(pr) = Self::interrupt(&mut interrupter, &mut plan_receiver).await {
+                        stats.write().await.add_stat(pr.stat);
+                    };
                     break 'main;
                 }
                 Ok(_) = clock.changed() => {
@@ -203,8 +222,12 @@ impl PlannerManager {
                             }
                             explanation
                         };
+
+
                         if planning {
-                            Self::interrupt(&mut interrupter);
+                            if let Some(pr) = Self::interrupt(&mut interrupter, &mut plan_receiver).await {
+                                stats.write().await.add_stat(pr.stat)
+                            };
                         }
 
                         let mut new_state = state_manager.get_snapshot().await;
@@ -242,12 +265,14 @@ impl PlannerManager {
                                     Printer::print_chronicle(&instance.chronicle, &problem.context.model);
                                 }
                             }*/
-
                         let PlannerInstance {
-                            _updater: u,
-                            interrupter: i,
-                            plan_receiver: p,
-                        } = PlannerInstance::new(pp, problem, table, opt,explanation );
+                            id: _id,
+                             _updater: u,
+                             interrupter: i,
+                             plan_receiver: p,
+                        } =
+                        PlannerInstance::new(next_id, clock_manager.clone(), pp, problem, table, opt,explanation );
+                        next_id+=1;
                         _updater = Some(u);
                         interrupter = Some(i);
                         plan_receiver = Some(p);
@@ -259,20 +284,37 @@ impl PlannerManager {
     }
 }
 
+pub struct PlannerResult {
+    stat: PlanningInstanceStat,
+    update: Option<ActingTreeUpdate>,
+}
+
 pub struct PlannerInstance {
+    id: u32,
     _updater: mpsc::UnboundedSender<VarUpdate>,
     interrupter: oneshot::Sender<bool>,
-    plan_receiver: oneshot::Receiver<ActingTreeUpdate>,
+    plan_receiver: oneshot::Receiver<PlannerResult>,
 }
 
 impl PlannerInstance {
     pub fn new(
+        id: u32,
+        clock: ClockManager,
         planner_problem: PlannerProblem,
         problem: chronicles::Problem,
         table: ActingVarRefTable,
         opt: Option<PMetric>,
         explanation: String,
     ) -> Self {
+        let mut stat = PlanningInstanceStat {
+            id,
+            duration: Duration::zero(),
+            optimal: false,
+            interrupted: false,
+        };
+
+        let start = clock.now();
+
         if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
             println!("Planning for:\n{}", explanation);
         }
@@ -346,37 +388,36 @@ impl PlannerInstance {
                 ProcessInterface::new("__PROCESS__ARIES__", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS)
                     .await;
 
-            tokio::select! {
+            let update = tokio::select! {
                 _ = process.recv() => {
-
+                    None
                 }
                 _ = interrupted => {
                     handle.abort();
                     if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
                         println!("Interrupted planning for: \n{}", exp_2);
                     }
+                    None
                 }
-                Ok(Ok(Some(pu))) = planner => {
-                    if plan_sender.send(pu).is_err() {
-                        panic!("error sending plan update");
-                    }
+                Ok(Ok(update)) = planner => {
+                    update
                 }
+            };
+
+            let end = clock.now();
+            stat.duration =
+                crate::ompas::manager::acting::interval::Interval::new(start, Some(end)).duration();
+            if plan_sender.send(PlannerResult { stat, update }).is_err() {
+                panic!("error sending plan update");
             }
         });
 
         Self {
+            id,
             _updater,
             interrupter,
             plan_receiver,
         }
-    }
-
-    pub async fn wait(self) -> ActingTreeUpdate {
-        self.plan_receiver.await.unwrap()
-    }
-
-    pub fn interrupt(self) {
-        let _ = self.interrupter.send(true);
     }
 
     pub fn update(&self, updates: Vec<VarUpdate>) {

@@ -52,16 +52,13 @@ async fn log(
     working_dir: Option<PathBuf>,
     mut end_receiver: broadcast::Receiver<EndSignal>,
 ) {
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-
     let dir_path: PathBuf = match working_dir {
         Some(wd) => {
             let mut dir_path = wd;
-            dir_path.push("lisp_logs");
+            dir_path.push("sompas_logs");
             dir_path
         }
-        None => format!("{}lisp", OMPAS_WORKING_DIR.get_ref()).into(),
+        None => format!("{}/lisp", OMPAS_WORKING_DIR.get_ref()).into(),
     };
 
     fs::create_dir_all(&dir_path).expect("could not create logs directory");

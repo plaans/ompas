@@ -119,13 +119,10 @@ pub async fn lisp_interpreter(opt: Opt) {
         pb.clone()
     } else {
         let home = OMPAS_WORKING_DIR.get_ref();
-        PathBuf::from(format!("{}/ompas_benchmark", home))
+        PathBuf::from(format!("{}/benchmark", home))
     };
 
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-
-    log.push(string_date);
+    log.push(Master::get_string_date());
     fs::create_dir_all(log.clone()).unwrap();
 
     let ctx_rae = ModMonitor::new(
@@ -185,7 +182,7 @@ pub async fn lisp_interpreter(opt: Opt) {
     let problem_name = problem.file_name().unwrap().to_str().unwrap();
     let problem_name = problem_name.replace(".lisp", "");
     com.send(format!(
-        "(export-stats gobot-sim_{}_{})",
+        "(export_stats gobot-sim_{}_{}_{}.yml)",
         if opt.fa {
             "fa"
         } else if opt.lrpt {
@@ -197,7 +194,8 @@ pub async fn lisp_interpreter(opt: Opt) {
         } else {
             "random"
         },
-        problem_name
+        problem_name,
+        Master::get_string_date(),
     ))
     .await
     .expect("could not send to LI");

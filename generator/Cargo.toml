@@ -22,3 +22,10 @@ petgraph = "0.6.4"
 name = "test_yaml"
 crate-type = ["bin"]
 
+[[example]]
+name = "gripper_generator"
+crate-type = ["bin"]
+
+[[example]]
+name = "gripper_door_generator"
+crate-type = ["bin"]

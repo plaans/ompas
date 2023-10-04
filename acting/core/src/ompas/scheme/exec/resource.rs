@@ -1,5 +1,5 @@
 use crate::model::process_ref::{Label, ProcessRef};
-use crate::ompas::manager::acting::inner::ProcessKind;
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::acting::ActingProcessId;
 use crate::ompas::manager::resource::{
@@ -105,7 +105,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         .try_into()?;
     let id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
-            if acting_manager.get_kind(id).await == ProcessKind::Method {
+            if acting_manager.get_kind(id).await == ActingProcessKind::Method {
                 acting_manager
                     .new_acquire(
                         Label::ResourceAcquisition(acting_manager.get_number_acquire(*id).await),

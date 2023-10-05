@@ -3,10 +3,10 @@ use generator::generator::gripper::GripperGenerator;
 use generator::generator::gripper_build::GripperBuildGenerator;
 use generator::generator::gripper_door::GripperDoorGenerator;
 use generator::generator::gripper_multi::GripperMultiGenerator;
+use generator::generator::jobshop::JobshopGenerator;
 use ompas_middleware::OMPAS_WORKING_DIR;
 use std::fs;
-use std::fs::{create_dir_all, File};
-use std::io::Write;
+use std::fs::create_dir_all;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -14,6 +14,8 @@ const GRIPPER: &str = "gripper";
 const GRIPPER_DOOR: &str = "gripper-door";
 const GRIPPER_MULTI: &str = "gripper-multi";
 const GRIPPER_BUILD: &str = "gripper-build";
+const JOBSHOP_TWO: &str = "jobshop-two";
+const JOBSHOP_SIX: &str = "jobshop-six";
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -49,6 +51,12 @@ pub fn main() -> Result<(), String> {
         GRIPPER_BUILD.to_string(),
         Box::<GripperBuildGenerator>::default(),
     );
+    config
+        .generators
+        .insert(JOBSHOP_TWO.to_string(), Box::new(JobshopGenerator::new(2)));
+    config
+        .generators
+        .insert(JOBSHOP_SIX.to_string(), Box::new(JobshopGenerator::new(6)));
 
     println!("{} to do...", config.jobs.len());
     let mut path = config
@@ -74,12 +82,15 @@ pub fn main() -> Result<(), String> {
                 let mut file_path = path.clone();
                 let name = format!("{}_{}_{}", job.name, recipe_label, i);
                 file_path.push(format!("{}.lisp", name));
-                let pb = generator.new_problem(recipe)?;
+                let mut pb = generator.new_problem(recipe)?;
 
                 //println!("{}", pb.to_sompas());
 
-                let mut file = File::create(file_path).unwrap();
-                file.write_all(pb.to_sompas().as_bytes()).unwrap();
+                /*let mut file = File::create(file_path).unwrap();
+                file.write_all(pb.to_sompas().as_bytes()).unwrap();*/
+
+                pb.store(&file_path);
+
                 if config.generate_report {
                     let mut report_path = path.clone();
                     report_path.push(format!("{}_report", name));

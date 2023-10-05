@@ -12,6 +12,7 @@ pub mod gripper;
 pub mod gripper_build;
 pub mod gripper_door;
 pub mod gripper_multi;
+pub mod jobshop;
 
 pub fn populate_topology<N, E>(
     graph: &mut Graph<N, E>,

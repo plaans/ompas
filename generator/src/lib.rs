@@ -2,6 +2,8 @@ pub mod config;
 pub mod generator;
 
 use std::fmt::Write;
+use std::fs::File;
+use std::io::Write as OtherWrite;
 use std::path::PathBuf;
 
 use crate::config::Recipe;
@@ -54,6 +56,12 @@ pub trait Problem {
         writeln!(str, "\n)").unwrap();
         str
     }
+
+    fn store(&mut self, path: &PathBuf) {
+        let mut file = File::create(path).unwrap();
+        file.write_all(self.to_sompas().as_bytes()).unwrap();
+    }
+
     fn report(&self, _: PathBuf) -> PathBuf {
         todo!()
     }

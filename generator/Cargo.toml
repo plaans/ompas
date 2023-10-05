@@ -14,8 +14,9 @@ ompas-language = {path = "../acting/language"}
 rand = {workspace = true}
 structopt = { workspace = true}
 serde = { workspace = true}
+serde_yaml = { workspace = true}
+serde_json = { workspace = true, features = [] }
 
-serde_yaml = "0.9.25"
 petgraph = "0.6.4"
 
 [[example]]

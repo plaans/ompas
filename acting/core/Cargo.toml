@@ -37,6 +37,8 @@ async-stream = {workspace = true}
 map-macro =  {workspace = true}
 tokio-stream = { workspace = true }
 async-recursion = {workspace = true}
+serde_json = {workspace = true}
+serde_yaml = {workspace = true}
 
 
 futures = "0.3.28"
@@ -46,5 +48,4 @@ cli-table = "0.4.7"
 num-integer = "0.1.45"
 csv = { version = "1.3.0", features = [] }
 serde = { version = "1.0.188", features = ["derive"] }
-serde_json = "1.0.107"
-serde_yaml = "0.9.25"
+

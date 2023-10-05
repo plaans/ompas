@@ -3,16 +3,12 @@ use crate::ompas::manager::acting::process::process_stat::ActingProcessStat;
 use crate::ompas::manager::planning::planner_stat::PlannerStat;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct OMPASRunStat {
     inner: Vec<OMPASStat>,
 }
 
 impl OMPASRunStat {
-    pub fn new() -> Self {
-        Self { inner: vec![] }
-    }
-
     pub fn add_stat(&mut self, stat: impl Into<OMPASStat>) {
         self.inner.push(stat.into());
     }

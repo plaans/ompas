@@ -23,6 +23,7 @@ use crate::ompas::scheme::exec::refinement::rae_plan::rae_plan_select;
 use crate::ompas::scheme::exec::state::{instances, ModState};
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
+use ::aries::collections::seq::Seq;
 use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::refinement::*;
 use ompas_language::exec::MOD_EXEC;
@@ -187,7 +188,7 @@ async fn check_refinement_trace(
     let debug = acting_manager.get_debug(task_id).await.unwrap();
     let method_id = match &rt.selected {
         Selected::Anticipated(refinement_id) => {
-            let method_debug = acting_manager.get_debug(&refinement_id).await.unwrap();
+            let method_debug = acting_manager.get_debug(refinement_id).await.unwrap();
             log.debug(format!(
                 "({task_id}) Chose planned refinement for {debug}: ({refinement_id}) {method_debug}"
             ));
@@ -536,7 +537,7 @@ pub fn random_select(
     _: &LEnv,
 ) -> lruntimeerror::Result<LValue> {
     let mut rng = rand::thread_rng();
-    let mut candidates: Vec<&LValue> = candidates.iter().map(|lv| lv).collect();
+    let mut candidates: Vec<&LValue> = candidates.iter().to_vec();
     candidates.shuffle(&mut rng);
     Ok(candidates.get(0).cloned().unwrap_or(&LValue::Nil).clone())
 }

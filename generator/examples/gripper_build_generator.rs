@@ -1,13 +1,15 @@
 use generator::config::Recipe;
 use generator::generator::gripper::{BALL, ROOM, TASK};
-use generator::generator::gripper_door::{GripperDoorGenerator, MAX_DISTANCE, MAX_EDGE};
+use generator::generator::gripper_build::{GripperBuildGenerator, TOY};
+use generator::generator::gripper_door::{MAX_DISTANCE, MAX_EDGE};
+use generator::generator::gripper_multi::ROBOT;
 use generator::Generator;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "gripper-door-generator",
-    about = "Generation of problems for gripper-door domain"
+    name = "gripper-multi-generator",
+    about = "Generation of problems for gripper-multi domain"
 )]
 struct Opt {
     #[structopt(short = "b", long = "ball")]
@@ -20,6 +22,10 @@ struct Opt {
     max_distance: u32,
     #[structopt(short = "e", long = "edge")]
     max_edge: u32,
+    #[structopt(short = "a", long = "robot")]
+    robot: u32,
+    #[structopt(short = "o", long = "toy")]
+    toy: u32,
 }
 
 pub fn main() {
@@ -32,8 +38,10 @@ pub fn main() {
     recipe.insert(TASK.to_string(), opt.task);
     recipe.insert(MAX_DISTANCE.to_string(), opt.max_distance);
     recipe.insert(MAX_EDGE.to_string(), opt.max_edge);
+    recipe.insert(ROBOT.to_string(), opt.robot);
+    recipe.insert(TOY.to_string(), opt.toy);
 
-    let problem = GripperDoorGenerator::default()
+    let problem = GripperBuildGenerator::default()
         .new_problem(&recipe)
         .unwrap();
     let sompas = problem.to_sompas();

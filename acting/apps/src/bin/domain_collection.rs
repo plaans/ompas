@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use ompas_core::model::sym_domain::cst;
 use ompas_core::model::sym_domain::domain_test::DomainTest;
 use ompas_core::model::sym_domain::domain_test::DomainTest::*;

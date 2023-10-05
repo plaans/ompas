@@ -2,8 +2,7 @@
 //! The repl is based on the project rustyline.
 //!
 //! It contains only one function (for the moment): run that takes two arguments.
-use chrono::{DateTime, Utc};
-use ompas_middleware::OMPAS_WORKING_DIR;
+use ompas_middleware::{Master, OMPAS_WORKING_DIR};
 use ompas_utils::task_handler::{subscribe_new_task, EndSignal};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
@@ -63,7 +62,7 @@ async fn log(
 
     fs::create_dir_all(&dir_path).expect("could not create logs directory");
     let mut file_path = dir_path.clone();
-    file_path.push(format!("log_{}", string_date));
+    file_path.push(format!("log_{}", Master::get_string_date()));
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)

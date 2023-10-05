@@ -23,35 +23,35 @@ pub trait Problem {
     fn to_sompas(&self) -> String {
         let mut str = "(begin\n".to_string();
 
-        write!(str, "({}\n", DEF_OBJECTS).unwrap();
+        writeln!(str, "\t({}", DEF_OBJECTS).unwrap();
         for (t, objects) in self.get_objects() {
-            str.push_str("\t(");
+            str.push_str("\t\t(");
             objects.iter().for_each(|o| write!(str, "{o} ").unwrap());
-            write!(str, "{t})\n").unwrap();
+            writeln!(str, "{t})").unwrap();
         }
-        str.push_str(")\n");
+        str.push_str("\t)\n");
 
-        write!(str, "({}\n", DEF_FACTS).unwrap();
+        writeln!(str, "\t({}", DEF_FACTS).unwrap();
         for (sv, v) in self.get_dynamic_facts() {
-            write!(str, "\t{}\n", list!(sv, v)).unwrap();
+            writeln!(str, "\t\t{}", list!(sv, v)).unwrap();
         }
-        str.push_str(")\n");
+        str.push_str("\t)\n\n");
 
-        write!(str, "({}\n", DEF_STATIC_FACTS).unwrap();
+        writeln!(str, "\t({}", DEF_STATIC_FACTS).unwrap();
         for (sv, v) in self.get_static_facts() {
-            write!(str, "{}\n", list!(sv, v)).unwrap();
+            writeln!(str, "\t\t{}", list!(sv, v)).unwrap();
         }
-        str.push_str(")\n");
+        str.push_str("\t)\n\n");
 
         for task in self.get_tasks() {
-            write!(str, "({}", EXEC_TASK).unwrap();
+            write!(str, "\t({}", EXEC_TASK).unwrap();
             for p in task {
                 str.push(' ');
                 str.push_str(p.as_str());
             }
             str.push_str(")\n");
         }
-        write!(str, ")\n").unwrap();
+        writeln!(str, "\n)").unwrap();
         str
     }
     fn report(&self, _: PathBuf) -> PathBuf {

@@ -1845,7 +1845,7 @@ impl InnerActingManager {
     }
 
     pub async fn get_run_stats(&self) -> OMPASRunStat {
-        let mut stats = OMPASRunStat::new();
+        let mut stats = OMPASRunStat::default();
         self.processes[0]
             .inner
             .as_root()
@@ -1960,9 +1960,9 @@ impl InnerActingManager {
         let parent: Vec<ActingProcessId> = self.processes[0].inner.as_root().unwrap().tasks.clone();
         for p in &parent {
             let process = &self.processes[*p];
-            write!(
+            writeln!(
                 str,
-                "\"{}\";\"{}\";\"{}\"\n",
+                "\"{}\";\"{}\";\"{}\"",
                 process.debug().clone().unwrap(),
                 process.status,
                 {

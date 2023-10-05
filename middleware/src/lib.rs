@@ -80,7 +80,7 @@ impl Master {
         let (tx_end, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
         let date = Utc::now() + chrono::Duration::hours(2);
 
-        let (logger, tx_end_logger) = Logger::new(date.clone());
+        let (logger, tx_end_logger) = Logger::new(date);
 
         let master = Self {
             processes: Arc::new(Default::default()),

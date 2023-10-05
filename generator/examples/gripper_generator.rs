@@ -1,6 +1,6 @@
 use generator::config::Recipe;
-use generator::generator::gripper::GripperGenerator;
-use generator::{Generator, Problem};
+use generator::generator::gripper::{GripperGenerator, BALL, ROOM, TASK};
+use generator::Generator;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -21,12 +21,10 @@ pub fn main() {
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
 
-    //let config = GripperConfig::new(opt.ball, opt.room, opt.task);
-
     let mut recipe = Recipe::new();
-    recipe.insert("ball".to_string(), opt.ball);
-    recipe.insert("room".to_string(), opt.room);
-    recipe.insert("task".to_string(), opt.task);
+    recipe.insert(BALL.to_string(), opt.ball);
+    recipe.insert(ROOM.to_string(), opt.room);
+    recipe.insert(TASK.to_string(), opt.task);
 
     let problem = GripperGenerator::default().new_problem(&recipe).unwrap();
     let sompas = problem.to_sompas();

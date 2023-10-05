@@ -1,12 +1,19 @@
 use generator::config::GeneratorConfig;
 use generator::generator::gripper::GripperGenerator;
+use generator::generator::gripper_build::GripperBuildGenerator;
 use generator::generator::gripper_door::GripperDoorGenerator;
+use generator::generator::gripper_multi::GripperMultiGenerator;
 use ompas_middleware::OMPAS_WORKING_DIR;
 use std::fs;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
+
+const GRIPPER: &str = "gripper";
+const GRIPPER_DOOR: &str = "gripper-door";
+const GRIPPER_MULTI: &str = "gripper-multi";
+const GRIPPER_BUILD: &str = "gripper-build";
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -28,11 +35,19 @@ pub fn main() -> Result<(), String> {
 
     config
         .generators
-        .insert("gripper".to_string(), Box::new(GripperGenerator::default()));
+        .insert(GRIPPER.to_string(), Box::<GripperGenerator>::default());
 
     config.generators.insert(
-        "gripper-door".to_string(),
-        Box::new(GripperDoorGenerator::default()),
+        GRIPPER_DOOR.to_string(),
+        Box::<GripperDoorGenerator>::default(),
+    );
+    config.generators.insert(
+        GRIPPER_MULTI.to_string(),
+        Box::<GripperMultiGenerator>::default(),
+    );
+    config.generators.insert(
+        GRIPPER_BUILD.to_string(),
+        Box::<GripperBuildGenerator>::default(),
     );
 
     println!("{} to do...", config.jobs.len());

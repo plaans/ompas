@@ -10,9 +10,11 @@ struct Opt {}
 
 pub fn main() {
     let mut config = GeneratorConfig::default();
-    let mut gripper_job = Job::default();
+    let mut gripper_job = Job {
+        name: "gripper".to_string(),
+        ..Default::default()
+    };
 
-    gripper_job.name = "gripper".to_string();
     let mut simple = Recipe::default();
     simple.insert("task".to_string(), 1);
     simple.insert("room".to_string(), 2);

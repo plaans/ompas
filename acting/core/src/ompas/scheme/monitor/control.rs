@@ -671,7 +671,7 @@ pub async fn export_to_csv(env: &LEnv, args: &[LValue]) -> LResult {
     fs::create_dir_all(&path).expect("could not create stats directory");
 
     path.push(match file {
-        Some(f) => format!("{}", f),
+        Some(f) => f.to_string(),
         None => format!("{}_{}.csv", OMPAS_STATS, Master::get_string_date()),
     });
 
@@ -700,9 +700,7 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
         0 => {}
         1 => {
             let arg: String = (&args[0]).try_into().map_err(|e: LRuntimeError| {
-                e.chain(format!(
-                    "Expected either a format or a file name, e.g. \"stat.yml\""
-                ))
+                e.chain("Expected either a format or a file name, e.g. \"stat.yml\"")
             })?;
             match arg.as_str() {
                 YAML_FORMAT => {
@@ -721,7 +719,7 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
                     } else {
                         return Err(LRuntimeError::new(
                             EXPORT_STATS,
-                            format!("Expected either a format or a file name, e.g. \"stat.yml\""),
+                            "Expected either a format or a file name, e.g. \"stat.yml\"",
                         ));
                     }
                 }
@@ -741,7 +739,7 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
     fs::create_dir_all(&path).expect("could not create stats directory");
 
     path.push(match file_name {
-        Some(f) => format!("{}", f),
+        Some(f) => f.to_string(),
         None => format!("{}_{}.csv", OMPAS_STATS, Master::get_string_date()),
     });
 

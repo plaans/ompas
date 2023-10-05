@@ -29,3 +29,13 @@ crate-type = ["bin"]
 [[example]]
 name = "gripper_door_generator"
 crate-type = ["bin"]
+
+[[example]]
+name = "gripper_multi_generator"
+crate-type = ["bin"]
+
+[[example]]
+name = "gripper_build_generator"
+crate-type = ["bin"]
+
+

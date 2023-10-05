@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use im::HashMap;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::{Master, ProcessInterface, OMPAS_WORKING_DIR, PROCESS_TOPIC_ALL};
@@ -263,7 +262,7 @@ async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
             dir_path
         }
         None => {
-            let mut path = OMPAS_WORKING_DIR.get_ref().into();
+            let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
             path.push("lisp");
             path
         }

@@ -61,10 +61,10 @@ pub async fn translate(env: &LEnv, obj: String) -> Result<(), LRuntimeError> {
         .find(|&ch| {
             let ch = ch.chronicle.as_ref().unwrap();
             let st = &ch.st;
-            ch.get_name().format(&st, true).contains(&obj)
+            ch.get_name().format(st, true).contains(&obj)
         })
         .unwrap();
-    debug_with_markdown(&obj, &ch, "/tmp/".into(), true);
+    debug_with_markdown(&obj, ch, "/tmp/".into(), true);
 
     Ok(())
 }

@@ -1,9 +1,8 @@
 use crate::config::{GetElement, Recipe};
 use crate::generator::gripper::GripperTask::Place;
-use crate::generator::gripper::Object::{Ball, Robby};
-use crate::generator::gripper::{
-    GripperConfig, GripperTask, Object, Room, AT_ROBBY, BALL, POS, ROOM,
-};
+use crate::generator::gripper::{GripperConfig, GripperTask, Room, BALL, POS, ROOM};
+use crate::generator::gripper_door::{Door, GripperDoorConfig, CONNECTS, DOOR, OPENED};
+use crate::generator::gripper_multi::Object::{Ball, Robot};
 use crate::generator::{populate_topology, write_dot_to_file};
 use crate::{Generator, Problem, Task};
 use petgraph::dot::Dot;
@@ -16,84 +15,86 @@ use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 
-//Recipe
-pub const MAX_EDGE: &str = "max-edge";
-pub const MAX_DISTANCE: &str = "max-distance";
+pub const ROBOT: &str = "robot";
 
-pub const DOOR: &str = "door";
-
-pub const CONNECTS: &str = "connects";
-pub const OPENED: &str = "opened";
-
+pub const AT_ROB: &str = "at-rob";
 #[derive(Default)]
-pub struct GripperDoorGenerator {}
+pub struct GripperMultiGenerator {}
 
-impl Generator for GripperDoorGenerator {
+impl Generator for GripperMultiGenerator {
     fn new_problem(&self, recipe: &Recipe) -> Result<Box<dyn Problem>, String> {
-        Ok(GripperDoorProblem::generate(recipe).map(Box::new)?)
+        Ok(GripperMultiProblem::generate(recipe).map(Box::new)?)
     }
 }
 
 #[derive(Default)]
-pub struct GripperDoorProblem {
+pub struct GripperMultiProblem {
     tasks: Vec<GripperTask>,
     //Topology
     graph: Graph<Room<Object>, Door>,
 }
 
-#[derive(Debug)]
-pub struct Door {
-    pub id: u32,
-    pub opened: bool,
+pub struct GripperMultiConfig {
+    pub gripper_door_config: GripperDoorConfig,
+    pub n_robot: u32,
 }
 
-impl Display for Door {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}_{}", DOOR, self.id)
-    }
-}
-
-pub struct GripperDoorConfig {
-    pub gripper_config: GripperConfig,
-    pub max_distance: u32,
-    pub max_edge: u32,
-}
-
-impl TryFrom<&Recipe> for GripperDoorConfig {
+impl TryFrom<&Recipe> for GripperMultiConfig {
     type Error = String;
 
     fn try_from(value: &Recipe) -> Result<Self, Self::Error> {
-        let gripper_config: GripperConfig = value.try_into()?;
+        let gripper_door_config = value.try_into()?;
 
-        let max_distance = value.get_element(MAX_DISTANCE)?;
-        let max_connected = value.get_element(MAX_EDGE)?;
+        let n_robot = value.get_element(ROBOT)?;
 
-        Ok(Self::new(gripper_config, max_distance, max_connected))
+        Ok(Self::new(gripper_door_config, n_robot))
     }
 }
 
-impl GripperDoorConfig {
-    pub fn new(gripper_config: GripperConfig, max_distance: u32, max_edge: u32) -> Self {
+impl GripperMultiConfig {
+    pub fn new(gripper_door_config: GripperDoorConfig, n_robot: u32) -> Self {
         Self {
-            gripper_config,
-            max_distance,
-            max_edge,
+            gripper_door_config,
+            n_robot,
         }
     }
 }
 
-impl Problem for GripperDoorProblem {
+#[derive(Debug)]
+pub enum Object {
+    Robot(u32),
+    Ball(u32),
+}
+
+impl Display for Object {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Robot(i) => format!("{}_{}", ROBOT, i),
+                Ball(i) => format!("{}_{}", BALL, i),
+            }
+        )
+    }
+}
+
+impl Problem for GripperMultiProblem {
     fn generate(recipe: &Recipe) -> Result<Self, String> {
-        let GripperDoorConfig {
-            gripper_config:
-                GripperConfig {
-                    n_ball,
-                    n_room,
-                    n_task,
+        let GripperMultiConfig {
+            gripper_door_config:
+                GripperDoorConfig {
+                    gripper_config:
+                        GripperConfig {
+                            n_ball,
+                            n_room,
+                            n_task,
+                        },
+                    max_distance,
+                    max_edge,
                 },
-            max_distance,
-            max_edge,
-        }: GripperDoorConfig = recipe.try_into()?;
+            n_robot,
+        }: GripperMultiConfig = recipe.try_into()?;
 
         let mut pb = Self::default();
         let rg = &mut rand::thread_rng();
@@ -110,12 +111,14 @@ impl Problem for GripperDoorProblem {
             }
         });
 
-        pb.graph
-            .node_weights_mut()
-            .choose(rg)
-            .unwrap()
-            .contains
-            .push(Robby);
+        for i in 0..n_robot {
+            pb.graph
+                .node_weights_mut()
+                .choose(rg)
+                .unwrap()
+                .contains
+                .push(Robot(i));
+        }
 
         // Declaration of the balls
         for i in 0..n_ball {
@@ -139,6 +142,7 @@ impl Problem for GripperDoorProblem {
         let mut balls = vec![];
         let mut rooms = vec![];
         let mut doors = vec![];
+        let mut robots = vec![];
 
         for door in self.graph.edge_weights() {
             doors.push(door.to_string())
@@ -147,8 +151,10 @@ impl Problem for GripperDoorProblem {
         for node in self.graph.node_weights() {
             rooms.push(node.to_string());
             for o in &node.contains {
-                if let Ball(_) = o {
-                    balls.push(o.to_string())
+                let label = o.to_string();
+                match o {
+                    Robot(_) => robots.push(label),
+                    Ball(_) => balls.push(label),
                 }
             }
         }
@@ -157,11 +163,23 @@ impl Problem for GripperDoorProblem {
             (BALL.to_string(), balls),
             (ROOM.to_string(), rooms),
             (DOOR.to_string(), doors),
+            (ROBOT.to_string(), robots),
         ]
     }
 
     fn get_tasks(&self) -> Vec<Task> {
-        self.tasks.iter().map(|t| t.into()).collect()
+        self.tasks
+            .iter()
+            .map(|t| match t {
+                Place(b, r) => {
+                    vec![
+                        "place".to_string(),
+                        Ball(*b).to_string(),
+                        Room::<Object>::new(*r).to_string(),
+                    ]
+                }
+            })
+            .collect()
     }
 
     fn get_dynamic_facts(&self) -> Vec<(LValue, LValue)> {
@@ -169,11 +187,10 @@ impl Problem for GripperDoorProblem {
         for node in self.graph.node_weights() {
             let room_lv: LValue = node.to_string().into();
             for o in &node.contains {
+                let label: LValue = o.to_string().into();
                 match o {
-                    Robby => facts.push((list![AT_ROBBY.into()], room_lv.clone())),
-                    Ball(_) => {
-                        facts.push((list!(POS.into(), o.to_string().into()), room_lv.clone()))
-                    }
+                    Robot(_) => facts.push((list![AT_ROB.into(), label], room_lv.clone())),
+                    _ => facts.push((list!(POS.into(), label), room_lv.clone())),
                 }
             }
         }

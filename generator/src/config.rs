@@ -20,3 +20,16 @@ pub struct Job {
 }
 
 pub type Recipe = HashMap<String, u32>;
+
+pub trait GetElement {
+    fn get_element(&self, e: &str) -> Result<u32, String>;
+}
+
+impl GetElement for Recipe {
+    fn get_element(&self, e: &str) -> Result<u32, String> {
+        match self.get(e) {
+            None => Err(format!("{} is undefined", e)),
+            Some(e) => Ok(*e),
+        }
+    }
+}

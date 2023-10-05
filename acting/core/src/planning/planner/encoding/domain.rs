@@ -333,7 +333,7 @@ fn convert_constraint(
             }
             _ => Err(LRuntimeError::new(
                 "constraint::eq",
-                format!("cannot encode constraint {}", c.format(&st, false)),
+                format!("cannot encode constraint {}", c.format(st, false)),
             ))?,
         },
         Constraint::Not(a) => {

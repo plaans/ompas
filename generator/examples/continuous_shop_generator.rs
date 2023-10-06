@@ -1,6 +1,8 @@
 use generator::config::Recipe;
+use generator::generator::continuous_shop::{
+    ContinuousShopGenerator, PACKAGE_MAX_PROCESS, PACKAGE_MIN_PROCESS,
+};
 use generator::generator::gobot::{MAX_TIME, MIN_TIME, PACKAGE, PROCESS};
-use generator::generator::jobshop::JobshopGenerator;
 use generator::Generator;
 use std::fs;
 use std::path::PathBuf;
@@ -20,6 +22,10 @@ struct Opt {
     min_time: u32,
     #[structopt(short = "u", long = "max_time")]
     max_time: u32,
+    #[structopt(short = "i", long = "min_process_package")]
+    package_min_process: u32,
+    #[structopt(short = "a", long = "max_process_package")]
+    package_max_process: u32,
 }
 
 pub fn main() {
@@ -31,8 +37,12 @@ pub fn main() {
     recipe.insert(PROCESS.to_string(), opt.process);
     recipe.insert(MIN_TIME.to_string(), opt.min_time);
     recipe.insert(MAX_TIME.to_string(), opt.max_time);
-    let mut problem = JobshopGenerator::default().new_problem(&recipe).unwrap();
-    let mut path: PathBuf = "/tmp/jobshop".into();
+    recipe.insert(PACKAGE_MIN_PROCESS.to_string(), opt.package_min_process);
+    recipe.insert(PACKAGE_MAX_PROCESS.to_string(), opt.package_max_process);
+    let mut problem = ContinuousShopGenerator::default()
+        .new_problem(&recipe)
+        .unwrap();
+    let mut path: PathBuf = "/tmp/continuous".into();
     let _ = fs::create_dir_all(&path);
     path.push("problem.lisp");
     problem.store(&path);

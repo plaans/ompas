@@ -18,10 +18,18 @@ pub trait Problem {
     fn generate(recipe: &Recipe) -> Result<Self, String>
     where
         Self: Sized;
-    fn get_objects(&self) -> Vec<(String, Vec<String>)>;
-    fn get_tasks(&self) -> Vec<Task>;
-    fn get_dynamic_facts(&self) -> Vec<(LValue, LValue)>;
-    fn get_static_facts(&self) -> Vec<(LValue, LValue)>;
+    fn get_objects(&self) -> Vec<(String, Vec<String>)> {
+        todo!()
+    }
+    fn get_tasks(&self) -> Vec<Task> {
+        todo!()
+    }
+    fn get_dynamic_facts(&self) -> Vec<(LValue, LValue)> {
+        todo!()
+    }
+    fn get_static_facts(&self) -> Vec<(LValue, LValue)> {
+        todo!()
+    }
     fn to_sompas(&self) -> String {
         let mut str = "(begin\n".to_string();
 

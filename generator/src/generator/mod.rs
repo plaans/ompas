@@ -8,6 +8,8 @@ use std::io::Write as OtherWrite;
 use std::path::PathBuf;
 use std::process::Command;
 
+pub mod continuous_shop;
+pub mod gobot;
 pub mod gripper;
 pub mod gripper_build;
 pub mod gripper_door;

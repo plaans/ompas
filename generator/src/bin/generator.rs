@@ -1,4 +1,5 @@
 use generator::config::GeneratorConfig;
+use generator::generator::continuous_shop::ContinuousShopGenerator;
 use generator::generator::gripper::GripperGenerator;
 use generator::generator::gripper_build::GripperBuildGenerator;
 use generator::generator::gripper_door::GripperDoorGenerator;
@@ -14,12 +15,12 @@ const GRIPPER: &str = "gripper";
 const GRIPPER_DOOR: &str = "gripper-door";
 const GRIPPER_MULTI: &str = "gripper-multi";
 const GRIPPER_BUILD: &str = "gripper-build";
-const JOBSHOP_TWO: &str = "jobshop-two";
-const JOBSHOP_SIX: &str = "jobshop-six";
+const JOBSHOP: &str = "jobshop";
+const CONTINUOUS_SHOP: &str = "continuous-shop";
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "test_yaml",
+    name = "Generator",
     about = "Generation of problems for gripper domain"
 )]
 struct Opt {
@@ -53,11 +54,11 @@ pub fn main() -> Result<(), String> {
     );
     config
         .generators
-        .insert(JOBSHOP_TWO.to_string(), Box::new(JobshopGenerator::new(2)));
-    config
-        .generators
-        .insert(JOBSHOP_SIX.to_string(), Box::new(JobshopGenerator::new(6)));
-
+        .insert(JOBSHOP.to_string(), Box::<JobshopGenerator>::default());
+    config.generators.insert(
+        CONTINUOUS_SHOP.to_string(),
+        Box::<ContinuousShopGenerator>::default(),
+    );
     println!("{} to do...", config.jobs.len());
     let mut path = config
         .output_path
@@ -83,11 +84,6 @@ pub fn main() -> Result<(), String> {
                 let name = format!("{}_{}_{}", job.name, recipe_label, i);
                 file_path.push(format!("{}.lisp", name));
                 let mut pb = generator.new_problem(recipe)?;
-
-                //println!("{}", pb.to_sompas());
-
-                /*let mut file = File::create(file_path).unwrap();
-                file.write_all(pb.to_sompas().as_bytes()).unwrap();*/
 
                 pb.store(&file_path);
 

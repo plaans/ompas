@@ -16,7 +16,9 @@ structopt = { workspace = true}
 serde = { workspace = true}
 serde_yaml = { workspace = true}
 serde_json = { workspace = true, features = [] }
+map-macro = {workspace = true}
 
+serde_repr = "0.1"
 petgraph = "0.6.4"
 
 [[example]]

@@ -27,11 +27,8 @@ use crate::ompas::scheme::monitor::log::ModLog;
 use crate::ompas::scheme::monitor::planning::ModPlanning;
 use ompas_language::monitor::*;
 use ompas_language::process::{LOG_TOPIC_OMPAS, OMPAS};
-use sompas_modules::advanced_math::ModAdvancedMath;
-use sompas_modules::string::ModString;
-use sompas_modules::time::ModTime;
-use sompas_modules::utils::ModUtils;
-use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
+use sompas_modules::ModExtendedStd;
+use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::{ImportType, LEnv};
 
 //LANGUAGE
@@ -114,12 +111,7 @@ impl ModMonitor {
     ///
     async fn init_empty_env(&mut self) {
         let mut env: LEnv = get_root_env().await;
-        env.import_module(ModAdvancedMath::default(), WithoutPrefix);
-        env.import_module(ModString::default(), WithoutPrefix);
-        env.import_module(ModTime::new(2), WithoutPrefix);
-        env.import_module(ModUtils::default(), WithoutPrefix);
-        env.import_module(ModString::default(), WithPrefix);
-
+        env.import_module(ModExtendedStd::default(), WithoutPrefix);
         env.import_module(ModExec::new(&ModControl::new(self)).await, WithoutPrefix);
         eval_init(&mut env).await;
         self.empty_env = env;

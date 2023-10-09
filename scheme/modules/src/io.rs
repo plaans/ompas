@@ -16,8 +16,9 @@ use std::path::PathBuf;
 LANGUAGE
  */
 
-#[derive(Debug)]
+#[derive(Clone, Default, Debug)]
 pub enum LogOutput {
+    #[default]
     Stdout,
     Log(LogClient),
     File(PathBuf),
@@ -31,23 +32,18 @@ impl From<PathBuf> for LogOutput {
 
 /// Handles the channel to communicate with the Lisp Interpreter
 /// Note: Be careful when there is response on the receiver
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct ModIO {
-    log: LogOutput,
-}
-
-impl Default for ModIO {
-    fn default() -> Self {
-        Self {
-            log: LogOutput::Stdout,
-        }
-    }
+    log_output: LogOutput,
 }
 
 impl ModIO {
+    pub fn new(log_output: LogOutput) -> Self {
+        Self { log_output }
+    }
     ///Set the log output
     pub fn set_log_output(&mut self, output: LogOutput) {
-        self.log = output
+        self.log_output = output
     }
 }
 
@@ -90,7 +86,7 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
 
     let ctx = env.get_context::<ModIO>(MOD_IO)?;
 
-    match &ctx.log {
+    match &ctx.log_output {
         LogOutput::Stdout => {
             println!("{}", lv);
         }

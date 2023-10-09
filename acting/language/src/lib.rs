@@ -597,6 +597,19 @@ pub mod monitor {
         pub const ADD_RESOURCES: &str = "add-resources";
         pub const DOC_ADD_RESOURCES: &str = "Declare a list of new resources";
 
+        pub const REMOVE_COMMAND: &str = "remove-command";
+        pub const DOC_REMOVE_COMMAND: &str = "Removes command from the domain definition.";
+
+        pub const REMOVE_STATE_FUNCTION: &str = "remove-state-function";
+        pub const DOC_REMOVE_STATE_FUNCTION: &str =
+            "Removes state-function from the domain definition.";
+
+        pub const REMOVE_METHOD: &str = "remove-method";
+        pub const DOC_REMOVE_METHOD: &str = "Removes method from the domain definition";
+
+        pub const REMOVE_TASK: &str = "remove-task";
+        pub const DOC_REMOVE_TASK: &str = "Removes task and its methods from the domain definition";
+
         //Macros
 
         pub const DEF_STATE_FUNCTION: &str = "def-state-function";

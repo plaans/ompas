@@ -124,6 +124,15 @@ impl From<ModModel> for LModule {
         module.add_async_fn(ADD_OBJECTS, add_objects, DOC_ADD_OBJECTS, false);
         module.add_async_fn(ADD_RESOURCE, add_resource, DOC_ADD_RESOURCE, false);
         module.add_async_fn(ADD_RESOURCES, add_resources, DOC_ADD_RESOURCES, false);
+        module.add_async_fn(REMOVE_COMMAND, remove_command, DOC_REMOVE_COMMAND, false);
+        module.add_async_fn(
+            REMOVE_STATE_FUNCTION,
+            remove_state_function,
+            DOC_REMOVE_STATE_FUNCTION,
+            false,
+        );
+        module.add_async_fn(REMOVE_METHOD, remove_method, DOC_REMOVE_METHOD, false);
+        module.add_async_fn(REMOVE_TASK, remove_task, DOC_REMOVE_TASK, false);
 
         //Macros
         module.add_macro(
@@ -953,15 +962,37 @@ pub async fn add_resources(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
     Ok(())
 }
 
+#[async_scheme_fn]
+pub async fn remove_command(env: &LEnv, label: String) {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
+    ctx.domain.remove_command(&label).await;
+}
+
+#[async_scheme_fn]
+pub async fn remove_state_function(env: &LEnv, label: String) {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
+    ctx.domain.remove_state_function(&label).await;
+}
+
+#[async_scheme_fn]
+pub async fn remove_method(env: &LEnv, label: String) {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
+    ctx.domain.remove_method(&label).await;
+}
+
+#[async_scheme_fn]
+pub async fn remove_task(env: &LEnv, label: String) {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
+    ctx.domain.remove_task(&label).await;
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use ompas_middleware::logger::LogClient;
     use sompas_core::test_utils::{test_expression_with_env, Expr, TestExpression};
     use sompas_core::{eval_init, get_root_env};
-    use sompas_modules::advanced_math::ModAdvancedMath;
-    use sompas_modules::io::ModIO;
-    use sompas_modules::utils::ModUtils;
+    use sompas_modules::ModExtendedStd;
     use sompas_structs::lenv::ImportType::WithoutPrefix;
     use sompas_structs::lenv::LEnv;
 
@@ -971,9 +1002,7 @@ mod test {
         let log: LogClient = LogClient::new("TEST", "TEST").await;
         env.log = log;
 
-        env.import_module(ModUtils::default(), WithoutPrefix);
-
-        env.import_module(ModAdvancedMath::default(), WithoutPrefix);
+        env.import_module(ModExtendedStd::default(), WithoutPrefix);
 
         let mut monitor = ModMonitor::default();
         monitor.init_empty_env().await;
@@ -981,8 +1010,6 @@ mod test {
         let mod_model = ModModel::new(&monitor);
 
         env.import_module(mod_model, WithoutPrefix);
-
-        env.import_module(ModIO::default(), WithoutPrefix);
         eval_init(&mut env).await;
         env
     }

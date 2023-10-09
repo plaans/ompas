@@ -28,13 +28,10 @@ use ompas_middleware::logger::LogClient;
 use ompas_middleware::{Master, ProcessInterface, OMPAS_WORKING_DIR};
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
-use sompas_modules::advanced_math::ModAdvancedMath;
-use sompas_modules::io::{LogOutput, ModIO};
-use sompas_modules::string::ModString;
-use sompas_modules::time::ModTime;
-use sompas_modules::utils::ModUtils;
+use sompas_modules::io::LogOutput;
+use sompas_modules::ModExtendedStd;
 use sompas_structs::kindlvalue::KindLValue;
-use sompas_structs::lenv::ImportType::{WithPrefix, WithoutPrefix};
+use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
@@ -79,18 +76,10 @@ impl ModControl {
             env.import_module(module, WithoutPrefix);
         }
 
-        env.import_module(ModUtils::default(), WithoutPrefix);
+        let mut mod_extended_std = ModExtendedStd::default();
+        mod_extended_std.set_log_output(LogOutput::Log(self.log.clone()));
 
-        env.import_module(ModAdvancedMath::default(), WithoutPrefix);
-
-        env.import_module(ModString::default(), WithPrefix);
-
-        let mut ctx_io = ModIO::default();
-        ctx_io.set_log_output(LogOutput::Log(self.log.clone()));
-
-        env.import_module(ctx_io, WithoutPrefix);
-
-        env.import_module(ModTime::new(2), WithoutPrefix);
+        env.import_module(mod_extended_std, WithoutPrefix);
         env.import_module(ModExec::new(self).await, WithoutPrefix);
         eval_init(&mut env).await;
 

@@ -27,7 +27,9 @@
         (:params (?d door) (?r room) (?g gripper))
         (:pre-conditions
             (= (at-robby) ?r)
-            (connects ?r ?d ?r2)
+            (exists
+                (instances room)
+                (lambda (?r2) (connects ?r ?d ?r2)))
             (= (carry ?g) 'empty))
         (:effects
             ('opened ?d true)))
@@ -37,7 +39,9 @@
         (:params (?d door) (?r room) (?g gripper))
         (:pre-conditions
             (= (at-robby) ?r)
-            (connects ?r ?d ?r2)
+            (exists
+                (instances room)
+                (lambda (?r2) (connects ?r ?d ?r2)))
             (= (carry ?g) 'empty))
         (:effects
             ('opened ?d false)))

@@ -962,5 +962,21 @@ pub mod io {
     pub const DOC_GET_ENV_VAR: &str = "Get the current value of an environment variable.";
 }
 
+pub mod first_order_logic {
+    pub const MOD_FIRST_ORDER_LOGIC: &str = "first_order_logic";
+    pub const DOC_MOD_FIRST_ORDER_LOGIC: &str = "Module that proposes first order algebra";
+
+    pub const EXISTS: &str = "exists";
+    pub const DOC_EXISTS: &str ="Takes as argument a set and a lambda. Return true if the lambda is true for at least one of the element of the list.";
+
+    pub const FORALL: &str = "forall";
+    pub const DOC_FORALL: &str= "Takes as argument a set and a lambda. Return true if the lambda is true all elements of the set.";
+}
+
+pub mod extended_std {
+    pub const MOD_EXTENDED_STD: &str = "mod-extended-std";
+    pub const DOC_MOD_EXTENDED_STD: &str = "Contains all modules of the extended standard std.";
+}
+
 pub const PROCESS_TOPIC_INTERPRETER: &str = "__PROCESS_TOPIC_INTERPRETER__";
 pub const LOG_TOPIC_INTERPRETER: &str = "__LOG_TOPIC_INTERPRETER__";

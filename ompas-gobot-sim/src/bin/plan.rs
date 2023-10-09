@@ -6,11 +6,7 @@ use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use ompas_middleware::logger::LogClient;
 use ompas_middleware::{LogLevel, Master};
-use sompas_modules::advanced_math::ModAdvancedMath;
-use sompas_modules::io::ModIO;
-use sompas_modules::string::ModString;
-use sompas_modules::time::ModTime;
-use sompas_modules::utils::ModUtils;
+use sompas_modules::ModExtendedStd;
 use sompas_repl::lisp_interpreter::LispInterpreter;
 use sompas_structs::lruntimeerror;
 use std::path::PathBuf;
@@ -46,18 +42,7 @@ async fn main() -> lruntimeerror::Result<()> {
 async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
     let mut li = LispInterpreter::new().await;
 
-    let ctx_io = ModIO::default();
-    let ctx_math = ModAdvancedMath::default();
-    let ctx_utils = ModUtils::default();
-    let ctx_string = ModString::default();
-
-    //Insert the doc for the different contexts.
-
-    li.import_namespace(ctx_utils);
-    li.import_namespace(ctx_io);
-    li.import_namespace(ctx_math);
-    li.import_namespace(ctx_string);
-    li.import_namespace(ModTime::new(2));
+    li.import_namespace(ModExtendedStd::default());
 
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(

@@ -123,4 +123,26 @@ impl DomainManager {
     pub async fn get_task(&self, label: &str) -> Option<Task> {
         self.inner.read().await.tasks.get(label).cloned()
     }
+
+    pub async fn remove_command(&self, label: &str) {
+        self.inner.write().await.commands.remove(label);
+    }
+
+    pub async fn remove_state_function(&self, label: &str) {
+        self.inner.write().await.state_functions.remove(label);
+    }
+
+    pub async fn remove_task(&self, label: &str) {
+        let mut locked = self.inner.write().await;
+        let task = locked.tasks.remove(label);
+        if let Some(task) = task {
+            for m in task.get_methods() {
+                locked.methods.remove(m);
+            }
+        }
+    }
+
+    pub async fn remove_method(&self, label: &str) {
+        self.inner.write().await.methods.remove(label);
+    }
 }

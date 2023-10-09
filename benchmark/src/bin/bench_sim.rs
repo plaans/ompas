@@ -2,10 +2,7 @@ use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::FileDescriptor;
 use ompas_middleware::{Master, OMPAS_WORKING_DIR};
-use sompas_modules::advanced_math::ModAdvancedMath;
-use sompas_modules::io::ModIO;
-use sompas_modules::string::ModString;
-use sompas_modules::utils::ModUtils;
+use sompas_modules::ModExtendedStd;
 use sompas_repl::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
 };
@@ -84,22 +81,11 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_io = ModIO::default();
-    let ctx_math = ModAdvancedMath::default();
-    let ctx_utils = ModUtils::default();
-    let ctx_string = ModString::default();
+    let mut mod_extended_std = ModExtendedStd::default();
+    mod_extended_std.set_log_output(log.clone().into());
 
-    //Insert the doc for the different contexts.
+    li.import_namespace(mod_extended_std);
 
-    //Add the sender of the channel.
-
-    ctx_io.set_log_output(log.clone().into());
-
-    li.import_namespace(ctx_utils);
-    li.import_namespace(ctx_io);
-    li.import_namespace(ctx_math);
-
-    li.import_namespace(ctx_string);
     let ctx_rae = ModMonitor::new("nil", Some(log.clone())).await;
 
     if opt.view {

@@ -4,11 +4,7 @@ use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::{LogLevel, Master, OMPAS_WORKING_DIR};
-use sompas_modules::advanced_math::ModAdvancedMath;
-use sompas_modules::io::ModIO;
-use sompas_modules::string::ModString;
-use sompas_modules::time::ModTime;
-use sompas_modules::utils::ModUtils;
+use sompas_modules::ModExtendedStd;
 use sompas_repl::lisp_interpreter::{
     ChannelToLispInterpreter, LispInterpreter, LispInterpreterConfig,
 };
@@ -95,24 +91,9 @@ pub async fn lisp_interpreter(opt: Opt) {
 
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_io = ModIO::default();
-    let ctx_math = ModAdvancedMath::default();
-    let ctx_utils = ModUtils::default();
-    let ctx_string = ModString::default();
-    let mod_time = ModTime::new(2);
-
-    //Insert the doc for the different contexts.
-
-    //Add the sender of the channel.
-
-    ctx_io.set_log_output(log.clone().into());
-
-    li.import_namespace(ctx_utils);
-    li.import_namespace(ctx_io);
-    li.import_namespace(ctx_math);
-    li.import_namespace(mod_time);
-
-    li.import_namespace(ctx_string);
+    let mut mod_extended_std = ModExtendedStd::default();
+    mod_extended_std.set_log_output(log.clone().into());
+    li.import_namespace(mod_extended_std);
 
     let mut log = if let Some(pb) = &opt.log {
         pb.clone()

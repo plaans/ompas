@@ -35,7 +35,6 @@
 
 
     (def-method move_and_drop
-      (:task pick-and-drop)
       (:task place)
         (:params (?o carriable) (?r room) (?g gripper))
         (:pre-conditions (!= (pos ?o) ?r) (= (carry ?g) ?o))

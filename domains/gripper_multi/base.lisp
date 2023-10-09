@@ -1,6 +1,13 @@
 (begin
+    (define gripper-multi-path
+        (concatenate (get-env-var "OMPAS_PATH") "/domains/gripper_multi"))
+    (set-current-dir gripper-multi-path)
+    (read "../gripper/base.lisp")
+    (read "../gripper_door/base.lisp")
+
     (def-types robot)
     ; Additional state functions
+    (remove-state-function at-robby)
     (def-state-function at-rob (:params (?r robot)) (:result room))
     (def-state-function carry (:params (?r robot) (?g gripper)) (:result carriable))
 

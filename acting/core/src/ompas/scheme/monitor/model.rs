@@ -416,9 +416,14 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
             } else {
                 return Err(LRuntimeError::default());
             }
-            let test =
-                generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
-                    .await?;
+            let test = generate_test_type_expr(
+                env,
+                &[model
+                    .get(&PARAMETERS.into())
+                    .ok_or_else(|| LRuntimeError::new("create_model", "missing :parameters"))?
+                    .clone()],
+            )
+            .await?;
             format!(
                 "(lambda {} (do {} {} {}))",
                 params.get_params_as_lvalue(),
@@ -435,10 +440,21 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
                 &st,
             )
             .await?;
-            let body = car(env, &[model.get(&BODY.into()).unwrap().clone()])?;
-            let test =
-                generate_test_type_expr(env, &[model.get(&PARAMETERS.into()).unwrap().clone()])
-                    .await?;
+            let body = car(
+                env,
+                &[model
+                    .get(&BODY.into())
+                    .ok_or_else(|| LRuntimeError::new("create_model", "missing :body"))?
+                    .clone()],
+            )?;
+            let test = generate_test_type_expr(
+                env,
+                &[model
+                    .get(&PARAMETERS.into())
+                    .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?
+                    .clone()],
+            )
+            .await?;
             format!(
                 "(lambda {} (do {} {}))",
                 params.get_params_as_lvalue(),

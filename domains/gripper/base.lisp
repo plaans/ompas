@@ -1,6 +1,8 @@
 (begin
-    (def-types (room location) gripper 
-    (ball carriable))
+    (def-types
+        (room location)
+        gripper
+        (ball carriable))
     (def-objects
       (left right gripper)
       (empty carriable)

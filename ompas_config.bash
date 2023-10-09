@@ -1,8 +1,14 @@
+#!/bin/bash
 # Environment variables of the OMPAS project
+SOURCE=${BASH_SOURCE[0]}
+while [ -L "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
+  SOURCE=$(readlink "$SOURCE")
+  [[ $SOURCE != /* ]] && SOURCE=$DIR/$SOURCE # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+SCRIPT_DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
 
-# SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-# echo "Script directory: $SCRIPT_DIR"
+echo "Script directory: $SCRIPT_DIR"
 
 # choice of how resources are encoded in the planner
 # - assignment: default encoding using linear constraints, conditions and effects

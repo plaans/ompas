@@ -183,11 +183,11 @@ pub fn rm_duplicated_constraints(c: &mut Chronicle) {
             let i2 = i2 + n;
             if c1 == c2 {
                 to_remove.insert(i2);
-                println!(
+                /*println!(
                     "remove same constraints: [{i1}]{} = [{i2}]{}",
                     c1.format(&c.st, true),
                     c2.format(&c.st, true)
-                )
+                )*/
             }
         }
     }

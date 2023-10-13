@@ -167,7 +167,7 @@ pub async fn __plan(
     for (i, task) in tasks.iter().enumerate() {
         if let Some(start) = task.start {
             let ch = &mut pp.instances[i + 1].instantiated_chronicle;
-            *ch = ch.instantiate(vec![Instantiation::new(
+            *ch = ch.clone().instantiate(vec![Instantiation::new(
                 ch.interval.get_start(),
                 st.new_cst(start.as_cst().unwrap()),
             )]);
@@ -192,20 +192,32 @@ pub async fn __plan(
         }
     }
 
-    let result = run_planner(aries_problem, opt);
+    let result = run_planner(aries_problem, opt, None);
+
     //println!("{}", format_partial_plan(&pb, &x)?);
 
     if let Ok(Some(pr)) = result {
-        //result::print_chronicles(&pr);
         let instances = instantiate_chronicles(&pp, &pr, &table);
         let PlanResult { ass, fp } = pr;
+        // for v in ass.variables() {
+        //     let prez = format!("[{:?}]", ass.presence_literal(v));
+        //     let v_str = format!("{v:?}");
+        //     print!("{prez:<6}  {v_str:<6} <- {:?}", ass.domain(v));
+        //     if let Some(lbl) = fp.model.get_label(v) {
+        //         println!("    {lbl:?}");
+        //     } else {
+        //         println!()
+        //     }
+        // }
 
         let choices = extract_choices(&table, &ass, &fp.model, &pp);
 
         if OMPAS_PLAN_OUTPUT.get() {
             println!("Plan found");
-            for i in instances {
-                println!("{}", i)
+            if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                for i in instances {
+                    println!("{}", i)
+                }
             }
             for choice in &choices {
                 println!("{}:{}", choice.process_ref, choice.choice_inner)

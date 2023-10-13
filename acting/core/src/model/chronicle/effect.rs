@@ -4,19 +4,19 @@ use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVari
 use crate::model::sym_table::VarId;
 use im::HashSet;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Effect {
     pub interval: Interval,
     pub sv: Vec<VarId>,
     pub operation: EffectOperation,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct EffectOperation {
     pub var_id: VarId,
     pub inner: EffectOperationInner,
 }
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum EffectOperationInner {
     Assign,
     Increase,

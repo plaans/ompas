@@ -68,10 +68,18 @@ pub struct ActingModel {
 }
 
 impl ActingModel {
-    pub fn get_instantiated_chronicle(&self) -> Option<Chronicle> {
+    pub fn get_clean_instantiated_chronicle(&self) -> Option<Chronicle> {
         self.chronicle
             .as_ref()
-            .map(|c| c.instantiate_and_clean(self.runtime_info.clone()))
+            .map(|c| c.clone().instantiate_and_clean(self.runtime_info.clone()))
+    }
+
+    pub fn get_instantiated_chronicle(&self) -> Option<Chronicle> {
+        self.chronicle.as_ref().map(|c| {
+            c.clone()
+                .add_models(vec![])
+                .instantiate(self.runtime_info.instantiations().clone())
+        })
     }
 }
 #[derive(Clone)]
@@ -189,7 +197,7 @@ impl ActingModel {
             chronicle.interval.get_end(),
         ));
 
-        chronicle.add_effect(effect)
+        chronicle.add_effect(effect);
     }
 
     pub fn add_goal(&mut self, mut goal: Goal) {
@@ -232,10 +240,12 @@ impl ActingModel {
 
         let st = chronicle.st.clone();
 
-        let start = match task.start {
-            Some(start) => st.new_float(start.as_secs()),
-            None => st.new_timepoint(),
-        };
+        let start = st.new_timepoint();
+        if let Some(t_s) = task.start {
+            let r = st.set_domain(&st.get_domain_id(&start), t_s.as_secs());
+            assert!(r.is_none())
+        }
+
         let interval = chronicle::interval::Interval::new(start, st.new_timepoint());
 
         let start = interval.get_start();
@@ -257,8 +267,8 @@ impl ActingModel {
         };
 
         let constraints = vec![
-            Constraint::leq(chronicle.interval.get_start(), interval.get_start()),
-            Constraint::leq(interval.get_end(), chronicle.interval.get_end()),
+            Constraint::leq(chronicle.interval.get_start(), start),
+            Constraint::leq(end, chronicle.interval.get_end()),
         ];
 
         let binding = ActionModel::new(subtask, constraints);

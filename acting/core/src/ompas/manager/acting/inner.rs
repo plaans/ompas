@@ -1429,7 +1429,7 @@ impl InnerActingManager {
             match &process.inner {
                 ActingProcessInner::RootTask(_) => {
                     let chronicle = self.models[process.am_id()]
-                        .get_instantiated_chronicle()
+                        .get_clean_instantiated_chronicle()
                         .unwrap();
 
                     add_chronicle(
@@ -1448,7 +1448,7 @@ impl InnerActingManager {
 
                         let abstract_process = &self.processes[*abstract_model];
                         let chronicle = self.models[abstract_process.get_am_id()]
-                            .get_instantiated_chronicle()
+                            .get_clean_instantiated_chronicle()
                             .unwrap();
 
                         add_chronicle(
@@ -1469,7 +1469,7 @@ impl InnerActingManager {
                         for refinement_id in methods {
                             let method_process = &self.processes[*refinement_id];
                             let chronicle = self.models[method_process.get_am_id()]
-                                .get_instantiated_chronicle()
+                                .get_clean_instantiated_chronicle()
                                 .unwrap();
                             let refinement_label = method_process.inner.as_method().unwrap().label;
                             add_chronicle(

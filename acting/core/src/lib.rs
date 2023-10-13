@@ -44,6 +44,7 @@ impl FromStr for ResourceEncoding {
 }
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[repr(u8)]
 pub enum ChronicleDebug {
     Off = 0,
     On = 1,

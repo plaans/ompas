@@ -186,8 +186,8 @@ impl Ord for LNumber {
 }
 
 impl PartialOrd for LNumber {
-    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
-        unimplemented!()
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 
     fn lt(&self, other: &Self) -> bool {

@@ -512,7 +512,7 @@ pub mod utils {
     pub const LAMBDA_PAR: &str = "(lambda _list_
         (begin
             (define _n_ (len _list_))
-            (define _handle_symbols_ (mapf (lambda (_n_) (string::concatenate _h _n_ _)) (range 0 (- _n_ 1))))
+            (define _handle_symbols_ (mapf (lambda (_n_) (concatenate _h _n_ _)) (range 0 (- _n_ 1))))
             (define _tasks_ (mapf (lambda (_t_ _h_) `(define ,_h_ (async ,_t_))) _list_ _handle_symbols_))
             (define _awaits_ (mapf (lambda (_h_) `(await ,_h_)) _handle_symbols_))
             (eval (cons begin (append _tasks_ _awaits_))))
@@ -967,9 +967,13 @@ pub mod first_order_logic {
     pub const DOC_MOD_FIRST_ORDER_LOGIC: &str = "Module that proposes first order algebra";
 
     pub const EXISTS: &str = "exists";
+    pub const LAMBDA_EXISTS: &str = "(lambda (set f)
+    (eval (cons 'or (mapf (lambda (?i) (list f ?i)) set))))";
     pub const DOC_EXISTS: &str ="Takes as argument a set and a lambda. Return true if the lambda is true for at least one of the element of the list.";
 
     pub const FORALL: &str = "forall";
+    pub const LAMBDA_FORALL: &str = "(lambda (set f)
+    (eval (cons 'and (mapf (lambda (?i) (list f ?i)) set))))";
     pub const DOC_FORALL: &str= "Takes as argument a set and a lambda. Return true if the lambda is true all elements of the set.";
 }
 

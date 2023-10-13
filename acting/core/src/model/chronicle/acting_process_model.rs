@@ -24,8 +24,13 @@ impl ActingProcessModelCollection {
     ) {
         let binding = binding.into();
         let label = label.into();
-        if self.inner.insert(label, binding).is_some() {
-            panic!()
+        if let std::collections::hash_map::Entry::Vacant(e) = self.inner.entry(label.clone()) {
+            e.insert(binding);
+        } else {
+            println!(
+                "WARNING! (label = {}, binding = {:?}) has already been added to chronicle",
+                label, binding
+            )
         }
     }
 
@@ -149,7 +154,7 @@ impl FormatWithSymTable for ActingProcessModelCollection {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ActingProcessModel {
     Arbitrary(ArbitraryModel),
     Action(ActionModel),
@@ -269,7 +274,7 @@ impl FormatWithSymTable for ActingProcessModel {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ArbitraryModel {
     pub timepoint: VarId,
     pub var_id: VarId,
@@ -286,7 +291,7 @@ impl ArbitraryModel {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ActionModel {
     pub task: SubTask,
     pub constraints: Vec<Constraint>,
@@ -298,7 +303,7 @@ impl ActionModel {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct AcquireModel {
     pub constraints: Vec<Constraint>,
     pub conditions: Vec<Condition>,
@@ -362,7 +367,7 @@ impl From<Label> for ActingProcessModelLabel {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ResourceModel {
     pub resource: VarId,
     pub quantity: VarId,

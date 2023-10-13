@@ -38,8 +38,6 @@ pub mod test_utils;
 pub const SOMPAS_DEBUG: &str = "SOMPAS_DEBUG";
 
 pub async fn get_root_env() -> LEnv {
-    // let map = im::hashmap::HashMap::new();
-    // map.ins
     let mut env = LEnv::default();
     env.import_module(ModStd::default(), ImportType::WithoutPrefix);
     eval_init(&mut env).await;
@@ -409,7 +407,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                         let expanded = expand(&eval(lv, env, None).await?, top_level, env).await?;
                         //if get_debug() {
                         env.log
-                            .trace(format!("In expand: macro expanded: {:?}", expanded));
+                            .trace(format!("In expand: macro expanded: {}", expanded));
                         //}
                         return Ok(expanded);
                     }
@@ -456,7 +454,6 @@ pub fn expand_quasi_quote(x: &LValue, env: &LEnv) -> LResult {
         }
         _ => Ok(vec![LPrimitive::Quote.into(), x.clone()].into()),
     }
-    //Verify if has unquotesplicing here
 }
 
 #[inline]
@@ -587,11 +584,13 @@ pub async fn eval(
         match current.kind {
             StackKind::NonEvaluated(ref lv) => {
                 debug.push(current.interruptibily, lv.to_string());
-                match lv {
+                match &lv {
                     LValue::Symbol(s) => {
-                        let result = match scopes.get_last().get_symbol(s.as_str()) {
-                            None => s.into(),
+                        let scope = scopes.get_last();
+                        let str = s.as_str();
+                        let result = match scope.get_symbol(str) {
                             Some(lv) => lv,
+                            None => s.into(),
                         };
                         results.push(result);
                         debug.log_last_result(&results);
@@ -743,10 +742,6 @@ pub async fn eval(
                                         CoreOperatorFrame::Eval,
                                         interruptibility,
                                     ));
-                                    queue.push(StackFrame::new(
-                                        CoreOperatorFrame::Expand,
-                                        interruptibility,
-                                    ));
                                     queue.push(StackFrame::new_lvalue(
                                         args[0].clone(),
                                         interruptibility,
@@ -795,15 +790,10 @@ pub async fn eval(
                                 }
                                 LPrimitive::Interruptible => {
                                     unreachable!();
-                                    //queue.push(StackFrame::interruptible(args[0].clone()))
                                 }
                                 LPrimitive::Uninterruptible => {
                                     unreachable!();
-                                    //queue.push(StackFrame::uninterruptible(args[0].clone()))
                                 }
-                                /*LCoreOperator::QuasiInterruptible => {
-                                    queue.push(StackFrame::quasiinterruptible(args[0].clone()))
-                                }*/
                                 LPrimitive::Race => {
                                     let handler_1 =
                                         async_eval(args[0].clone(), scopes.get_last().clone());
@@ -886,6 +876,22 @@ pub async fn eval(
                                     debug.log_last_result(&results);
                                 }
                             }
+                        } else if scopes
+                            .get_last()
+                            .get_macro(proc.to_string().as_str())
+                            .is_some()
+                        {
+                            //debug.push(interruptibility, list!())
+                            queue.push(StackFrame::new(CoreOperatorFrame::Eval, interruptibility));
+                            queue
+                                .push(StackFrame::new(CoreOperatorFrame::Expand, interruptibility));
+                            // debug
+                            //     .push(interruptibility, list!(LPrimitive::Eval.into(), lv.clone()));
+                            // debug.push(
+                            //     interruptibility,
+                            //     list!(LPrimitive::Expand.into(), lv.clone()),
+                            // );
+                            results.push(lv.clone());
                         } else {
                             scopes.new_scope();
                             queue.push(StackFrame::new(
@@ -1090,14 +1096,15 @@ pub async fn eval(
                         CoreOperatorFrame::EvalEnd,
                         interruptibility,
                     ));
-                    queue.push(StackFrame::new_lvalue(
-                        results.pop().unwrap(),
-                        interruptibility,
-                    ));
+                    let r = results.pop().unwrap();
+                    debug.push(interruptibility, list![LPrimitive::Eval.into(), r.clone()]);
+                    queue.push(StackFrame::new_lvalue(r, interruptibility));
                 }
                 CoreOperatorFrame::Expand => {
                     let result = results.pop().unwrap();
+                    scopes.new_scope();
                     results.push(expand(&result, true, scopes.get_last_mut()).await?);
+                    scopes.revert_scope();
                     debug.push(Unininterruptible, list!(LPrimitive::Expand.into(), result));
                     debug.log_last_result(&results);
                 }

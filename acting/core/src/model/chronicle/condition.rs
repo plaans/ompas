@@ -4,7 +4,7 @@ use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVari
 use crate::model::sym_table::VarId;
 use im::HashSet;
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Condition {
     pub interval: Interval,
     pub sv: Vec<VarId>,

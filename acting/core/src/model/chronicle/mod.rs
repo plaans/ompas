@@ -346,9 +346,9 @@ impl Chronicle {
             .as_str(),
         );
         s.push('\n');
-        s.push_str(format!("- name: {}\n", self.name.format(st.borrow(), sym_version)).as_str());
+        s.push_str(format!("- name: {}\n", self.name.format(st, sym_version)).as_str());
         //task
-        s.push_str(format!("- task: {}\n", self.task.format(st.borrow(), sym_version)).as_str());
+        s.push_str(format!("- task: {}\n", self.task.format(st, sym_version)).as_str());
         s.push_str("-variable(s): {");
 
         let mut variables = self
@@ -374,26 +374,26 @@ impl Chronicle {
 
         s.push_str("-constraint(s): {");
         for c in &self.constraints {
-            write!(s, "\n\t{}", c.format(st.borrow(), sym_version)).unwrap();
+            write!(s, "\n\t{}", c.format(st, sym_version)).unwrap();
         }
         s.push_str("}\n");
 
         //conditions
         s.push_str("-condition(s): {");
         for c in &self.conditions {
-            write!(s, "\n\t{}", c.format(st.borrow(), sym_version)).unwrap();
+            write!(s, "\n\t{}", c.format(st, sym_version)).unwrap();
         }
         s.push_str("}\n");
         //effects
         s.push_str("-effect(s): {");
         for e in &self.effects {
-            write!(s, "\n\t{}", e.format(st.borrow(), sym_version)).unwrap();
+            write!(s, "\n\t{}", e.format(st, sym_version)).unwrap();
         }
         s.push_str("}\n");
         //substasks
         s.push_str("-subtask(s): {");
         for e in &self.subtasks {
-            write!(s, "\n\t{}", e.format(st.borrow(), sym_version)).unwrap();
+            write!(s, "\n\t{}", e.format(st, sym_version)).unwrap();
         }
         s.push_str("}\n");
         s.push_str("-synthetic task(s): {\n");
@@ -423,7 +423,7 @@ impl Chronicle {
         let mut new_variables: HashSet<VarId> = Default::default();
         for v in &old_variables {
             let mut v = *v;
-            v.flat_bindings(st.borrow());
+            v.flat_bindings(st);
             new_variables.insert(v);
         }
 
@@ -438,25 +438,17 @@ impl Chronicle {
         self.acting_process_models.flat_bindings(st);
     }
 
-    pub fn instantiate(&self, instantiations: Vec<Instantiation>) -> Self {
-        let mut new = self.clone();
+    pub fn instantiate(mut self, instantiations: Vec<Instantiation>) -> Self {
         for Instantiation { var, value } in instantiations {
-            new.replace(&var, &value);
-            new.variables.remove(&var);
-            new.variables.remove(&value);
+            self.replace(&var, &value);
+            self.variables.remove(&var);
+            self.variables.remove(&value);
         }
-        new
+        self
     }
 
-    pub fn instantiate_and_clean(&self, runtime_info: RuntimeInfo) -> Self {
-        let mut new = self.clone();
-
-        let RuntimeInfo {
-            to_remove,
-            instantiations,
-        } = runtime_info;
-
-        let models = &mut new.acting_process_models.inner;
+    pub fn add_models(mut self, to_remove: Vec<ActingProcessModelLabel>) -> Self {
+        let models = &mut self.acting_process_models.inner;
 
         to_remove.iter().for_each(|l| match l {
             ActingProcessModelLabel::Label(_) => {
@@ -480,20 +472,25 @@ impl Chronicle {
 
         let models: Vec<_> = models.values().cloned().collect();
         for model in models {
-            new.absorb_acting_process_model(model.clone());
+            self.absorb_acting_process_model(model.clone());
         }
+        self
+    }
 
-        for Instantiation { var, value } in instantiations {
-            new.replace(&var, &value);
-            new.variables.remove(&var);
-            new.variables.remove(&value);
-        }
+    pub fn instantiate_and_clean(self, runtime_info: RuntimeInfo) -> Self {
+        let RuntimeInfo {
+            to_remove,
+            instantiations,
+        } = runtime_info;
 
-        new.remove_instantiated_elements();
+        let mut model = self
+            .add_models(to_remove)
+            .instantiate(instantiations)
+            .remove_instantiated_elements();
 
-        post_processing(&mut new).unwrap();
+        post_processing(&mut model).unwrap();
 
-        new
+        model
     }
 
     pub fn absorb_acting_process_model(&mut self, model: impl Into<ActingProcessModel>) {
@@ -530,7 +527,7 @@ impl Chronicle {
         }
     }
 
-    fn remove_instantiated_elements(&mut self) {
+    fn remove_instantiated_elements(mut self) -> Self {
         let st = self.st.clone();
         let mut free_variables: HashSet<VarId> = Default::default();
         for var in &self.variables {
@@ -602,36 +599,7 @@ impl Chronicle {
 
             self.remove_subtasks(to_remove)
         }
-
-        /*// Remove bindings
-        {
-            let mut to_remove = vec![];
-            'loop_binding: for (label, binding) in &self.acting_process_models.inner {
-                match binding {
-                    ActingProcessModel::Resource(acq) => {
-                        if free_variables.contains(&acq.request)
-                            && free_variables.contains(&acq.acquisition.get_start())
-                        {
-                            to_remove.push(*label)
-                        }
-                    }
-                    ActingProcessModel::Action(_) => {}
-                    _ => {
-                        let variables = binding.get_variables();
-                        for var in &variables {
-                            if free_variables.contains(var) {
-                                continue 'loop_binding;
-                            }
-                        }
-                        to_remove.push(*label)
-                    }
-                }
-            }
-
-            for label in to_remove {
-                self.acting_process_models.remove_process_model(label);
-            }
-        }*/
+        self
     }
 }
 
@@ -657,6 +625,10 @@ impl RuntimeInfo {
 
     pub fn add_to_remove(&mut self, label: impl Into<ActingProcessModelLabel>) {
         self.to_remove.push(label.into())
+    }
+
+    pub fn instantiations(&self) -> &Vec<Instantiation> {
+        &self.instantiations
     }
 }
 

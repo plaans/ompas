@@ -11,3 +11,4 @@ Cargo.lock
 *.yml
 gobot-bin
 ompas_config_local.bash
+playground.bash

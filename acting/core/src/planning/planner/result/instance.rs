@@ -22,7 +22,7 @@ pub fn instantiate_chronicles(
             instantiations.push(Instantiation::new(*var, value));
         }
 
-        let instantiated = chronicle.instantiate(instantiations);
+        let instantiated = chronicle.clone().instantiate(instantiations);
 
         instances.push(instantiated)
     }

@@ -31,7 +31,7 @@ use crate::planning::planner::encoding::problem_generation::{
 use crate::planning::planner::encoding::{PlannerDomain, PlannerProblem};
 use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
-use crate::planning::planner::solver::{run_planner, PMetric};
+use crate::planning::planner::solver::{run_planner, PMetric, PlannerInterruptSender};
 use crate::{
     ChronicleDebug, OMPAS_CHRONICLE_DEBUG, OMPAS_DEBUG_CONTINUOUS_PLANNING, OMPAS_PLAN_OUTPUT,
 };
@@ -42,7 +42,6 @@ use aries::model::Model;
 use aries_planning::chronicles;
 use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId, VarLabel};
-use futures::future::abortable;
 use itertools::Itertools;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::ProcessInterface;
@@ -54,7 +53,9 @@ use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot, RwLock};
+use std::thread;
+use tokio::runtime::Handle;
+use tokio::sync::{mpsc, oneshot, watch, RwLock};
 
 pub mod acting_var_ref_table;
 pub mod plan_update;
@@ -121,7 +122,7 @@ impl PlannerManager {
     }
 
     async fn interrupt(
-        interrupter: &mut Option<oneshot::Sender<bool>>,
+        interrupter: &mut Option<PlannerInterruptSender>,
         plan_receiver: &mut Option<oneshot::Receiver<PlannerResult>>,
     ) -> Option<PlannerResult> {
         let interrupter = interrupter.take();
@@ -157,11 +158,13 @@ impl PlannerManager {
         let mut next_id = 0;
 
         let mut planning = false;
-        let mut interrupter: Option<oneshot::Sender<bool>> = None;
+        let mut interrupter: Option<PlannerInterruptSender> = None;
         let mut _updater: Option<mpsc::UnboundedSender<VarUpdate>> = None;
         let mut plan_receiver: Option<oneshot::Receiver<PlannerResult>> = None;
 
-        let mut state_update_subscriber = state_manager.new_subscriber(StateRule::All).await;
+        let mut state_update_subscriber = state_manager
+            .new_subscriber(StateRule::Specific(vec![]))
+            .await;
 
         let mut clock = clock_manager.subscribe_to_clock().await;
         let mut state: Option<WorldStateSnapshot>;
@@ -193,8 +196,15 @@ impl PlannerManager {
                         while let Ok(update) = rx_update.try_recv() {
                             updates.push(update)
                         }
-                        if let Ok(state_update) = state_update_subscriber.channel.try_recv() {
-                            updates.push(PlannerUpdate::StateUpdate(state_update))
+                        let mut state_update: HashSet<_> = Default::default();
+
+                        while let Ok(updated) = state_update_subscriber.channel.try_recv() {
+                            for update in updated {
+                                state_update.insert(update);
+                            }
+                        }
+                        if !state_update.is_empty() {
+                            updates.push(PlannerUpdate::StateUpdate(state_update.drain().collect()));
                         }
                         if !updates.is_empty() {
                         //Debug
@@ -223,7 +233,6 @@ impl PlannerManager {
                             explanation
                         };
 
-
                         if planning {
                             if let Some(pr) = Self::interrupt(&mut interrupter, &mut plan_receiver).await {
                                 stats.write().await.add_stat(pr.stat)
@@ -244,7 +253,6 @@ impl PlannerManager {
                         env.update_context(ModState::new_from_snapshot(ep.state.clone()));
 
                         let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
-                        //std::process::exit(0);
 
                         if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
                             for (origin, chronicle) in pp
@@ -256,15 +264,16 @@ impl PlannerManager {
                             }
                         }
 
-                        let rule = StateRule::Specific(pp.domain.sf.iter().map(|sf|sf.get_label().into()).collect());
+                        let rule = StateRule::Specific(pp.domain.sf.iter().map(|sf| sf.get_label().into()).collect());
+                        //println!("({}) Update subscriber rule: {:?}",state_update_subscriber.id, rule);
                         state_manager.update_subscriber_rule(&state_update_subscriber.id, rule).await;
 
                         let (problem, table) = encode(&pp).await.unwrap();
-                        /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
                                 for instance in &problem.chronicles {
                                     Printer::print_chronicle(&instance.chronicle, &problem.context.model);
                                 }
-                            }*/
+                            }
                         let PlannerInstance {
                             id: _id,
                              _updater: u,
@@ -277,6 +286,7 @@ impl PlannerManager {
                         interrupter = Some(i);
                         plan_receiver = Some(p);
                         planning = true;
+
                     }
                 }
             }
@@ -292,7 +302,7 @@ pub struct PlannerResult {
 pub struct PlannerInstance {
     id: u32,
     _updater: mpsc::UnboundedSender<VarUpdate>,
-    interrupter: oneshot::Sender<bool>,
+    interrupter: PlannerInterruptSender,
     plan_receiver: oneshot::Receiver<PlannerResult>,
 }
 
@@ -319,17 +329,17 @@ impl PlannerInstance {
             println!("Planning for:\n{}", explanation);
         }
         let (_updater, _updated) = mpsc::unbounded_channel();
-        let (interrupter, interrupted) = oneshot::channel();
+        let (interrupter, interrupted) = watch::channel(false);
         let (plan_sender, plan_receiver) = oneshot::channel();
         let exp = Arc::new(explanation);
-        let exp_2 = exp.clone();
 
-        let (planner, handle) = abortable(tokio::spawn(async move {
-            let result = run_planner(problem.clone(), opt);
-            //println!("{}", format_partial_plan(&pb, &x)?);
+        let handle = Handle::current();
 
-            if let Ok(Some(pr)) = result {
-                //result::print_chronicles(&pr);
+        thread::spawn(move || {
+            let _guard = handle.enter();
+
+            let result = run_planner(problem.clone(), opt, Some(interrupted));
+            let update = if let Ok(Some(pr)) = result {
                 let PlanResult { ass, fp } = pr;
 
                 let choices = extract_choices(&table, &ass, &fp.model, &planner_problem);
@@ -377,33 +387,10 @@ impl PlannerInstance {
                             Printer::print_chronicle(&instance.chronicle, &problem.context.model);
                         }
                     }
-                    std::process::exit(0)
+                    //std::process::exit(0)
                 }
                 None
-            }
-        }));
-
-        tokio::spawn(async move {
-            let mut process =
-                ProcessInterface::new("__PROCESS__ARIES__", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS)
-                    .await;
-
-            let update = tokio::select! {
-                _ = process.recv() => {
-                    None
-                }
-                _ = interrupted => {
-                    handle.abort();
-                    if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
-                        println!("Interrupted planning for: \n{}", exp_2);
-                    }
-                    None
-                }
-                Ok(Ok(update)) = planner => {
-                    update
-                }
             };
-
             let end = clock.now();
             stat.duration =
                 crate::ompas::manager::acting::interval::Interval::new(start, Some(end)).duration();
@@ -446,13 +433,13 @@ pub async fn populate_problem(
                               ci: &ChronicleInstance,
                               instance_id: usize| {
         let chronicle = &ci.instantiated_chronicle;
-        /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::On {
+        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
             println!(
                 "instantiated:{}\nmodel:{}",
                 chronicle,
                 ci.am.chronicle.as_ref().unwrap()
             )
-        }*/
+        }
         if ci.origin != ChronicleOrigin::Original {
             names.insert(chronicle.get_name()[0].format(st, true));
             tasks.insert(chronicle.get_task()[0].format(st, true));

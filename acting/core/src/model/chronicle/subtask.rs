@@ -5,7 +5,7 @@ use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVari
 use crate::model::sym_table::VarId;
 use im::HashSet;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SubTask {
     pub interval: Interval,
     pub name: Vec<VarId>,

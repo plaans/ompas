@@ -10,12 +10,15 @@
     ;(read planning_domain/problems/p1_debug.lisp)
     ;(plan t_jobshop)
 
-    (start-with-planner false)
-    ;(start)
-    ;(activate_log log-ompas)
-    (wait-task (trigger-task t_jobshop))
-    ;(wait-task (trigger-task t_carry_to_machine robot0 package0 machine0))
-    ;(wait-task (trigger-task t_process_on_machine package0 machine0 3))
-    ;(stop)
+    ;(read planning_domain/problems/ft06.lisp)
+    (start)
+    (sleep 1)
+    ;(plan t_jobshop)
+
+    ;(start-with-planner true)
+
+    (wait-task (exec-task t_jobshop))
     (exit 0)
+    ;(exec-task t_jobshop)
+
 )

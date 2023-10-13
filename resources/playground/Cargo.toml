@@ -13,6 +13,10 @@ ompas-utils={path = "../../utils"}
 ompas-gobotsim = {path = "../../ompas-gobot-sim"}
 ompas-core = {path = "../../acting/core"}
 aries = {path = "../../aries/solver"}
+aries_planners = {path = "../../aries/planning/planners"}
+aries_planning = {path = "../../aries/planning/planning"}
 
-tokio = { version = "1.17.0", features = ["full", "time"] }
-rustyline = "7.1.0"
+tokio = { workspace = true }
+rustyline = { workspace = true }
+tracing-subscriber = "0.3.17"
+tracing = "0.1.37"

@@ -2,16 +2,16 @@
 
 # SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-# echo "Script directory: $SCRIPT_DIR"
+#echo "Script directory: $SCRIPT_DIR"
 
 # choice of how resources are encoded in the planner
 # - assignment: default encoding using linear constraints, conditions and effects
-# export OMPAS_RESOURCE_ENCODING=assignment
+#export OMPAS_RESOURCE_ENCODING=assignment
 # - addition: new CSP encoding using increase and decrease effects operators
 export OMPAS_RESOURCE_ENCODING=addition
 
 # print the generates chronicles
-export OMPAS_CHRONICLE_DEBUG=on
+export OMPAS_CHRONICLE_DEBUG=off
 
 # Frequency at which continuous planning will be updated
 export OMPAS_DELIBERATION_FREQUENCY=1
@@ -20,7 +20,7 @@ export OMPAS_DELIBERATION_FREQUENCY=1
 export OMPAS_PLAN_OUTPUT=true
 
 # print the continuous planning deliberation phases
-export OMPAS_DEBUG_CONTINUOUS_PLANNING=true
+export OMPAS_DEBUG_CONTINUOUS_PLANNING=false
 
 # activate the debug of OMPAS
 export OMPAS_DEBUG=false
@@ -38,5 +38,6 @@ export SOMPAS_DEBUG=false
 
 export ARIES_PRINT_PLANNER_OUTPUT=true
 export ARIES_LCP_TIME_SCALE=1000
-export ARIES_PRINT_INITIAL_PROPAGATION=false
+#export ARIES_PRINT_INITIAL_PROPAGATION=false
 export ARIES_LCP_RELAXED_TEMPORAL_CONSTRAINT_TASK_METHOD=true;
+export ARIES_RESOURCE_LA_USE_ASSIGN_END_TIMEPOINT=true;

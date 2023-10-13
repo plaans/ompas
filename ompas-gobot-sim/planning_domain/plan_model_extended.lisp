@@ -46,8 +46,7 @@
             (begin
                 (define t_r (robot.location ?r))
                 (define time (travel-time t_r ?dest))
-                (transitive-assert time 'robot.location ?r ?dest)
-                ;(transitive-assert 1 'robot.location ?r ?dest)
+                (transitive-effect time 'robot.location ?r ?dest)
             ))
     )
 
@@ -158,7 +157,7 @@
     (def-task-om-model t_process
         (:params (?m machine) (?p package) (?d int))
         (:body
-            (transitive-assert
+            (transitive-effect
                 ?d
                 'package.location ?p 
                 (machine.output_belt ?m))))

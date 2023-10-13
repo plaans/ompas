@@ -53,7 +53,7 @@
           (:body
                  (do
                      (wait-for `(< (robot.battery ,?r) 0.5))
-                     (define h (acquire ?r 1 '(:priority 1000)))
+                     (define h (acquire ?r '(:priority 1000)))
                      (go_charge ?r)
                      (wait-for `(> (robot.battery ,?r) 0.9))
                      (release h)
@@ -98,7 +98,7 @@
                                  `(do
                                      (define ?r (arbitrary (instances robot) rand-element))
                                      ;(define ?r 'robot0)
-                                     (define h_r (acquire ?r 1))
+                                     (define h_r (acquire ?r))
                                      ;(sleep 1)
                                      (t_carry_to_machine ?r ,?p ,(find_output_machine))
                                      ;nil
@@ -110,19 +110,19 @@
 
 
 
-    (def-task test (:params))
+    (def-task test)
+    (def-command c_test (:params (?r robot)))
     (def-method m_test 
         (:task test)
         (:params (?r robot))
         (:pre-conditions true)
         (:body 
             (begin
-                ;(define ?r 'robot1)
-                (define rh (acquire ?r 1))
-                (sleep 1)
-                (release rh)
-                )
-        ))
+                (define rh (acquire ?r))
+                (c_test ?r)
+                ;(sleep 1)
+                ;(release rh)
+                )))
 
 
     (def-task t_process_on_machine (:params (?p package) (?m machine) (?d int)))
@@ -136,9 +136,9 @@
             (do
                 ;(define ?r (car (instances robot)))
                 (define ?r (arbitrary (instances robot) rand-element))
-                (define h1 (acquire ?m 1))
+                (define h1 (acquire ?m))
                 ;(define ?r 'robot1)
-                (define h2 (acquire ?r 1))
+                (define h2 (acquire ?r))
                 (t_carry_to_machine ?r ?p ?m)
                 ;(release h2)
                 (t_process ?m ?p ?d)

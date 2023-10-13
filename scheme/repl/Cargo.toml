@@ -16,6 +16,5 @@ im = { workspace =true }
 tokio =  { workspace =true }
 chrono =  { workspace =true }
 map-macro =  { workspace =true }
-
-rustyline = "12.0.0"
+rustyline = {workspace = true}
 

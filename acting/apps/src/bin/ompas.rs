@@ -34,6 +34,16 @@ async fn main() {
 }
 
 async fn lisp_interpreter(opt: &Opt) {
+    // let subscriber = tracing_subscriber::fmt()
+    //     .with_timer(tracing_subscriber::fmt::time::Uptime::from(
+    //         std::time::Instant::now(),
+    //     ))
+    //     // .without_time() // if activated, no time will be printed on logs (useful for counting events with `counts`)
+    //     .with_thread_ids(true)
+    //     .with_max_level(tracing::Level::TRACE)
+    //     .finish();
+    // tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let mut li = LispInterpreter::new().await;
 
     let mut mod_extended_std = ModExtendedStd::default();

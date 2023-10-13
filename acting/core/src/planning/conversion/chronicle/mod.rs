@@ -420,6 +420,9 @@ pub fn convert_into_chronicle(
                                     sv: vec![quantity_symbol, resource],
                                     operation: EffectOperation::assign(new_q_acquire),
                                 });
+                                acquire
+                                    .constraints
+                                    .push(Constraint::lt(t_acquire_prime, interval.get_end()));
 
                                 acquire
                                     .constraints
@@ -459,6 +462,9 @@ pub fn convert_into_chronicle(
                                     sv: vec![quantity_symbol, resource],
                                     operation: EffectOperation::assign(new_q_release),
                                 });
+                                release
+                                    .constraints
+                                    .push(Constraint::lt(t_release, t_release_prime));
 
                                 // t_r' = t_r + \eps
                                 release.constraints.push(Constraint::eq(
@@ -599,6 +605,10 @@ pub fn convert_into_chronicle(
                                 interval.get_end(),
                                 Computation::add(vec![interval.get_start(), eps]),
                             ));
+                            ch.add_constraint(Constraint::lt(
+                                interval.get_start(),
+                                interval.get_end(),
+                            ))
                         }
 
                         let result = ch.st.new_nil();

@@ -6,7 +6,7 @@ This module contains functions to create and format strings. A string is a speci
 - `string` creates a string LValue.
 - `concatenate`: takes a list of args and concatenate them into a string.
 ```lisp
->> (string::concatenate this is a test)
+>> (concatenate this is a test)
 LI>> thisisatest
 ```
 

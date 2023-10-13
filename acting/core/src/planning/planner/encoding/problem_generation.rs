@@ -4,6 +4,7 @@ use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::process_ref::{MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
+use crate::planning::conversion::chronicle::post_processing::try_eval_apply;
 use crate::planning::conversion::convert;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, PLEnv, PLValue};
 use crate::planning::planner::problem::ChronicleInstance;
@@ -125,11 +126,14 @@ pub async fn convert_into_chronicle_instance(
 
     let om: ActingModel = convert(Some(ch), lv, &mut p_env, st.clone()).await?;
 
-    let instantiated_chronicle = om
+    let mut instantiated_chronicle = om
         .chronicle
         .as_ref()
         .unwrap()
+        .clone()
         .instantiate_and_clean(Default::default());
+
+    try_eval_apply(&mut instantiated_chronicle, &p_env.env).await?;
 
     Ok(ChronicleInstance {
         instantiated_chronicle,

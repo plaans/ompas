@@ -51,11 +51,11 @@ impl From<ModExtendedStd> for LModule {
         let log_output = m.log_output.clone();
         let mut module = LModule::new(m, MOD_EXTENDED_STD, DOC_MOD_EXTENDED_STD);
         module.add_submodule(ModAdvancedMath::default(), WithoutPrefix);
-        module.add_submodule(ModFirstOrderLogic::default(), WithoutPrefix);
         module.add_submodule(ModSort::default(), WithoutPrefix);
         module.add_submodule(ModString::default(), WithoutPrefix);
         module.add_submodule(ModTime::new(time_zone), WithoutPrefix);
         module.add_submodule(ModUtils::default(), WithoutPrefix);
+        module.add_submodule(ModFirstOrderLogic::default(), WithoutPrefix);
         module.add_submodule(ModIO::new(log_output), WithoutPrefix);
 
         module

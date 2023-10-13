@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 /// List of facts that have been updated
 pub type StateUpdate = Vec<LValueS>;
 
+#[derive(Debug)]
 pub enum StateRule {
     All,
     Specific(Vec<LValueS>),
@@ -36,6 +37,10 @@ impl StateUpdateManager {
         for subscriber in self.inner.values() {
             match &subscriber.rule {
                 StateRule::All => {
+                    /*println!(
+                        "({}) rule = {:?},\n concerned {:?}",
+                        id, subscriber.rule, updated
+                    );*/
                     let _ = subscriber.channel.send(updated.clone());
                 }
                 StateRule::Specific(rules) => {
@@ -51,6 +56,11 @@ impl StateUpdateManager {
                         }
 
                         if !concerned.is_empty() {
+                            /*println!(
+                                "({}) rule = {:?},\n concerned {:?}",
+                                id, subscriber.rule, concerned
+                            );*/
+
                             let _ = subscriber.channel.send(concerned);
                         }
                     }

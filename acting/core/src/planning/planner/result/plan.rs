@@ -287,7 +287,7 @@ pub fn extract_instantiated_methods(pr: &PlanResult) -> LResult {
     };
     let mut lv_methods: Vec<LValue> = vec![];
     for m in methods {
-        let name: Vec<LValue> = m.chronicle.name.iter().map(|s| fmt1(s)).collect::<_>();
+        let name: Vec<LValue> = m.chronicle.name.iter().map(fmt1).collect::<_>();
         lv_methods.push(name.into());
     }
 

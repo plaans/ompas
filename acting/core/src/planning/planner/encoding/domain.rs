@@ -35,6 +35,7 @@ use aries_planning::chronicles::{
     StateVar, SubTask, VarType, TIME_SCALE,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
+use env_param::EnvParam;
 use function_name::named;
 use ompas_language::sym_table::*;
 use sompas_structs::lruntimeerror;
@@ -42,7 +43,7 @@ use sompas_structs::lruntimeerror::LRuntimeError;
 use std::ops::Deref;
 use std::sync::Arc;
 
-const TIMEPOINT_UB: IntCst = 1000 * 1000; //INT_CST_MAX;
+static TIMEPOINT_UB: EnvParam<IntCst> = EnvParam::new("OMPAS_TIMEPOINT_UB", "1000000");
 
 #[named]
 pub fn encode_ctx(
@@ -315,20 +316,21 @@ fn convert_constraint(
                     match var {
                         Atom::Int(IAtom { var, shift }) => {
                             sum += LinearTerm::int(sign, var, prez);
-                            sum += LinearTerm::constant_int(shift, prez);
+                            sum += LinearTerm::constant_int(sign * shift, prez);
                         }
                         Atom::Fixed(FAtom {
                             num: IAtom { var, shift },
                             denom,
                         }) => {
                             sum += LinearTerm::rational(sign, var, denom, prez);
-                            sum += LinearTerm::constant_rational(shift, denom, prez);
+                            sum += LinearTerm::constant_rational(sign * shift, denom, prez);
                         }
                         _ => unreachable!(),
                     };
                 }
 
-                sum.simplify();
+                let sum = sum.simplify();
+                //println!("INFO! sum = {:?}", sum);
                 aConstraint::linear_eq_zero(sum)
             }
             _ => Err(LRuntimeError::new(
@@ -413,15 +415,8 @@ fn convert_constraint(
                         .model
                         .new_optional_bvar(prez, container / VarType::Reification)
                         .into();
-                    let mut cs = convert_constraint(
-                        c.deref(),
-                        prez,
-                        container,
-                        table,
-                        st,
-                        ctx,
-                        Some(value),
-                    )?;
+                    let mut cs =
+                        convert_constraint(c, prez, container, table, st, ctx, Some(value))?;
                     constraints.append(&mut cs);
                     aConstraint::neq(get_atom(&a, ctx), value)
                 }
@@ -548,7 +543,7 @@ pub fn read_chronicle(
         } else if t == lattice.get_type_id(TYPE_TIMEPOINT).unwrap() {
             let fvar = ctx.model.new_optional_fvar(
                 0,
-                TIMEPOINT_UB,
+                TIMEPOINT_UB.get(),
                 TIME_SCALE.get(),
                 prez,
                 container / var_type,
@@ -707,25 +702,17 @@ pub fn read_chronicle(
         let operation = match &e.operation.inner {
             EffectOperationInner::Assign => EffectOp::Assign(value),
             EffectOperationInner::Increase => {
-                if let Atom::Int(IAtom {
-                    var: IVar::ZERO,
-                    shift,
-                }) = value
-                {
-                    EffectOp::Increase(shift)
+                if let Atom::Int(iatom) = value {
+                    EffectOp::Increase(iatom)
                 } else {
-                    panic!("Increase of variables is not supported yet");
+                    panic!("Increase support only integer variable.");
                 }
             }
             EffectOperationInner::Decrease => {
-                if let Atom::Int(IAtom {
-                    var: IVar::ZERO,
-                    shift,
-                }) = value
-                {
-                    EffectOp::Increase(-shift)
+                if let Atom::Int(iatom) = value {
+                    EffectOp::Decrease(iatom)
                 } else {
-                    panic!("Increase of variables is not supported yet");
+                    panic!("Decrease support only integer variable.");
                 }
             }
         };

@@ -40,6 +40,10 @@ impl DomainManager {
         self.inner.read().await.is_task(label)
     }
 
+    pub async fn is_command(&self, label: &str) -> bool {
+        self.inner.read().await.is_command(label)
+    }
+
     pub async fn get_list_tasks(&self) -> LValue {
         self.inner.read().await.get_list_tasks()
     }

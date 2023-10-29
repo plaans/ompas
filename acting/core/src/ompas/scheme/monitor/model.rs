@@ -16,6 +16,7 @@ use crate::ompas::scheme::monitor::ModMonitor;
 use crate::planning::conversion::context::ConversionContext;
 use ompas_language::exec::state::EFFECT;
 use ompas_language::monitor::model::*;
+use ompas_language::sym_table::TYPE_OBJECT;
 use ompas_middleware::logger::LogClient;
 use sompas_core::modules::list::{car, cons, first};
 use sompas_core::{eval, expand, get_root_env, parse};
@@ -34,7 +35,7 @@ use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
 
 pub struct ModModel {
-    state: StateManager,
+    state_manager: StateManager,
     st: RefSymTable,
     resource_manager: ResourceManager,
     empty_env: LEnv,
@@ -46,12 +47,12 @@ pub struct ModModel {
 impl ModModel {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
-            state: monitor.acting_manager.state.clone(),
+            state_manager: monitor.acting_manager.state_manager.clone(),
             st: monitor.acting_manager.st.clone(),
             resource_manager: monitor.acting_manager.resource_manager.clone(),
             empty_env: monitor.empty_env.clone(),
             domain_description: monitor.platform.domain().into(),
-            domain: monitor.acting_manager.domain.clone(),
+            domain: monitor.acting_manager.domain_manager.clone(),
             log: monitor.log.clone(),
         }
     }
@@ -75,7 +76,7 @@ impl ModModel {
     }
 
     pub async fn get_plan_state(&self) -> WorldStateSnapshot {
-        let mut state = self.state.get_snapshot().await;
+        let mut state = self.state_manager.get_snapshot().await;
         let snap_resource: WorldStateSnapshot = self.resource_manager.get_snapshot(None).await;
         state.absorb(snap_resource);
         state
@@ -809,7 +810,7 @@ pub async fn add_env(env: &LEnv, label: String, value: &LValue) -> Result<(), LR
 ///Takes in input a list of initial facts that will be stored in the inner world part of the State.
 #[async_scheme_fn]
 pub async fn add_facts(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
-    let state = &env.get_context::<ModModel>(MOD_MODEL)?.state;
+    let state = &env.get_context::<ModModel>(MOD_MODEL)?.state_manager;
 
     let mut inner_dynamic = PartialState {
         inner: Default::default(),
@@ -831,7 +832,7 @@ pub async fn add_static_facts(
     env: &LEnv,
     map: im::HashMap<LValue, LValue>,
 ) -> Result<(), LRuntimeError> {
-    let state = &env.get_context::<ModModel>(MOD_MODEL)?.state;
+    let state = &env.get_context::<ModModel>(MOD_MODEL)?.state_manager;
 
     let mut inner_static = PartialState {
         inner: Default::default(),
@@ -857,7 +858,7 @@ pub async fn add_type(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> 
         _ => return Err(LRuntimeError::wrong_number_of_args(ADD_TYPE, args, 1..2)),
     };
 
-    ctx.state.add_type(&t, parent.as_deref()).await;
+    ctx.state_manager.add_type(&t, parent.as_deref()).await;
 
     Ok(())
 }
@@ -893,7 +894,7 @@ pub async fn add_types(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError>
 pub async fn add_object(env: &LEnv, object: String, t: String) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
 
-    ctx.state.add_instance(&object, &t).await;
+    ctx.state_manager.add_instance(&object, &t).await;
 
     Ok(())
 }
@@ -931,6 +932,10 @@ pub async fn add_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
         None => 1,
         Some(lv) => lv.try_into()?,
     };
+
+    if LValue::Nil == ctx.state_manager.instance(&label, TYPE_OBJECT).await {
+        ctx.state_manager.add_instance(&label, TYPE_OBJECT).await
+    }
 
     ctx.resource_manager
         .new_resource(label, Some(capacity))

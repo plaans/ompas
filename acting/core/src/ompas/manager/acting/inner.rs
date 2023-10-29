@@ -52,6 +52,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
+use std::time::SystemTime;
 use tokio::sync::{broadcast, watch};
 
 const TASK_NAME: &str = "task_name";
@@ -258,19 +259,23 @@ impl InnerActingManager {
                         Label::AbstractModel => {
                             id = obj.inner.as_action().unwrap().abstract_model?;
                         }
-                        Label::Command(_) => {
-                            id = if let Some(id) = obj
-                                .inner
-                                .as_method()
-                                .unwrap_or_else(|| {
-                                    panic!("{id} is not a method but a {}.", obj.inner.kind())
-                                })
-                                .childs
-                                .get(&label)
-                            {
-                                *id
+                        Label::Command(c) => {
+                            if id == 0 {
+                                id = obj.inner.as_root().unwrap().nth_command(*c)?;
                             } else {
-                                return None;
+                                id = if let Some(id) = obj
+                                    .inner
+                                    .as_method()
+                                    .unwrap_or_else(|| {
+                                        panic!("{id} is not a method but a {}.", obj.inner.kind())
+                                    })
+                                    .childs
+                                    .get(&label)
+                                {
+                                    *id
+                                } else {
+                                    return None;
+                                }
                             }
                         }
                     }
@@ -460,8 +465,7 @@ impl InnerActingManager {
         }
 
         let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
-        let rank = root.n_task();
-        root.add_top_level_task(id);
+        let rank = root.add_top_level_task(id);
 
         let label = Label::Task(rank);
         self.processes.push(ActingProcess::new(
@@ -474,6 +478,44 @@ impl InnerActingManager {
             start,
             end,
             TaskProcess::new(new_args),
+        ));
+        self.notify_planner(PlannerUpdate::ProblemUpdate(id));
+
+        ProcessRef::Relative(0, vec![label])
+    }
+
+    pub fn new_high_level_command(&mut self, debug: String, mut args: Vec<Cst>) -> ProcessRef {
+        let id = self.processes.len();
+        let task_ref = self.models[0].add_new_task(NewTask {
+            start: None,
+            args: args.clone(),
+        });
+
+        let start = self.new_acting_var_with_ref(&task_ref.start, &0);
+        let end = self.new_acting_var_with_ref(&task_ref.end, &0);
+
+        let mut new_args = vec![];
+
+        for (val, arg_id) in args.drain(..).zip(task_ref.name) {
+            let arg = self.new_acting_var_with_ref(&arg_id, &0);
+            self.set_execution_val(&arg, val);
+            new_args.push(arg)
+        }
+
+        let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
+        let rank = root.add_top_level_command(id);
+
+        let label = Label::Command(rank);
+        self.processes.push(ActingProcess::new(
+            id,
+            0,
+            Some(label),
+            ProcessOrigin::Execution,
+            0,
+            Some(debug),
+            start,
+            end,
+            CommandProcess::new(new_args),
         ));
         self.notify_planner(PlannerUpdate::ProblemUpdate(id));
 
@@ -1604,8 +1646,14 @@ impl InnerActingManager {
         let dot_file_name = "acting_tree.dot";
         path_dot.push(dot_file_name);
         let mut file = File::create(&path_dot).unwrap();
+        let now = SystemTime::now();
         let dot = self.export_trace_dot_graph();
+        println!(
+            "export to dot time: {} µs",
+            now.elapsed().unwrap().as_micros()
+        );
         file.write_all(dot.as_bytes()).unwrap();
+        println!("write to file: {} µs", now.elapsed().unwrap().as_micros());
         set_current_dir(&path).unwrap();
         let trace = "acting_tree.png";
         std::process::Command::new("dot")
@@ -1614,6 +1662,10 @@ impl InnerActingManager {
             .unwrap()
             .wait()
             .unwrap();
+        println!(
+            "export and generate png time: {} µs",
+            now.elapsed().unwrap().as_micros()
+        );
 
         let mut md_path = path.clone();
         let md_file_name = "acting_tree.md";
@@ -1663,7 +1715,6 @@ impl InnerActingManager {
         } = update;
         self.add_processes_from_chronicles(acting_models);
         self.absorb_choices(choices).await;
-        //locked.dump_trace(None)
         self.notify_planner_tree_update();
     }
 

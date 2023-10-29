@@ -94,6 +94,18 @@ pub async fn rae(
                             JobType::Debug => {
                                 log.debug(format!("new triggered debug: {}", job_expr));
                             },
+                            JobType::Command => {
+                                let vec: Vec<LValue> = job_lvalue.clone().try_into().unwrap();
+                                let mut vec_cst = vec![];
+                                for e in vec {
+                                    vec_cst.push(e.as_cst().unwrap())
+                                }
+                                let id: ProcessRef = acting_manager.new_high_level_command(job_lvalue.to_string(),vec_cst).await;
+
+                                let mod_context: ModActingContext = ModActingContext::new(id.clone());
+                                pr = id;
+                                new_env.update_context(mod_context);
+                            }
                         }
 
                         //info!("LValue to be evaluated: {}", job_lvalue);
@@ -135,7 +147,7 @@ pub async fn rae(
                         let async_handle = LAsyncHandle::new(future, tx);
 
                         let response: Response = match job_type {
-                            JobType::Task => {
+                            JobType::Task | JobType::Command => {
                                 Response::Process(TaskProcess::new(pr, async_handle))
                             }
                             JobType::Debug => {

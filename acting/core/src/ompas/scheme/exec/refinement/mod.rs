@@ -316,7 +316,11 @@ pub async fn select(
         .iter()
         .map(|cst| LValue::from(cst.clone()))
         .collect();
-    let state: WorldStateSnapshot = mod_refinement.acting_manager.state.get_snapshot().await;
+    let state: WorldStateSnapshot = mod_refinement
+        .acting_manager
+        .state_manager
+        .get_snapshot()
+        .await;
 
     let mut candidates = applicable(&state, &task, env).await?;
 

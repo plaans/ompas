@@ -1,7 +1,7 @@
-use crate::ompas::interface::job::Job;
+use crate::ompas::interface::job::{Job, JobType};
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
-use crate::ompas::interface::trigger_collection::{Response, TaskCollection, TaskHandle};
+use crate::ompas::interface::trigger_collection::{JobCollection, JobHandle, PendingJob, Response};
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::ActingManager;
@@ -51,7 +51,7 @@ pub struct ModControl {
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::UnboundedSender<OMPASJob>>>>,
     pub(crate) platform: PlatformManager,
-    pub(crate) tasks: TaskCollection,
+    pub(crate) jobs: JobCollection,
 }
 
 impl ModControl {
@@ -62,7 +62,7 @@ impl ModControl {
             log: monitor.log.clone(),
             task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
-            tasks: Default::default(),
+            jobs: Default::default(),
         }
     }
 
@@ -83,7 +83,8 @@ impl ModControl {
         env.import_module(ModExec::new(self).await, WithoutPrefix);
         eval_init(&mut env).await;
 
-        let domain_exec_symbols: LEnvSymbols = self.acting_manager.domain.get_exec_env().await;
+        let domain_exec_symbols: LEnvSymbols =
+            self.acting_manager.domain_manager.get_exec_env().await;
 
         env.set_new_top_symbols(domain_exec_symbols);
 
@@ -96,7 +97,7 @@ impl ModControl {
 
     pub async fn reboot(&self) {
         self.acting_manager.clear().await;
-        self.tasks.clear().await;
+        self.jobs.clear().await;
         *self.task_stream.write().await = None;
     }
 }
@@ -128,6 +129,8 @@ impl From<ModControl> for LModule {
         module.add_lambda(WAIT_TASK, LAMBDA_WAIT_TASK, DOC_WAIT_TASK);
         module.add_async_fn(GET_TASK_ID, get_task_id, DOC_GET_TASK_ID, false);
         module.add_async_fn(CANCEL_TASK, cancel_task, DOC_CANCEL_TASK, false);
+
+        module.add_async_fn(EXEC_COMMAND, exec_command, DOC_EXEC_COMMAND, false);
 
         module.add_async_fn(
             SET_CONFIG_PLATFORM,
@@ -171,8 +174,8 @@ impl From<ModControl> for LModule {
         module.add_async_fn(GET_RESOURCES, get_resources, DOC_GET_RESOURCES, false);
         module.add_async_fn(GET_MONITORS, get_monitors, DOC_GET_MONITORS, false);
         module.add_async_fn(GET_COMMANDS, get_commands, DOC_GET_COMMANDS, false);
-        module.add_async_fn(GET_TASKS, get_tasks, DOC_GET_TASKS, false);
-        module.add_async_fn(GET_METHODS, get_methods, DOC_GET_METHODS, false);
+        module.add_async_fn(GET_TASK_LIST, get_tasks, DOC_GET_TASK_LIST, false);
+        module.add_async_fn(GET_METHOD_LIST, get_methods, DOC_GET_METHOD_LIST, false);
         module.add_async_fn(
             GET_STATE_FUNCTIONS,
             get_state_functions,
@@ -197,7 +200,7 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let acting_manager = ctx.acting_manager.clone();
     //acting_manager.clock_manager.reset().await;
 
-    let pendings = ctx.tasks.move_pendings().await;
+    let pendings = ctx.jobs.move_pendings().await;
 
     let (tx, rx) = mpsc::unbounded_channel();
 
@@ -208,7 +211,10 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let env = ctx.get_exec_env().await;
     let log = ctx.log.clone();
 
-    let receiver_event_update_state = acting_manager.state.new_subscriber(StateRule::All).await;
+    let receiver_event_update_state = acting_manager
+        .state_manager
+        .new_subscriber(StateRule::All)
+        .await;
     let env_clone = env.clone();
     let monitors = acting_manager.monitor_manager.clone();
     tokio::spawn(async move {
@@ -221,22 +227,22 @@ pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
 
     let sender = ctx.get_sender().await.unwrap();
 
-    for (id, task) in pendings {
+    for PendingJob { id, r#type, lvalue } in pendings {
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let job = Job::new_task(tx, task);
+        let job = Job::new(tx, r#type, lvalue);
         let sender = sender.clone();
         tokio::spawn(async move {
             sender.send(job.into()).expect("could not send job to rae");
         });
         let trigger: Response = rx.recv().await.unwrap()?;
         if let Response::Process(process) = trigger {
-            ctx.tasks.set_task_process(&id, process).await;
+            ctx.jobs.set_task_process(&id, process).await;
         } else {
             unreachable!("{EXEC_TASK} should receive a TaskProcess")
         }
     }
 
-    Ok(format!("OMPAS launched successfully. {}", start_result))
+    Ok(format!("OMPAS launched successfully: {}", start_result))
 }
 
 /// Launch main loop of rae in an other asynchronous task.
@@ -249,7 +255,7 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
     acting_manager
         .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
         .await;
-    let pendings = ctx.tasks.move_pendings().await;
+    let pendings = ctx.jobs.move_pendings().await;
 
     let (tx, rx) = mpsc::unbounded_channel();
 
@@ -260,7 +266,10 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
     let env = ctx.get_exec_env().await;
     let log = ctx.log.clone();
 
-    let receiver_event_update_state = acting_manager.state.new_subscriber(StateRule::All).await;
+    let receiver_event_update_state = acting_manager
+        .state_manager
+        .new_subscriber(StateRule::All)
+        .await;
     let env_clone = env.clone();
     let monitors = acting_manager.monitor_manager.clone();
     tokio::spawn(async move {
@@ -273,16 +282,16 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
 
     let sender = ctx.get_sender().await.unwrap();
 
-    for (id, task) in pendings {
+    for PendingJob { id, r#type, lvalue } in pendings {
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let job = Job::new_task(tx, task);
+        let job = Job::new(tx, r#type, lvalue);
         let sender = sender.clone();
         tokio::spawn(async move {
             sender.send(job.into()).expect("could not send job to rae");
         });
         let trigger: Response = rx.recv().await.unwrap()?;
         if let Response::Process(process) = trigger {
-            ctx.tasks.set_task_process(&id, process).await;
+            ctx.jobs.set_task_process(&id, process).await;
         } else {
             unreachable!("{EXEC_TASK} should receive a TaskProcess")
         }
@@ -339,7 +348,7 @@ pub async fn exec_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntimeErr
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
     let task = args[0].to_string();
-    if !ctx.acting_manager.domain.is_task(&task).await {
+    if !ctx.acting_manager.domain_manager.is_task(&task).await {
         return Err(LRuntimeError::new(
             EXEC_TASK,
             format!("{} is not a task.", task),
@@ -347,7 +356,7 @@ pub async fn exec_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntimeErr
     }
 
     match ctx.get_sender().await {
-        None => Ok(ctx.tasks.add_pending_task(args.into()).await),
+        None => Ok(ctx.jobs.add_pending_job(JobType::Task, args.into()).await),
         Some(sender) => {
             let (tx, mut rx) = mpsc::unbounded_channel();
             let job = Job::new_task(tx, args.into());
@@ -357,9 +366,9 @@ pub async fn exec_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntimeErr
             });
             let trigger: Response = rx.recv().await.unwrap()?;
             if let Response::Process(process) = trigger {
-                Ok(ctx.tasks.add_process(process).await)
+                Ok(ctx.jobs.add_process(process).await)
             } else {
-                unreachable!("{EXEC_TASK} should receive a TaskTrigger struct.")
+                unreachable!("{} should receive a TaskTrigger struct.", EXEC_TASK)
             }
         }
     }
@@ -368,10 +377,10 @@ pub async fn exec_task(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntimeErr
 #[async_scheme_fn]
 pub async fn _wait_task(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let trigger: Option<TaskHandle> = ctx.tasks.get_task(task_id).await;
+    let trigger: Option<JobHandle> = ctx.jobs.get_job(task_id).await;
     match trigger {
-        Some(TaskHandle::Process(process)) => Ok(LValue::Handle(process.get_handle())),
-        Some(TaskHandle::Pending(_)) => Ok(string!(format!(
+        Some(JobHandle::Process(process)) => Ok(LValue::Handle(process.get_handle())),
+        Some(JobHandle::Pending(_)) => Ok(string!(format!(
             "{task_id} is a pending task because ompas has been started yet."
         ))),
         None => Err(LRuntimeError::new(
@@ -384,10 +393,10 @@ pub async fn _wait_task(env: &LEnv, task_id: usize) -> LResult {
 #[async_scheme_fn]
 pub async fn get_task_id(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let trigger: Option<TaskHandle> = ctx.tasks.get_task(task_id).await;
+    let trigger: Option<JobHandle> = ctx.jobs.get_job(task_id).await;
     match trigger {
-        Some(TaskHandle::Process(process)) => Ok(format!("{:?}", process.get_ref()).into()),
-        Some(TaskHandle::Pending(_)) => Ok(string!(format!(
+        Some(JobHandle::Process(process)) => Ok(format!("{:?}", process.get_ref()).into()),
+        Some(JobHandle::Pending(_)) => Ok(string!(format!(
             "{task_id} is a pending task because ompas has been started yet."
         ))),
         None => Err(LRuntimeError::new(
@@ -400,16 +409,52 @@ pub async fn get_task_id(env: &LEnv, task_id: usize) -> LResult {
 #[async_scheme_fn]
 pub async fn cancel_task(env: &LEnv, task_id: usize) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let trigger: Option<TaskHandle> = ctx.tasks.get_task(task_id).await;
+    let trigger: Option<JobHandle> = ctx.jobs.get_job(task_id).await;
     match trigger {
-        Some(TaskHandle::Process(process)) => process.get_handle().interrupt().await,
-        Some(TaskHandle::Pending(_)) => Ok(string!(format!(
+        Some(JobHandle::Process(process)) => process.get_handle().interrupt().await,
+        Some(JobHandle::Pending(_)) => Ok(string!(format!(
             "Cannot cancel {task_id} because it is still a pending task"
         ))),
         None => Err(LRuntimeError::new(
             WAIT_TASK,
             format!("{} is not the id of a triggered task", task_id),
         )),
+    }
+}
+
+#[async_scheme_fn]
+pub async fn exec_command(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntimeError> {
+    let env = env.clone();
+
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+
+    let task = args[0].to_string();
+    if !ctx.acting_manager.domain_manager.is_command(&task).await {
+        return Err(LRuntimeError::new(
+            EXEC_COMMAND,
+            format!("{} is not a command.", task),
+        ));
+    }
+
+    match ctx.get_sender().await {
+        None => Ok(ctx
+            .jobs
+            .add_pending_job(JobType::Command, args.into())
+            .await),
+        Some(sender) => {
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let job = Job::new_command(tx, args.into());
+
+            tokio::spawn(async move {
+                sender.send(job.into()).expect("could not send job to rae");
+            });
+            let trigger: Response = rx.recv().await.unwrap()?;
+            if let Response::Process(process) = trigger {
+                Ok(ctx.jobs.add_process(process).await)
+            } else {
+                unreachable!("{} should receive a TaskTrigger struct.", EXEC_COMMAND)
+            }
+        }
     }
 }
 
@@ -516,7 +561,7 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
         }
         _ => return Err(LRuntimeError::wrong_number_of_args(GET_STATE, args, 0..1)),
     };
-    let state = ctx.acting_manager.state.get_state(_type).await;
+    let state = ctx.acting_manager.state_manager.get_state(_type).await;
     Ok(state.into_map())
 }
 
@@ -587,28 +632,31 @@ pub async fn get_monitors(env: &LEnv) -> LResult {
 #[async_scheme_fn]
 pub async fn get_commands(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.acting_manager.domain.get_list_commands().await)
+    Ok(ctx.acting_manager.domain_manager.get_list_commands().await)
 }
 
 ///Get the list of tasks in the environment
 #[async_scheme_fn]
 pub async fn get_tasks(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.acting_manager.domain.get_list_tasks().await)
+    Ok(ctx.acting_manager.domain_manager.get_list_tasks().await)
 }
 
 ///Get the methods of a given task
 #[async_scheme_fn]
 pub async fn get_methods(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.acting_manager.domain.get_list_methods().await)
+    Ok(ctx.acting_manager.domain_manager.get_list_methods().await)
 }
 
 ///Get the list of state functions in the environment
 #[async_scheme_fn]
 pub async fn get_state_functions(env: &LEnv) -> LValue {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.acting_manager.domain.get_list_state_functions().await
+    ctx.acting_manager
+        .domain_manager
+        .get_list_state_functions()
+        .await
 }
 
 /// Returns the whole RAE environment if no arg et the entry corresponding to the symbol passed in args.
@@ -628,10 +676,10 @@ pub async fn get_domain(env: &LEnv, args: &[LValue]) -> LResult {
 
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
     match key {
-        None => Ok(ctx.acting_manager.domain.format().await.into()),
+        None => Ok(ctx.acting_manager.domain_manager.format().await.into()),
         Some(key) => Ok(ctx
             .acting_manager
-            .domain
+            .domain_manager
             .get_element_description(key.as_ref())
             .await
             .into()),

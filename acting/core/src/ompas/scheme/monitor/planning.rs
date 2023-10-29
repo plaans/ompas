@@ -52,7 +52,7 @@ impl ModPlanning {
             goals: Arc::new(Default::default()),
             tasks: Arc::new(Default::default()),
             _st: monitor.acting_manager.st.clone(),
-            _domain: monitor.acting_manager.domain.clone(),
+            _domain: monitor.acting_manager.domain_manager.clone(),
         }
     }
 }
@@ -145,10 +145,10 @@ pub async fn __plan(
     env.update_context(ModState::new_from_snapshot(state));
     let opt = if opt { Some(PMetric::Makespan) } else { None };
     let st = acting_manager.st.clone();
-    let domain: OMPASDomain = acting_manager.domain.get_inner().await;
+    let domain: OMPASDomain = acting_manager.domain_manager.get_inner().await;
     add_domain_symbols(&st, &domain);
 
-    let mut state = acting_manager.state.get_snapshot().await;
+    let mut state = acting_manager.state_manager.get_snapshot().await;
     let resource_state = acting_manager.resource_manager.get_snapshot(None).await;
     state.absorb(resource_state);
     let ep: ExecutionProblem = ExecutionProblem {

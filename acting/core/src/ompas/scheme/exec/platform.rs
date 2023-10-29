@@ -1,6 +1,7 @@
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::error::RaeExecError;
 use crate::ompas::manager::acting::acting_var::AsCst;
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
 use crate::ompas::manager::platform::PlatformManager;
@@ -84,17 +85,21 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
         let acting_manager = &env.get_context::<ModPlatform>(MOD_PLATFORM)?.acting_manager;
 
         let command_id: ActingProcessId = match &pr {
-            ProcessRef::Id(id) => {
-                acting_manager
-                    .new_command(
-                        Label::Command(acting_manager.get_number_subtask(*id).await),
-                        id,
-                        args,
-                        debug,
-                        ProcessOrigin::Execution,
-                    )
-                    .await
-            }
+            ProcessRef::Id(id) => match acting_manager.get_kind(id).await {
+                ActingProcessKind::Command => *id,
+                ActingProcessKind::Method => {
+                    acting_manager
+                        .new_command(
+                            Label::Command(acting_manager.get_number_subtask(*id).await),
+                            id,
+                            args,
+                            debug,
+                            ProcessOrigin::Execution,
+                        )
+                        .await
+                }
+                _ => unreachable!(),
+            },
 
             ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
                 Some(id) => id,

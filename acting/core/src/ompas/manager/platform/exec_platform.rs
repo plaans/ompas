@@ -175,9 +175,8 @@ impl ExecPlatform {
                                                 }
                                             }
                                         }
-                                            //println!("[PlatformClient] updating state");
-                                            acting_manager.state.update_state(r#static).await;
-                                            acting_manager.state.update_state(dynamic).await;
+                                            acting_manager.state_manager.update_state(r#static).await;
+                                            acting_manager.state_manager.update_state(dynamic).await;
                                     }
                                     Update::Event(event) => {
                                         match event.event {
@@ -198,7 +197,7 @@ impl ExecPlatform {
                                                 acting_manager.resource_manager.new_resource(label , Some(capacity)).await
                                             }
                                             Some(event::Event::Instance(instance)) => {
-                                                acting_manager.state.add_instance(&instance.object, &instance.r#type).await;
+                                                acting_manager.state_manager.add_instance(&instance.object, &instance.r#type).await;
                                             }
                                         }
                                     }

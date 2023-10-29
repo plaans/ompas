@@ -52,7 +52,7 @@ impl ModExec {
         Self {
             options: monitor.options.clone(),
             acting_manager: monitor.acting_manager.clone(),
-            domain: monitor.acting_manager.domain.clone(),
+            domain: monitor.acting_manager.domain_manager.clone(),
             platform: monitor.platform.clone(),
             log: LogClient::new("exec-ompas", LOG_TOPIC_OMPAS).await,
         }

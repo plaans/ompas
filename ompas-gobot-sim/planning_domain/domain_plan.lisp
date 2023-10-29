@@ -3,22 +3,22 @@
     (read planning_domain/base.lisp)
     (read planning_domain/lambdas.lisp)
     (read planning_domain/plan_model.lisp)
-    (read planning_domain/problems/j06.lisp)
-    ;(read planning_domain/problems/j01.lisp)
+    ;(read planning_domain/problems/j06.lisp)
+    (read planning_domain/problems/j01.lisp)
 
     ;(read planning_domain/problems/p1.lisp)
     ;(read planning_domain/problems/p1_debug.lisp)
     ;(plan t_jobshop)
 
     ;(read planning_domain/problems/ft06.lisp)
-    (start)
-    (sleep 1)
+    ;(start)
+    ;(sleep 1)
     ;(plan t_jobshop)
 
     ;(start-with-planner true)
 
-    (wait-task (exec-task t_jobshop))
-    (exit 0)
+    ;(wait-task (exec-task t_jobshop))
+    ;(exit 0)
     ;(exec-task t_jobshop)
 
 )

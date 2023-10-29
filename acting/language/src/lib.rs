@@ -883,9 +883,9 @@ pub mod monitor {
         pub const DOC_EXEC_TASK: &str = "Sends to the system a new task to address.";
         pub const DOC_EXEC_TASK_VERBOSE: &str = "Example: (exec-task t_dumber robot0)";
 
-        /*pub const ADD_TASK_TO_EXECUTE: &str = "add-task-to-execute";
-        pub const DOC_ADD_TASK_TO_EXECUTE: &str =
-            "Add a task in the list of tasks that will be sent to the system after it launches.";*/
+        pub const EXEC_COMMAND: &str = "exec-command";
+        pub const DOC_EXEC_COMMAND: &str = "Sends to RAE a new command to execute";
+        pub const DOC_EXEC_COMMAND_VERBOSE: &str = "Example: (exec-command do_move robot1 1 1)";
 
         pub const _WAIT_TASK: &str = "_wait_task";
         pub const DOC__WAIT_TASK: &str = "Wait on the result of a triggered task.";
@@ -928,24 +928,26 @@ pub mod monitor {
         pub const DOC_GET_AGENDA_VERBOSE: &str= "The agenda can be filtered in function of the kind\
         of the action {task, command} and their status {pending, accepted, rejected, success, failure, cancelled}";
 
-        pub const GET_RESOURCES: &str = "get-resources";
+        pub const GET_RESOURCES: &str = "get_resource_state";
         pub const DOC_GET_RESOURCES: &str =
             "Return the resources defined in the system and their waiting list.";
 
-        pub const GET_MONITORS: &str = "get-monitors";
+        pub const GET_MONITORS: &str = "get_monitored_fluent";
         pub const DOC_GET_MONITORS: &str =
             "Return the list of all dynamic expressions currently checked.";
 
-        pub const GET_COMMANDS: &str = "get-commands";
+        pub const GET_COMMANDS: &str = "get_command_list";
         pub const DOC_GET_COMMANDS: &str = "Return the list of all commands defined in the domain.";
 
-        pub const GET_TASKS: &str = "get-tasks";
-        pub const DOC_GET_TASKS: &str = "Return the list of all commands defined in the domain.";
+        pub const GET_TASK_LIST: &str = "get_task_list";
+        pub const DOC_GET_TASK_LIST: &str =
+            "Return the list of all commands defined in the domain.";
 
-        pub const GET_METHODS: &str = "get-methods";
-        pub const DOC_GET_METHODS: &str = "Return the list of all methods defined in the domain.";
+        pub const GET_METHOD_LIST: &str = "get-method-list";
+        pub const DOC_GET_METHOD_LIST: &str =
+            "Return the list of all methods defined in the domain.";
 
-        pub const GET_STATE_FUNCTIONS: &str = "get-state-functions";
+        pub const GET_STATE_FUNCTIONS: &str = "get_state_function_list";
         pub const DOC_GET_STATE_FUNCTIONS: &str =
             "Return the list of all state-functions defined in the domain.";
 

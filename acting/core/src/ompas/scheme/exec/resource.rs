@@ -6,6 +6,7 @@ use crate::ompas::manager::resource::{
     Capacity, Quantity, ResourceHandler, ResourceManager, WaitAcquire, WaiterPriority,
 };
 use crate::ompas::manager::state::action_status::ProcessStatus;
+use crate::ompas::manager::state::StateManager;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
 use crate::ompas::scheme::exec::ModExec;
 use futures::FutureExt;
@@ -14,6 +15,7 @@ use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::mode::*;
 use ompas_language::exec::resource::*;
 use ompas_language::exec::MOD_EXEC;
+use ompas_language::sym_table::TYPE_OBJECT;
 use ompas_middleware::logger::LogClient;
 use ompas_utils::dyn_async;
 use ompas_utils::other::generic_race;
@@ -33,6 +35,7 @@ use std::convert::{TryFrom, TryInto};
 
 pub struct ModResource {
     resource_manager: ResourceManager,
+    state_manager: StateManager,
     log: LogClient,
 }
 
@@ -40,6 +43,7 @@ impl ModResource {
     pub fn new(exec: &ModExec) -> Self {
         Self {
             resource_manager: exec.acting_manager.resource_manager.clone(),
+            state_manager: exec.acting_manager.state_manager.clone(),
             log: exec.log.clone(),
         }
     }
@@ -83,6 +87,10 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
         None => 1,
         Some(lv) => lv.try_into()?,
     };
+
+    if LValue::Nil == ctx.state_manager.instance(&label, TYPE_OBJECT).await {
+        ctx.state_manager.add_instance(&label, TYPE_OBJECT).await
+    }
 
     ctx.resource_manager
         .new_resource(label, Some(capacity))

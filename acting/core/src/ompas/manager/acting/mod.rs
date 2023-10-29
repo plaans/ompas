@@ -51,8 +51,8 @@ pub struct ActingManager {
     pub st: RefSymTable,
     pub resource_manager: ResourceManager,
     pub monitor_manager: MonitorManager,
-    pub domain: DomainManager,
-    pub state: StateManager,
+    pub domain_manager: DomainManager,
+    pub state_manager: StateManager,
     pub inner: RefInnerActingManager,
     pub clock_manager: ClockManager,
 }
@@ -68,8 +68,8 @@ impl ActingManager {
             st: st.clone(),
             resource_manager: resource_manager.clone(),
             monitor_manager: MonitorManager::from(clock_manager.clone()),
-            domain: domain.clone(),
-            state: StateManager::new(clock_manager.clone(), st.clone()),
+            domain_manager: domain.clone(),
+            state_manager: StateManager::new(clock_manager.clone(), st.clone()),
             inner: Arc::new(RwLock::new(InnerActingManager::new(
                 resource_manager,
                 clock_manager.clone(),
@@ -155,6 +155,10 @@ impl ActingManager {
 
     pub async fn new_high_level_task(&self, debug: String, args: Vec<Cst>) -> ProcessRef {
         self.inner.write().await.new_high_level_task(debug, args)
+    }
+
+    pub async fn new_high_level_command(&self, debug: String, args: Vec<Cst>) -> ProcessRef {
+        self.inner.write().await.new_high_level_command(debug, args)
     }
 
     //Task methods
@@ -393,8 +397,8 @@ impl ActingManager {
     pub async fn start_planner_manager(&self, env: LEnv, opt: Option<PMetric>) {
         let pmi = PlannerManager::run(
             self.inner.clone(),
-            self.state.clone(),
-            self.domain.get_inner().await,
+            self.state_manager.clone(),
+            self.domain_manager.get_inner().await,
             self.st.clone(),
             env,
             opt,
@@ -409,7 +413,7 @@ impl ActingManager {
     }
 
     pub async fn get_execution_problem(&self) -> ExecutionProblem {
-        let mut state = self.state.get_snapshot().await;
+        let mut state = self.state_manager.get_snapshot().await;
         let resource_state = self.resource_manager.get_snapshot(None).await;
         state.absorb(resource_state);
         ExecutionProblem {
@@ -450,7 +454,7 @@ impl ActingManager {
         ];
 
         let labels: Vec<Arc<Sym>> = self
-            .domain
+            .domain_manager
             .get_method(&label)
             .await
             .unwrap()

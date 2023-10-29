@@ -29,7 +29,7 @@ impl ModContinuousPlanning {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
             _st: monitor.acting_manager.st.clone(),
-            _domain: monitor.acting_manager.domain.clone(),
+            _domain: monitor.acting_manager.domain_manager.clone(),
         }
     }
 }
@@ -156,7 +156,7 @@ pub async fn new_event(env: &LEnv, args: &[LValue]) -> LResult {
     let state = env
         .get_context::<ModControl>(MOD_CONTROL)?
         .acting_manager
-        .state
+        .state_manager
         .clone();
     println!("[Debug CP] New-event [{}] {} <- {}", moment, key, value);
     state

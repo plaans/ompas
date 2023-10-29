@@ -32,7 +32,7 @@ pub struct ModState {
 impl ModState {
     pub fn new(exec: &ModExec) -> Self {
         Self {
-            state: exec.acting_manager.state.clone(),
+            state: exec.acting_manager.state_manager.clone(),
             monitors: exec.acting_manager.monitor_manager.clone(),
         }
     }

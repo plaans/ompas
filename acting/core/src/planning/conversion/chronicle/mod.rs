@@ -605,11 +605,8 @@ pub fn convert_into_chronicle(
                                 interval.get_end(),
                                 Computation::add(vec![interval.get_start(), eps]),
                             ));
-                            ch.add_constraint(Constraint::lt(
-                                interval.get_start(),
-                                interval.get_end(),
-                            ))
                         }
+                        ch.add_constraint(Constraint::lt(interval.get_start(), interval.get_end()));
 
                         let result = ch.st.new_nil();
                         st.union_var(&result, &result);

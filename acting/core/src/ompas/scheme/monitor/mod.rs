@@ -77,7 +77,7 @@ impl ModMonitor {
             PlatformDeclaration::Exec(exec) => {
                 let lisp_domain = exec.read().await.domain().await;
                 PlatformManager::new(
-                    module.acting_manager.domain.clone(),
+                    module.acting_manager.domain_manager.clone(),
                     module.acting_manager.clone(),
                     Some(
                         ExecPlatform::new(
@@ -93,7 +93,7 @@ impl ModMonitor {
                 )
             }
             PlatformDeclaration::Simu(s) => PlatformManager::new(
-                module.acting_manager.domain.clone(),
+                module.acting_manager.domain_manager.clone(),
                 module.acting_manager.clone(),
                 None,
                 s,

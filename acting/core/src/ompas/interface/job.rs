@@ -7,17 +7,9 @@ use tokio::sync::mpsc;
 #[derive(Debug, Clone)]
 pub enum JobType {
     Task,
+    Command,
     Debug,
 }
-
-/*impl Display for JobType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-
-                write!(f, "{}", )
-
-
-    }
-}*/
 
 #[derive(Debug, Clone)]
 pub struct Job {
@@ -33,6 +25,18 @@ impl Display for Job {
 }
 
 impl Job {
+    pub fn new(
+        sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>,
+        r#type: JobType,
+        value: LValue,
+    ) -> Self {
+        Self {
+            sender,
+            expr: value.to_string(),
+            r#type,
+        }
+    }
+
     pub fn new_task(
         sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>,
         value: LValue,
@@ -52,6 +56,17 @@ impl Job {
             sender,
             expr: value.to_string(),
             r#type: JobType::Debug,
+        }
+    }
+
+    pub fn new_command(
+        sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>,
+        value: LValue,
+    ) -> Self {
+        Self {
+            sender,
+            expr: value.to_string(),
+            r#type: JobType::Command,
         }
     }
 }

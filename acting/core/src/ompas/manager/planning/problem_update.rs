@@ -16,6 +16,7 @@ pub enum PlannerUpdate {
 
 pub struct ExecutionProblem {
     pub(crate) state: WorldStateSnapshot,
+    pub(crate) st: RefSymTable,
     pub(crate) chronicles: Vec<ChronicleInstance>,
 }
 

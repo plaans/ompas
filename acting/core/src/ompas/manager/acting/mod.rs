@@ -432,6 +432,7 @@ impl ActingManager {
         state.absorb(resource_state);
         ExecutionProblem {
             state,
+            st: self.st.clone(),
             chronicles: self.inner.read().await.get_current_chronicles(),
         }
     }

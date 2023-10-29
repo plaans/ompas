@@ -24,6 +24,7 @@ pub struct PlanningInstance {
     pub instances: Vec<ChronicleInstance>,
 }
 
+#[derive(Clone)]
 pub struct ChronicleInstance {
     pub instantiated_chronicle: Chronicle,
     pub generated: bool,

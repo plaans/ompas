@@ -15,10 +15,11 @@
     ;(sleep 1)
     ;(plan t_jobshop)
 
-    ;(start-with-planner true)
+    (start-with-planner true)
+    (start-acting-tree-display)
 
-    ;(wait-task (exec-task t_jobshop))
-    ;(exit 0)
+    (wait-task (exec-task t_jobshop))
+    (exit 0)
     ;(exec-task t_jobshop)
 
 )

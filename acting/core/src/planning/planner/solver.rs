@@ -1,3 +1,4 @@
+use crate::planning::planner::encoding::{PlannerDomain, PlannerProblem};
 use crate::planning::planner::result::PlanResult;
 use crate::{OMPAS_PLANNER_OUTPUT, OMPAS_PLAN_OUTPUT};
 use anyhow::Result;
@@ -74,7 +75,23 @@ pub fn run_planner(
                 );
             }
 
-            Some(PlanResult { ass, fp })
+            Some(PlanResult {
+                ass,
+                fp,
+                pp: Arc::new(PlannerProblem {
+                    st: Default::default(),
+                    instances: vec![],
+                    templates: vec![],
+                    domain: PlannerDomain {
+                        sf: vec![],
+                        methods: vec![],
+                        tasks: vec![],
+                        commands: vec![],
+                    },
+                    state: Default::default(),
+                }),
+                table: Arc::new(Default::default()),
+            })
         }
         SolverResult::Unsat => {
             if OMPAS_PLANNER_OUTPUT.get() {

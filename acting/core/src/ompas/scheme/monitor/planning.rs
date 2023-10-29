@@ -9,7 +9,9 @@ use crate::ompas::manager::acting::interval::Interval;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::problem_update::ExecutionProblem;
-use crate::ompas::manager::planning::{encode, extract_choices, populate_problem};
+use crate::ompas::manager::planning::{
+    encode, extract_choices, populate_problem, FinitePlanningProblem,
+};
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
@@ -21,6 +23,7 @@ use crate::planning::planner::result::instance::instantiate_chronicles;
 use crate::planning::planner::result::PlanResult;
 use crate::planning::planner::solver::{run_planner, PMetric};
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG, OMPAS_PLAN_OUTPUT};
+use aries::core::INT_CST_MAX;
 use aries_planning::chronicles;
 use aries_planning::chronicles::printer::Printer;
 use ompas_language::monitor::control::MOD_CONTROL;
@@ -153,6 +156,7 @@ pub async fn __plan(
     state.absorb(resource_state);
     let ep: ExecutionProblem = ExecutionProblem {
         state,
+        st: st.clone(),
         chronicles: vec![new_problem_chronicle_instance(
             &st,
             tasks.clone(),
@@ -161,7 +165,14 @@ pub async fn __plan(
         )],
     };
 
-    let mut pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
+    let mut pp: PlannerProblem = populate_problem(
+        FinitePlanningProblem::ExecutionProblem(&ep),
+        &domain,
+        &env,
+        INT_CST_MAX as u32,
+    )
+    .await
+    .unwrap();
 
     //hack
     for (i, task) in tasks.iter().enumerate() {
@@ -198,7 +209,7 @@ pub async fn __plan(
 
     if let Ok(Some(pr)) = result {
         let instances = instantiate_chronicles(&pp, &pr, &table);
-        let PlanResult { ass, fp } = pr;
+        let PlanResult { ass, fp, pp, table } = pr;
         // for v in ass.variables() {
         //     let prez = format!("[{:?}]", ass.presence_literal(v));
         //     let v_str = format!("{v:?}");

@@ -20,7 +20,6 @@ use crate::ompas::manager::planning::planner_stat::{PlannerStat, PlanningInstanc
 use crate::ompas::manager::planning::problem_update::{ExecutionProblem, PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{ResourceManager, WaiterPriority};
 use crate::ompas::manager::state::state_update_manager::StateRule;
-use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::manager::state::StateManager;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::planning::planner::encoding::domain::encode_ctx;
@@ -29,9 +28,11 @@ use crate::planning::planner::encoding::problem_generation::{
     convert_into_chronicle_instance, ActionParam, PAction,
 };
 use crate::planning::planner::encoding::{PlannerDomain, PlannerProblem};
+use crate::planning::planner::ompas_lcp;
+use crate::planning::planner::ompas_lcp::OMPASLCPConfig;
 use crate::planning::planner::problem::ChronicleInstance;
 use crate::planning::planner::result::PlanResult;
-use crate::planning::planner::solver::{run_planner, PMetric, PlannerInterruptSender};
+use crate::planning::planner::solver::{PMetric, PlannerInterruptSender};
 use crate::{
     ChronicleDebug, OMPAS_CHRONICLE_DEBUG, OMPAS_DEBUG_CONTINUOUS_PLANNING, OMPAS_PLAN_OUTPUT,
 };
@@ -40,7 +41,6 @@ use aries::model::extensions::{AssignmentExt, SavedAssignment, Shaped};
 use aries::model::lang::Variable;
 use aries::model::Model;
 use aries_planning::chronicles;
-use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId, VarLabel};
 use itertools::Itertools;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
@@ -149,6 +149,7 @@ impl PlannerManager {
         } = config;
 
         add_domain_symbols(&st, &domain);
+        let domain = Arc::new(domain);
         let mut process = ProcessInterface::new(
             PROCESS_PLANNER_MANAGER,
             PROCESS_TOPIC_OMPAS,
@@ -167,7 +168,6 @@ impl PlannerManager {
             .await;
 
         let mut clock = clock_manager.subscribe_to_clock().await;
-        let mut state: Option<WorldStateSnapshot>;
         'main: loop {
             tokio::select! {
                 Some(PlannerResult {
@@ -242,45 +242,39 @@ impl PlannerManager {
                         let mut new_state = state_manager.get_snapshot().await;
                         let resource_state = resource_manager.get_snapshot(Some(now)).await;
                         new_state.absorb(resource_state);
-                        state = Some(new_state);
-                        //}
+
+                        let mut env = env.clone();
+                        env.update_context(ModState::new_from_snapshot(new_state.clone()));
 
                         let ep = ExecutionProblem {
-                            state: state.unwrap(),
+                            state: new_state,
+                            st: st.clone(),
                             chronicles: acting_manager.read().await.get_current_chronicles(),
                         };
-                        let mut env = env.clone();
-                        env.update_context(ModState::new_from_snapshot(ep.state.clone()));
 
-                        let pp: PlannerProblem = populate_problem(&domain, &env, &st, ep).await.unwrap();
 
-                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-                            for (origin, chronicle) in pp
-                                .instances
-                                .iter()
-                                .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
-                            {
-                                println!("{:?}:\n{}", origin, chronicle)
-                            }
-                        }
+                        let config = PlannerInstanceConfig {
+                            id: next_id,
+                            config: OMPASLCPConfig {
+                                state_subscriber_id: state_update_subscriber.id,
+                                opt,
+                                state_manager:state_manager.clone(),
+                                domain: domain.clone(),
+                                env,
+                            },
+                            clock_manager: clock_manager.clone(),
+                            explanation,
 
-                        let rule = StateRule::Specific(pp.domain.sf.iter().map(|sf| sf.get_label().into()).collect());
-                        //println!("({}) Update subscriber rule: {:?}",state_update_subscriber.id, rule);
-                        state_manager.update_subscriber_rule(&state_update_subscriber.id, rule).await;
+                        };
 
-                        let (problem, table) = encode(&pp).await.unwrap();
-                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-                                for instance in &problem.chronicles {
-                                    Printer::print_chronicle(&instance.chronicle, &problem.context.model);
-                                }
-                            }
                         let PlannerInstance {
                             id: _id,
                              _updater: u,
                              interrupter: i,
                              plan_receiver: p,
                         } =
-                        PlannerInstance::new(next_id, clock_manager.clone(), pp, problem, table, opt,explanation );
+                        PlannerInstance::new(ep, config);
+
                         next_id+=1;
                         _updater = Some(u);
                         interrupter = Some(i);
@@ -299,6 +293,13 @@ pub struct PlannerResult {
     update: Option<ActingTreeUpdate>,
 }
 
+pub struct PlannerInstanceConfig {
+    pub id: u32,
+    pub config: OMPASLCPConfig,
+    pub clock_manager: ClockManager,
+    pub explanation: String,
+}
+
 pub struct PlannerInstance {
     id: u32,
     _updater: mpsc::UnboundedSender<VarUpdate>,
@@ -307,23 +308,22 @@ pub struct PlannerInstance {
 }
 
 impl PlannerInstance {
-    pub fn new(
-        id: u32,
-        clock: ClockManager,
-        planner_problem: PlannerProblem,
-        problem: chronicles::Problem,
-        table: ActingVarRefTable,
-        opt: Option<PMetric>,
-        explanation: String,
-    ) -> Self {
+    pub fn new(execution_problem: ExecutionProblem, config: PlannerInstanceConfig) -> Self {
         let mut stat = PlanningInstanceStat {
-            id,
+            id: config.id,
             duration: Duration::zero(),
             optimal: false,
             interrupted: false,
         };
 
-        let start = clock.now();
+        let PlannerInstanceConfig {
+            id,
+            config,
+            clock_manager,
+            explanation,
+        } = config;
+
+        let start = clock_manager.now();
 
         if OMPAS_DEBUG_CONTINUOUS_PLANNING.get() {
             println!("Planning for:\n{}", explanation);
@@ -338,65 +338,67 @@ impl PlannerInstance {
         thread::spawn(move || {
             let _guard = handle.enter();
 
-            let result = run_planner(problem.clone(), opt, Some(interrupted));
-            let update = if let Ok(Some(pr)) = result {
-                let PlanResult { ass, fp } = pr;
+            tokio::spawn(async move {
+                let result = ompas_lcp::run_planner(
+                    &execution_problem,
+                    &config,
+                    |_, _| {},
+                    Some(interrupted),
+                )
+                .await;
 
-                let choices = extract_choices(&table, &ass, &fp.model, &planner_problem);
+                let update = if let Ok(Some(pr)) = result {
+                    let PlanResult { ass, fp, pp, table } = pr;
 
-                if OMPAS_PLAN_OUTPUT.get() {
-                    println!("Successfully planned for:\n{}", exp);
+                    let choices = extract_choices(&table, &ass, &fp.model, &pp);
 
-                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-                        for (origin, chronicle) in planner_problem
-                            .instances
-                            .iter()
-                            .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
-                        {
-                            println!("{:?}:\n{}", origin, chronicle)
+                    if OMPAS_PLAN_OUTPUT.get() {
+                        println!("Successfully planned for:\n{}", exp);
+
+                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                            for (origin, chronicle) in pp
+                                .instances
+                                .iter()
+                                .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                            {
+                                println!("{:?}:\n{}", origin, chronicle)
+                            }
+                        }
+                        for choice in &choices {
+                            println!("{}:{}", choice.process_ref, choice.choice_inner)
                         }
                     }
-                    for choice in &choices {
-                        println!("{}:{}", choice.process_ref, choice.choice_inner)
+                    let new_ams = extract_new_acting_models(&table, &ass, &fp.model, &pp);
+
+                    //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
+                    Some(ActingTreeUpdate {
+                        acting_models: new_ams,
+                        choices,
+                    })
+                } else {
+                    if OMPAS_PLAN_OUTPUT.get() {
+                        println!("Successfully planned for:\n{}", exp);
+                        println!("No solution found by planner for");
+                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                            for (origin, chronicle) in execution_problem
+                                .chronicles
+                                .iter()
+                                .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                            {
+                                println!("{:?}:\n{}", origin, chronicle)
+                            }
+                        }
                     }
+                    None
+                };
+                let end = clock_manager.now();
+                stat.duration =
+                    crate::ompas::manager::acting::interval::Interval::new(start, Some(end))
+                        .duration();
+                if plan_sender.send(PlannerResult { stat, update }).is_err() {
+                    panic!("error sending plan update");
                 }
-                let new_ams = extract_new_acting_models(&table, &ass, &fp.model, planner_problem);
-
-                //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
-                Some(ActingTreeUpdate {
-                    acting_models: new_ams,
-                    choices,
-                })
-            } else {
-                if OMPAS_PLAN_OUTPUT.get() {
-                    println!("Successfully planned for:\n{}", exp);
-                    println!("No solution found by planner for");
-                    //println!("{exp}");
-                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-                        for (origin, chronicle) in planner_problem
-                            .instances
-                            .iter()
-                            .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
-                        {
-                            println!("{:?}:\n{}", origin, chronicle)
-                        }
-                    }
-
-                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
-                        for instance in &problem.chronicles {
-                            Printer::print_chronicle(&instance.chronicle, &problem.context.model);
-                        }
-                    }
-                    //std::process::exit(0)
-                }
-                None
-            };
-            let end = clock.now();
-            stat.duration =
-                crate::ompas::manager::acting::interval::Interval::new(start, Some(end)).duration();
-            if plan_sender.send(PlannerResult { stat, update }).is_err() {
-                panic!("error sending plan update");
-            }
+            })
         });
 
         Self {
@@ -414,19 +416,68 @@ impl PlannerInstance {
     }
 }
 
+pub enum FinitePlanningProblem<'a> {
+    ExecutionProblem(&'a ExecutionProblem),
+    PlannerProblem(&'a PlannerProblem),
+}
+
 /// Takes a finite execution model and adds needed chronicles to complete the model for the planner.
 /// First it searches tasks that have been refined, and then adds the new Acting Models
-pub async fn populate_problem(
+pub async fn populate_problem<'a>(
+    fpp: FinitePlanningProblem<'a>,
     domain: &OMPASDomain,
     env: &LEnv,
-    st: &RefSymTable,
-    ep: ExecutionProblem,
+    max_depth: u32,
 ) -> Result<PlannerProblem, LRuntimeError> {
-    let ExecutionProblem { state, chronicles } = ep;
+    let (state, st, mut instances, templates, mut names, mut tasks, mut sf_labels) = match fpp {
+        FinitePlanningProblem::ExecutionProblem(ep) => {
+            let ExecutionProblem {
+                state,
+                st,
+                chronicles,
+            } = ep;
+            let st = st;
 
-    let mut names: HashSet<String> = Default::default();
-    let mut tasks: HashSet<String> = Default::default();
-    let mut sf_labels: HashSet<String> = Default::default();
+            let names: HashSet<String> = Default::default();
+            let tasks: HashSet<String> = Default::default();
+            let sf_labels: HashSet<String> = Default::default();
+            (
+                state,
+                st,
+                chronicles.clone(),
+                vec![],
+                names,
+                tasks,
+                sf_labels,
+            )
+        }
+        FinitePlanningProblem::PlannerProblem(PlannerProblem {
+            st,
+            instances,
+            templates,
+            domain,
+            state,
+        }) => {
+            let names: HashSet<String> = domain.methods.iter().cloned().collect();
+            let mut tasks: Vec<String> = domain.tasks.clone();
+            tasks.append(&mut domain.commands.clone());
+            let tasks: HashSet<String> = tasks.drain(..).collect();
+            let sf_labels: HashSet<String> = domain
+                .sf
+                .iter()
+                .map(|sf| sf.get_label().to_string())
+                .collect();
+            (
+                state,
+                st,
+                instances.clone(),
+                templates.clone(),
+                names,
+                tasks,
+                sf_labels,
+            )
+        }
+    };
 
     let mut update_problem = |p_actions: &mut Vec<PAction>,
                               cis: &Vec<ChronicleInstance>,
@@ -467,6 +518,7 @@ pub async fn populate_problem(
                     };
                     value.push(val)
                 }
+                tasks.insert(subtask.name[0].format(st, true));
 
                 let mut pr = ci.pr.clone();
                 pr.push(subtask.label.unwrap());
@@ -492,100 +544,103 @@ pub async fn populate_problem(
     };
 
     let mut p_actions = vec![];
-    for (i, instance) in chronicles.iter().enumerate() {
-        update_problem(&mut p_actions, &chronicles, instance, i)
+    for (i, instance) in instances.iter().enumerate() {
+        update_problem(&mut p_actions, &instances, instance, i)
     }
-    let mut instances: Vec<ChronicleInstance> = chronicles;
 
-    while let Some(action) = p_actions.pop() {
-        let tps = &action.args;
-        if let Some(task) = domain.tasks.get(tps[0].lvalues().to_string().as_str()) {
-            let params = task.get_parameters().get_labels();
-            assert_eq!(params.len(), tps.len() - 1);
+    for _ in 0..max_depth {
+        let mut new_p_actions = vec![];
+        for action in p_actions {
+            let tps = &action.args;
+            if let Some(task) = domain.tasks.get(tps[0].lvalues().to_string().as_str()) {
+                let params = task.get_parameters().get_labels();
+                assert_eq!(params.len(), tps.len() - 1);
 
-            match task.get_model(&ModelKind::PlanModel) {
-                Some(model) => {
-                    let model_lambda: LLambda = model.try_into().expect("");
+                match task.get_model(&ModelKind::PlanModel) {
+                    Some(model) => {
+                        let model_lambda: LLambda = model.try_into().expect("");
 
-                    let mut instance: ChronicleInstance = convert_into_chronicle_instance(
-                        &model_lambda,
-                        action,
-                        None,
-                        task.get_parameters(),
-                        st,
-                        env,
-                        ChronicleKind::Task,
-                    )
-                    .await?;
-                    instance.pr.push(Label::AbstractModel);
-
-                    update_problem(&mut p_actions, &vec![], &instance, instances.len());
-
-                    instances.push(instance)
-                }
-                None => {
-                    for (i, m_label) in task.get_methods().iter().enumerate() {
-                        //methods.insert(m_label.to_string());
-                        let method = domain.get_methods().get(m_label).unwrap();
-                        let method_lambda: LLambda = method.get_body().try_into().expect("");
-
-                        let mut p_method: PAction = action.clone();
-                        p_method.args[0] = ActionParam::Instantiated(m_label.clone().into());
-                        for param in
-                            &method.parameters.get_labels()[task.get_parameters().inner().len()..]
-                        {
-                            p_method
-                                .args
-                                .push(ActionParam::Uninstantiated(param.to_string().into()))
-                        }
                         let mut instance: ChronicleInstance = convert_into_chronicle_instance(
-                            &method_lambda,
-                            p_method,
-                            Some(&action.args),
-                            method.get_parameters(),
+                            &model_lambda,
+                            action,
+                            None,
+                            task.get_parameters(),
                             st,
                             env,
-                            ChronicleKind::Method,
+                            ChronicleKind::Task,
                         )
                         .await?;
-                        let method_id = RefinementLabel {
-                            refinement_id: 0,
-                            method_label: MethodLabel::Possibility(i),
-                        };
-                        instance.pr.push(Label::Refinement(method_id));
-                        update_problem(&mut p_actions, &vec![], &instance, instances.len());
+                        instance.pr.push(Label::AbstractModel);
 
-                        instances.push(instance);
+                        update_problem(&mut new_p_actions, &vec![], &instance, instances.len());
+
+                        instances.push(instance)
+                    }
+                    None => {
+                        for (i, m_label) in task.get_methods().iter().enumerate() {
+                            //methods.insert(m_label.to_string());
+                            let method = domain.get_methods().get(m_label).unwrap();
+                            let method_lambda: LLambda = method.get_body().try_into().expect("");
+
+                            let mut p_method: PAction = action.clone();
+                            p_method.args[0] = ActionParam::Instantiated(m_label.clone().into());
+                            for param in &method.parameters.get_labels()
+                                [task.get_parameters().inner().len()..]
+                            {
+                                p_method
+                                    .args
+                                    .push(ActionParam::Uninstantiated(param.to_string().into()))
+                            }
+                            let mut instance: ChronicleInstance = convert_into_chronicle_instance(
+                                &method_lambda,
+                                p_method,
+                                Some(&action.args),
+                                method.get_parameters(),
+                                st,
+                                env,
+                                ChronicleKind::Method,
+                            )
+                            .await?;
+                            let method_id = RefinementLabel {
+                                refinement_id: 0,
+                                method_label: MethodLabel::Possibility(i),
+                            };
+                            instance.pr.push(Label::Refinement(method_id));
+                            update_problem(&mut new_p_actions, &vec![], &instance, instances.len());
+
+                            instances.push(instance);
+                        }
                     }
                 }
+            } else if let Some(command) = domain
+                .commands
+                .get(action.args[0].lvalues().to_string().as_str())
+            {
+                //commands.insert(command.get_label().to_string());
+                let model_lambda: LLambda = command
+                    .get_model(&ModelKind::PlanModel)
+                    .unwrap()
+                    .try_into()
+                    .expect("");
+
+                let mut instance: ChronicleInstance = convert_into_chronicle_instance(
+                    &model_lambda,
+                    action,
+                    None,
+                    command.get_parameters(),
+                    st,
+                    env,
+                    ChronicleKind::Command,
+                )
+                .await?;
+                instance.pr.push(Label::AbstractModel);
+
+                update_problem(&mut new_p_actions, &vec![], &instance, instances.len());
+
+                instances.push(instance)
             }
-        } else if let Some(command) = domain
-            .commands
-            .get(action.args[0].lvalues().to_string().as_str())
-        {
-            //commands.insert(command.get_label().to_string());
-            let model_lambda: LLambda = command
-                .get_model(&ModelKind::PlanModel)
-                .unwrap()
-                .try_into()
-                .expect("");
-
-            let mut instance: ChronicleInstance = convert_into_chronicle_instance(
-                &model_lambda,
-                action,
-                None,
-                command.get_parameters(),
-                st,
-                env,
-                ChronicleKind::Command,
-            )
-            .await?;
-            instance.pr.push(Label::AbstractModel);
-
-            update_problem(&mut p_actions, &vec![], &instance, instances.len());
-
-            instances.push(instance)
         }
+        p_actions = new_p_actions;
     }
 
     let sf = domain
@@ -616,16 +671,16 @@ pub async fn populate_problem(
         .collect();
 
     let mut pp = PlannerProblem {
-        st: st.clone(),
+        st: st.clone().clone(),
         instances,
-        templates: vec![],
+        templates,
         domain: PlannerDomain {
             sf,
             methods,
             tasks,
             commands,
         },
-        state,
+        state: state.clone(),
     };
 
     initialize_root_chronicle(&mut pp);
@@ -755,9 +810,13 @@ pub fn extract_new_acting_models(
     _table: &ActingVarRefTable,
     _ass: &Arc<SavedAssignment>,
     _model: &Model<VarLabel>,
-    mut pp: PlannerProblem,
+    pp: &PlannerProblem,
 ) -> Vec<ChronicleInstance> {
-    pp.instances.drain(..).filter(|c| c.generated).collect()
+    pp.instances
+        .iter()
+        .filter(|c| c.generated)
+        .cloned()
+        .collect()
 }
 
 pub struct ActingPlanResult {

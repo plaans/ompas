@@ -22,14 +22,22 @@ use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
 use crate::planning::planner::solver::PMetric;
 use inner::InnerActingManager;
 use ompas_language::exec::acting_context::DEF_PROCESS_ID;
+use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
+use ompas_middleware::{Master, ProcessInterface, OMPAS_WORKING_DIR};
+use ompas_utils::task_handler::EndSignal;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::{LValue, Sym};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
-use tokio::sync::{broadcast, watch, RwLock};
+use std::{fs, thread};
+use tokio::runtime::Handle;
+use tokio::sync::{broadcast, mpsc, watch, RwLock};
 
 pub mod acting_stat;
 pub mod acting_var;
@@ -45,6 +53,10 @@ pub type ActionId = usize;
 pub type ActingProcessId = usize;
 pub type AMId = usize;
 
+pub struct ActingTreeDisplayer {
+    killer: mpsc::Sender<EndSignal>,
+}
+
 pub type RefInnerActingManager = Arc<RwLock<InnerActingManager>>;
 #[derive(Clone)]
 pub struct ActingManager {
@@ -55,6 +67,7 @@ pub struct ActingManager {
     pub state_manager: StateManager,
     pub inner: RefInnerActingManager,
     pub clock_manager: ClockManager,
+    acting_tree_displayer: Arc<RwLock<Option<ActingTreeDisplayer>>>,
 }
 
 impl ActingManager {
@@ -77,6 +90,7 @@ impl ActingManager {
                 st,
             ))),
             clock_manager,
+            acting_tree_displayer: Arc::new(Default::default()),
         }
     }
 }
@@ -471,5 +485,83 @@ impl ActingManager {
 
     pub async fn update_acting_tree(&self, update: ActingTreeUpdate) {
         self.inner.write().await.update_acting_tree(update).await
+    }
+
+    pub async fn start_acting_tree_display(&self) {
+        let inner = self.inner.clone();
+        let handle = Handle::current();
+        let mut clock = self.clock_manager.subscribe_to_clock().await;
+
+        self.stop_acting_tree_display().await;
+
+        let (tx, mut rx) = mpsc::channel(1);
+
+        *self.acting_tree_displayer.write().await = Some(ActingTreeDisplayer { killer: tx });
+
+        let mut process =
+            ProcessInterface::new("ACTING_TREE_DISPLAY", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS)
+                .await;
+
+        thread::spawn(move || {
+            let _guard = handle.enter();
+
+            tokio::spawn(async move {
+                let path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+                let mut path = path.canonicalize().unwrap();
+                path.push("traces");
+
+                path.push(format!("acting_tree_{}", Master::get_string_date()));
+                fs::create_dir_all(&path).unwrap();
+
+                let mut path_dot = path.clone();
+                path_dot.push("acting_tree.dot");
+
+                let mut first = true;
+
+                let mut child = None;
+
+                loop {
+                    tokio::select! {
+                        _ = clock.changed() => {
+                            let dot = inner.read().await.export_trace_dot_graph();
+                            let mut dot_file = OpenOptions::new()
+                                .write(true)
+                                .create(true)
+                                .truncate(true)
+                                .open(&path_dot)
+                                .unwrap();
+                            let _ = dot_file.write_all(dot.as_bytes());
+                            if first {
+                                first = false;
+
+                                let mut command = Command::new("xdot");
+                                command
+                                    .args([&path_dot.display().to_string()])
+                                    .stdout(Stdio::null())
+                                    .stderr(Stdio::null());
+                                child = Some(command.spawn().expect("could not spawn dot displayer"));
+                            }
+                        }
+                        _ = process.recv() => {
+                            break;
+                        }
+                        _ = rx.recv() => {
+                            break;
+                        }
+                    }
+                }
+                if let Some(mut child) = child {
+                    child.kill().expect("could not kill acting tree displayer");
+                }
+            })
+        });
+    }
+
+    pub async fn stop_acting_tree_display(&self) {
+        let mut acting_tree_displayer = self.acting_tree_displayer.write().await;
+        if let Some(display) = acting_tree_displayer.as_ref() {
+            let _ = display.killer.send(true).await;
+        }
+        *acting_tree_displayer = None;
     }
 }

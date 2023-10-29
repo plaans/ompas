@@ -894,7 +894,7 @@ pub mod monitor {
         pub const LAMBDA_WAIT_TASK: &str = "(lambda (_id_) (await (_wait_task _id_)))";
         pub const DOC_WAIT_TASK: &str = "wrapper of _wait_task";
 
-        pub const GET_TASK_ID: &str = "get_task_id";
+        pub const GET_TASK_ID: &str = "get-task-id";
         pub const DOC_GET_TASK_ID: &str = "Get the internal id of the triggered task.";
 
         pub const CANCEL_TASK: &str = "cancel-task";
@@ -928,18 +928,18 @@ pub mod monitor {
         pub const DOC_GET_AGENDA_VERBOSE: &str= "The agenda can be filtered in function of the kind\
         of the action {task, command} and their status {pending, accepted, rejected, success, failure, cancelled}";
 
-        pub const GET_RESOURCES: &str = "get_resource_state";
+        pub const GET_RESOURCES: &str = "get-resource-state";
         pub const DOC_GET_RESOURCES: &str =
             "Return the resources defined in the system and their waiting list.";
 
-        pub const GET_MONITORS: &str = "get_monitored_fluent";
+        pub const GET_MONITORS: &str = "get-monitored-fluents";
         pub const DOC_GET_MONITORS: &str =
             "Return the list of all dynamic expressions currently checked.";
 
-        pub const GET_COMMANDS: &str = "get_command_list";
+        pub const GET_COMMANDS: &str = "get-command-list";
         pub const DOC_GET_COMMANDS: &str = "Return the list of all commands defined in the domain.";
 
-        pub const GET_TASK_LIST: &str = "get_task_list";
+        pub const GET_TASK_LIST: &str = "get-task-list";
         pub const DOC_GET_TASK_LIST: &str =
             "Return the list of all commands defined in the domain.";
 
@@ -947,7 +947,7 @@ pub mod monitor {
         pub const DOC_GET_METHOD_LIST: &str =
             "Return the list of all methods defined in the domain.";
 
-        pub const GET_STATE_FUNCTIONS: &str = "get_state_function_list";
+        pub const GET_STATE_FUNCTIONS: &str = "get-state-function-list";
         pub const DOC_GET_STATE_FUNCTIONS: &str =
             "Return the list of all state-functions defined in the domain.";
 
@@ -964,21 +964,28 @@ pub mod monitor {
         pub const GET_STATS: &str = "get-stats";
         pub const DOC_GET_STATS: &str = "Return the statistics of the execution of the system";
 
-        pub const EXPORT_STATS: &str = "export_stats";
+        pub const EXPORT_STATS: &str = "export-stats";
         pub const DOC_EXPORT_STATS: &str =
             "Export the stats of the current run in either yaml or json format";
 
-        pub const EXPORT_TO_CSV: &str = "export_to_csv";
+        pub const EXPORT_TO_CSV: &str = "export-to-csv";
         pub const DOC_EXPORT_TO_CSV: &str = "Export the statistics in csv format in a given file.";
 
-        pub const DUMP_TRACE: &str = "dump_trace";
+        pub const DUMP_TRACE: &str = "dump-trace";
         pub const DOC_DUMP_TRACE: &str =
             "Dump in a markdown the graph representing the execution trace.\n[Unstable] The markdown is shown in google-chrome if the right extension is installed.";
 
-        pub const DEBUG_OMPAS: &str = "debug_ompas";
+        pub const DEBUG_OMPAS: &str = "debug-ompas";
         pub const DOC_DEBUG_OMPAS: &str = "Wrapper around __debug_ompas__";
         pub const MACRO_DEBUG_OMPAS: &str = "(lambda (arg)
     `(__debug_ompas__ ',arg)))";
+
+        pub const START_ACTING_TREE_DISPLAY: &str = "start-acting-tree-display";
+        pub const DOC_START_ACTING_TREE_DISPLAY: &str =
+            "Display the acting tree as a svg file in the default svg viewer of the system.";
+
+        pub const STOP_ACTING_TREE_DISPLAY: &str = "stop-acting-tree-display";
+        pub const DOC_STOP_ACTING_TREE_DISPLAY: &str = "Stop the display of the acting tree";
     }
 }
 

@@ -188,6 +188,18 @@ impl From<ModControl> for LModule {
 
         module.add_async_fn(DUMP_TRACE, dump_trace, DOC_DUMP_TRACE, false);
         module.add_macro(DEBUG_OMPAS, MACRO_DEBUG_OMPAS, DOC_DEBUG_OMPAS);
+        module.add_async_fn(
+            START_ACTING_TREE_DISPLAY,
+            start_acting_tree_display,
+            DOC_START_ACTING_TREE_DISPLAY,
+            false,
+        );
+        module.add_async_fn(
+            STOP_ACTING_TREE_DISPLAY,
+            stop_acting_tree_display,
+            DOC_STOP_ACTING_TREE_DISPLAY,
+            false,
+        );
 
         module
     }
@@ -807,6 +819,26 @@ pub async fn dump_trace(env: &LEnv) -> Result<(), LRuntimeError> {
         .dump_trace(Some(
             format!("{}/traces", OMPAS_WORKING_DIR.get_ref()).into(),
         ))
+        .await;
+
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn start_acting_tree_display(env: &LEnv) -> Result<(), LRuntimeError> {
+    env.get_context::<ModControl>(MOD_CONTROL)?
+        .acting_manager
+        .start_acting_tree_display()
+        .await;
+
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn stop_acting_tree_display(env: &LEnv) -> Result<(), LRuntimeError> {
+    env.get_context::<ModControl>(MOD_CONTROL)?
+        .acting_manager
+        .stop_acting_tree_display()
         .await;
 
     Ok(())

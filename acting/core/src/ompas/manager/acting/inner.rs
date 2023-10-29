@@ -165,7 +165,6 @@ impl InnerActingManager {
     pub fn plan(&mut self) {
         if let Some(planner) = &self.planner_manager_interface {
             planner.send_update(PlannerUpdate::Plan);
-            //.unwrap_or_else(|_| panic!());
         }
     }
 
@@ -705,9 +704,6 @@ impl InnerActingManager {
                 am_id,
             },
         );
-
-        //let start = self.new_execution_var(&interval.get_start(), &am_id);
-        //let end = self.new_execution_var(&interval.get_end(), &am_id);
 
         self.processes.push(ActingProcess::new(
             id,

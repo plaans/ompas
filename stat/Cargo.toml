@@ -1,0 +1,20 @@
+[package]
+name = "ompas-stat"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ompas-core = {path = "../acting/core"}
+
+rand = {workspace = true}
+structopt = { workspace = true}
+serde = { workspace = true}
+serde_yaml = { workspace = true, features = [] }
+serde_json = { workspace = true, features = [] }
+map-macro = {workspace = true}
+
+[[bin]]
+name = "statos"
+path = "src/bin/main.rs"

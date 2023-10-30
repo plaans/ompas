@@ -29,7 +29,6 @@ use crate::ompas::manager::planning::planner_manager_interface::PlannerManagerIn
 use crate::ompas::manager::planning::problem_update::{PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::action_status::ProcessStatus::Running;
 use crate::planning::conversion::_convert;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::p_eval;
@@ -151,7 +150,7 @@ impl InnerActingManager {
             end,
             RootProcess::new(),
         );
-        root.status = Running(None);
+        root.status = ProcessStatus::Running(None);
         self.processes = vec![root];
         self.models = vec![model];
     }
@@ -369,6 +368,7 @@ impl InnerActingManager {
 
     pub fn set_start(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
         let instant = t.unwrap_or(self.clock_manager.now());
+        self.set_status(id, ProcessStatus::Running(None));
         self.set_execution_val(&self.processes[*id].start.clone(), instant);
     }
 
@@ -756,7 +756,7 @@ impl InnerActingManager {
             .unwrap()
             .set_executed(refinement_label.refinement_id, method, refinement_trace);
         let instant = self.clock_manager.now();
-        if self.get_status(action) != ProcessStatus::Pending {
+        if self.get_status(action) == ProcessStatus::Pending {
             self.set_status(action, ProcessStatus::Running(None));
             self.set_start(action, Some(instant));
         }
@@ -1536,7 +1536,7 @@ impl InnerActingManager {
             ProcessStatus::Pending | ProcessStatus::Planned => {
                 write!(str, "fillcolor=\"#ceceff\",")
             }
-            Running(_) | ProcessStatus::Accepted => {
+            ProcessStatus::Running(_) | ProcessStatus::Accepted => {
                 write!(str, "fillcolor=\"#ffffce\",")
             }
             ProcessStatus::Success => {

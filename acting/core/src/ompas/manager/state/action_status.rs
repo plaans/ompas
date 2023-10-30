@@ -30,7 +30,7 @@ impl Display for ProcessStatus {
             ProcessStatus::Running(progress) => {
                 write!(f, "running")?;
                 if let Some(p) = progress {
-                    write!(f, "({})", p)
+                    write!(f, "({}%)", (p * 100.0) as i64)
                 } else {
                     Ok(())
                 }

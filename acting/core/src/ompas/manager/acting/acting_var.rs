@@ -57,8 +57,8 @@ pub struct ActingVar {
 impl Display for ActingVar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.value {
-            ActingVal::Execution(e) => write!(f, "{e}"),
-            ActingVal::Planned(p) => write!(f, "~{p}"),
+            ActingVal::Execution(e) => write!(f, "{}", e),
+            ActingVal::Planned(p) => write!(f, "~{}", p),
             ActingVal::None => write!(f, ""),
         }
     }
@@ -114,7 +114,10 @@ impl ActingVar {
     }
 
     pub fn set_planned_val(&mut self, val: Cst) {
-        self.value = ActingVal::Planned(val)
+        match self.value {
+            ActingVal::None | ActingVal::Planned(_) => self.value = ActingVal::Planned(val),
+            ActingVal::Execution(_) => {}
+        }
     }
 }
 

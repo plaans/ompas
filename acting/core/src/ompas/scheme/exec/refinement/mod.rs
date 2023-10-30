@@ -79,38 +79,6 @@ impl From<ModRefinement> for LModule {
             LAMBDA___GET_PRECONDITIONS__,
             DOC___GET_PRECONDITIONS__,
         );
-        /*module.add_lambda(__GET_SCORE__, LAMBDA___GET_SCORE__, DOC___GET_SCORE__);
-        module.add_lambda(
-            __GET_COMMAND_MODEL__,
-            LAMBDA___GET_COMMAND_MODEL__,
-            DOC___GET_COMMAND_MODEL__,
-        );
-        module.add_lambda(
-            __EVAL_PRE_CONDITIONS__,
-            LAMBDA___EVAL_PRE_CONDITIONS__,
-            DOC___EVAL_PRE_CONDITIONS__,
-        );
-        module.add_lambda(
-            __COMPUTE_SCORE__,
-            LAMBDA___COMPUTE_SCORE__,
-            DOC___COMPUTE_SCORE__,
-        );
-        module.add_lambda(IS_APPLICABLE, LAMBDA_IS_APPLICABLE, DOC_IS_APPLICABLE);
-        module.add_lambda(
-            __GENERATE_APPLICABLE_INSTANCES__,
-            LAMBDA___GENERATE_APPLICABLE_INSTANCES__,
-            DOC___GENERATE_APPLICABLE_INSTANCES__,
-        );
-        module.add_lambda(
-            __R_GENERATE_INSTANCES__,
-            LAMBDA___R_GENERATE_INSTANCES__,
-            DOC___R_GENERATE_INSTANCES__,
-        );
-        module.add_lambda(
-            __R_TEST_METHOD__,
-            LAMBDA_R_TEST_METHOD,
-            DOC___R_TEST_METHOD__,
-        );*/
 
         module
     }

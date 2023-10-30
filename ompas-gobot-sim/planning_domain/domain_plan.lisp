@@ -19,7 +19,8 @@
     (start-acting-tree-display)
 
     (wait-task (exec-task t_jobshop))
+    (sleep 2)
+    (stop)
+    (sleep 1)
     (exit 0)
-    ;(exec-task t_jobshop)
-
 )

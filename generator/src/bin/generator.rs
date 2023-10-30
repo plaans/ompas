@@ -1,10 +1,10 @@
-use generator::config::GeneratorConfig;
-use generator::generator::continuous_shop::ContinuousShopGenerator;
-use generator::generator::gripper::GripperGenerator;
-use generator::generator::gripper_build::GripperBuildGenerator;
-use generator::generator::gripper_door::GripperDoorGenerator;
-use generator::generator::gripper_multi::GripperMultiGenerator;
-use generator::generator::jobshop::JobshopGenerator;
+use ompas_generator::config::GeneratorConfig;
+use ompas_generator::generator::continuous_shop::ContinuousShopGenerator;
+use ompas_generator::generator::gripper::GripperGenerator;
+use ompas_generator::generator::gripper_build::GripperBuildGenerator;
+use ompas_generator::generator::gripper_door::GripperDoorGenerator;
+use ompas_generator::generator::gripper_multi::GripperMultiGenerator;
+use ompas_generator::generator::jobshop::JobshopGenerator;
 use ompas_middleware::OMPAS_WORKING_DIR;
 use std::fs;
 use std::fs::create_dir_all;

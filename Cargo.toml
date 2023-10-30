@@ -20,7 +20,8 @@ members = [
     "acting/interface",
     "ompas-gobot-sim",
     "benchmark",
-    "generator"
+    "generator",
+    "stat",
 ]
 
 exclude = ["aries"]

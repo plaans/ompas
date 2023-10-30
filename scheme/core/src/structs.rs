@@ -272,9 +272,16 @@ impl<'a> ScopeCollection<'a> {
     }
 }
 
-#[derive(Default)]
 pub struct EvalStack {
     inner: Vec<StackFrame>,
+}
+
+impl Default for EvalStack {
+    fn default() -> Self {
+        Self {
+            inner: Vec::with_capacity(64),
+        }
+    }
 }
 
 impl EvalStack {

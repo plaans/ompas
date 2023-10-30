@@ -1,5 +1,5 @@
-use crate::OMPAS_WORKING_DIR;
 use crate::{LogLevel, LOG_TOPIC_ROOT, MASTER, MASTER_LABEL, TOKIO_CHANNEL_SIZE, TOPIC_ALL_ID};
+use crate::{LOGS_DIR, OMPAS_WORKING_DIR};
 use chrono::{DateTime, Utc};
 use log::Level;
 use ompas_utils::other::get_and_update_id_counter;
@@ -17,9 +17,6 @@ use std::{fs, mem};
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::time::sleep;
 
-fn default_log_directory() -> String {
-    format!("{}/logs", OMPAS_WORKING_DIR.get_ref())
-}
 const DEFAULT_MAX_LOG_LEVEL: Level = Level::Info;
 pub const END_SIGNAL: EndSignal = EndSignal {};
 pub const PROCESS_LOGGER: &str = "__PROCESS_LOGGER__";
@@ -49,15 +46,15 @@ pub struct Logger {
     #[allow(unused)]
     absolute_start: DateTime<Utc>,
     system_start: SystemTime,
-    current_log_dir: String,
+    logs_dir: PathBuf,
     max_log_level: Arc<RwLock<Level>>,
     end_receiver: Arc<broadcast::Receiver<EndSignal>>,
     sender_log: Arc<mpsc::UnboundedSender<LogMessage>>,
 }
 
 impl Logger {
-    pub fn new(date: DateTime<Utc>) -> (Self, mpsc::Sender<EndSignal>) {
-        let current_log_dir = date.format("%Y-%m-%d_%H-%M-%S").to_string();
+    pub fn new(date: DateTime<Utc>, mut run_dir: PathBuf) -> (Self, mpsc::Sender<EndSignal>) {
+        run_dir.push(LOGS_DIR);
 
         let (tx, rx) = mpsc::unbounded_channel();
         let (tx_end_logger, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
@@ -66,7 +63,7 @@ impl Logger {
             collection: Default::default(),
             absolute_start: date,
             system_start: SystemTime::now(),
-            current_log_dir,
+            logs_dir: run_dir,
             max_log_level: Arc::new(RwLock::new(DEFAULT_MAX_LOG_LEVEL)),
             end_receiver: Arc::new(rx_end),
             sender_log: Arc::new(tx),
@@ -296,30 +293,30 @@ impl Logger {
     ) -> LogTopicId {
         let id = get_and_update_id_counter(self.collection.next_topic_id.clone());
 
-        let path: String = match &file_descriptor {
-            None => format!(
-                "{}/{}/{}.txt",
-                default_log_directory(),
-                self.current_log_dir,
-                name
-            ),
-            Some(FileDescriptor::AbsolutePath(ap)) => ap.to_str().unwrap().to_string(),
-            Some(FileDescriptor::RelativePath(rp)) => format!(
-                "{}/{}/{}.txt",
-                default_log_directory(),
-                self.current_log_dir,
-                rp.to_str().unwrap()
-            ),
-            Some(FileDescriptor::Directory(d)) => format!("{}/{}.txt", d.to_str().unwrap(), name),
-            Some(FileDescriptor::Name(n)) => format!(
-                "{}/{}/{}.txt",
-                default_log_directory(),
-                self.current_log_dir,
-                n
-            ),
+        let path: PathBuf = match &file_descriptor {
+            None => {
+                let mut path = self.logs_dir.clone();
+                path.push(name.to_string());
+                path
+            }
+            Some(FileDescriptor::AbsolutePath(ap)) => ap.clone(),
+            Some(FileDescriptor::RelativePath(rp)) => {
+                let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+                path.push(rp);
+                path
+            }
+            Some(FileDescriptor::Directory(d)) => {
+                let mut path = d.clone();
+                path.push(name.to_string());
+                path
+            }
+            Some(FileDescriptor::Name(n)) => {
+                let mut path = self.logs_dir.clone();
+                path.push(n);
+                path
+            }
         };
 
-        let path: PathBuf = path.into();
         let mut dir_path: PathBuf = path.clone();
         dir_path.pop();
         fs::create_dir_all(dir_path.clone()).unwrap_or_else(|e| {

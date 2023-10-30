@@ -917,9 +917,6 @@ pub mod monitor {
         pub const GET_STATE: &str = "get-state";
         pub const DOC_GET_STATE: &str = "Returns the current state";
 
-        pub const GET_TASK_NETWORK: &str = "get-task-network";
-        pub const DOC_GET_TASK_NETWORK: &str = "Return the actual task network.";
-
         pub const GET_TYPE_HIERARCHY: &str = "get-type-hierarchy";
         pub const DOC_GET_TYPE_HIERARCHY: &str = "Return the type hierarchy defined in the domain.";
 
@@ -954,13 +951,6 @@ pub mod monitor {
         pub const GET_DOMAIN: &str = "get-domain";
         pub const DOC_RAE_GET_ENV: &str = "Return the domain.";
 
-        /*pub const GET_SYMBOL_TYPE: &str = "get-symbol-type";
-        pub const DOC_GET_SYMBOL_TYPE: &str =
-            "Return the type of the symbol as defined in the domain: state-function, command, task, method.";*/
-
-        /*pub const GET_STATUS: &str = "get-status";
-        pub const DOC_GET_STATUS: &str = "Returns the current status of actions";*/
-
         pub const GET_STATS: &str = "get-stats";
         pub const DOC_GET_STATS: &str = "Return the statistics of the execution of the system";
 
@@ -971,8 +961,8 @@ pub mod monitor {
         pub const EXPORT_TO_CSV: &str = "export-to-csv";
         pub const DOC_EXPORT_TO_CSV: &str = "Export the statistics in csv format in a given file.";
 
-        pub const DUMP_TRACE: &str = "dump-trace";
-        pub const DOC_DUMP_TRACE: &str =
+        pub const DUMP_ACTING_TREE: &str = "dump-acting-tree";
+        pub const DOC_DUMP_ACTING_TREE: &str =
             "Dump in a markdown the graph representing the execution trace.\n[Unstable] The markdown is shown in google-chrome if the right extension is installed.";
 
         pub const DEBUG_OMPAS: &str = "debug-ompas";
@@ -986,6 +976,10 @@ pub mod monitor {
 
         pub const STOP_ACTING_TREE_DISPLAY: &str = "stop-acting-tree-display";
         pub const DOC_STOP_ACTING_TREE_DISPLAY: &str = "Stop the display of the acting tree";
+
+        pub const EXPORT_REPORT: &str = "export-report";
+        pub const DOC_EXPORT_REPORT: &str =
+            "Exports the acting tree and the state of the current run.";
     }
 }
 

@@ -44,7 +44,7 @@ pub struct OMPASLCPConfig {
     pub env: LEnv,
 }
 
-pub fn is_fully_populated(instances: &Vec<ChronicleInstance>) -> bool {
+pub fn is_fully_populated(instances: &[ChronicleInstance]) -> bool {
     let origins: HashSet<ChronicleOrigin> = instances.iter().map(|c| c.origin.clone()).collect();
 
     for (instance_id, c) in instances.iter().enumerate() {
@@ -85,7 +85,7 @@ pub async fn run_planner(
 
     let mut pp = populate_problem(
         FinitePlanningProblem::ExecutionProblem(execution_problem),
-        &domain,
+        domain,
         env,
         0,
     )
@@ -105,7 +105,7 @@ pub async fn run_planner(
             println!("{depth_string} Solving with depth {depth_string}");
         }
 
-        pp = populate_problem(FinitePlanningProblem::PlannerProblem(&pp), &domain, &env, 1)
+        pp = populate_problem(FinitePlanningProblem::PlannerProblem(&pp), domain, env, 1)
             .await
             .unwrap();
         let fully_populated = is_fully_populated(&pp.instances);
@@ -129,7 +129,7 @@ pub async fn run_planner(
         );
 
         state_manager
-            .update_subscriber_rule(&state_subscriber_id, rule)
+            .update_subscriber_rule(state_subscriber_id, rule)
             .await;
 
         let (mut problem, table) = encode(&pp).await.unwrap();
@@ -176,7 +176,7 @@ pub async fn run_planner(
         let result = solve_finite_problem(
             pb.clone(),
             &STRATEGIES,
-            opt.clone(),
+            *opt,
             on_new_valid_assignment,
             best_cost - 1,
             interrupter.clone(),

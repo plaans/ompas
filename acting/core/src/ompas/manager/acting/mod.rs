@@ -19,11 +19,12 @@ use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, Wa
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::StateManager;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
+use crate::planning::conversion::flow_graph::graph::Dot;
 use crate::planning::planner::solver::PMetric;
 use inner::InnerActingManager;
 use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
-use ompas_middleware::{Master, ProcessInterface, OMPAS_WORKING_DIR};
+use ompas_middleware::{Master, ProcessInterface};
 use ompas_utils::task_handler::EndSignal;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
@@ -121,8 +122,8 @@ impl ActingManager {
         todo!()
     }
 
-    pub async fn print_processes(&self, _pf: ProcessFilter) -> String {
-        todo!()
+    pub async fn format_processes(&self, pf: ProcessFilter) -> String {
+        self.inner.read().await.format_processes(pf)
     }
 
     pub async fn get_stats(&self) -> LValue {
@@ -507,11 +508,7 @@ impl ActingManager {
             let _guard = handle.enter();
 
             tokio::spawn(async move {
-                let path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
-                let mut path = path.canonicalize().unwrap();
-                path.push("traces");
-
-                path.push(format!("acting_tree_{}", Master::get_string_date()));
+                let path: PathBuf = Master::get_run_dir();
                 fs::create_dir_all(&path).unwrap();
 
                 let mut path_dot = path.clone();
@@ -524,7 +521,7 @@ impl ActingManager {
                 loop {
                     tokio::select! {
                         _ = clock.changed() => {
-                            let dot = inner.read().await.export_trace_dot_graph();
+                            let dot = inner.read().await.acting_tree_as_dot();
                             let mut dot_file = OpenOptions::new()
                                 .write(true)
                                 .create(true)
@@ -564,5 +561,9 @@ impl ActingManager {
             let _ = display.killer.send(true).await;
         }
         *acting_tree_displayer = None;
+    }
+
+    pub async fn acting_tree_as_dot(&self) -> Dot {
+        self.inner.read().await.acting_tree_as_dot()
     }
 }

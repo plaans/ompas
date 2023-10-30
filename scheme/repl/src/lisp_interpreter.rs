@@ -1,6 +1,6 @@
 use im::HashMap;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
-use ompas_middleware::{Master, ProcessInterface, OMPAS_WORKING_DIR, PROCESS_TOPIC_ALL};
+use ompas_middleware::{Master, ProcessInterface, PROCESS_TOPIC_ALL};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
@@ -9,10 +9,6 @@ use sompas_language::PROCESS_TOPIC_INTERPRETER;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
-use std::fs;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -20,7 +16,7 @@ use tokio::task::JoinHandle;
 
 const PROCESS_INTERPRETER: &str = "__PROCESS_INTERPRETER__";
 const PROCESS_REPL: &str = "__PROCESS_REPL__";
-const PROCESS_LOG: &str = "__PROCESS_LOG__";
+
 #[derive(Debug)]
 pub struct LispInterpreterChannel {
     sender: UnboundedSender<String>,
@@ -239,81 +235,6 @@ impl LispInterpreter {
 ///Spawn repl task
 pub async fn spawn_repl(communication: ChannelToLispInterpreter) -> JoinHandle<()> {
     tokio::spawn(async move { repl(communication).await })
-}
-
-/// Spawn the log task
-pub async fn spawn_log(com: ChannelToLispInterpreter, log_path: Option<PathBuf>) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        log(com, log_path).await;
-    })
-}
-
-async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
-    let mut process_interface = ProcessInterface::new(
-        PROCESS_LOG,
-        PROCESS_TOPIC_INTERPRETER,
-        LOG_TOPIC_INTERPRETER,
-    )
-    .await;
-    let dir_path: PathBuf = match working_dir {
-        Some(wd) => {
-            let mut dir_path = wd;
-            dir_path.push("lisp_logs");
-            dir_path
-        }
-        None => {
-            let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
-            path.push("lisp");
-            path
-        }
-    };
-
-    fs::create_dir_all(&dir_path).expect("could not create logs directory");
-    let mut file_path = dir_path.clone();
-    file_path.push(format!("log_{}", Master::get_string_date()));
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(&file_path)
-        .expect("error creating log file");
-
-    loop {
-        tokio::select! {
-            buffer = com.recv() => {
-                let buffer = match buffer {
-                    None => {
-                        eprintln!("log task stopped working");
-                        break;
-                    }
-                    Some(Ok(lv)) => lv.to_string(),
-                    Some(Err(e)) => e.to_string()
-                };
-
-                file.write_all(format!("{}\n", buffer).as_bytes())
-                    .expect("could not write to log file");
-                }
-            _ = process_interface.recv() => {
-                com.close();
-                break;
-            }
-        }
-    }
-    println!("Draining log queue...");
-    while let Some(msg) = com.recv().await {
-        file.write_all(
-            format!(
-                "{}\n",
-                match msg {
-                    Ok(lv) => lv.to_string(),
-                    Err(e) => e.to_string(),
-                }
-            )
-            .as_bytes(),
-        )
-        .expect("could not write to log file");
-    }
-    println!("log task ended");
 }
 
 /// Function to handle the repl.

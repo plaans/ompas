@@ -436,7 +436,6 @@ pub async fn populate_problem<'a>(
                 st,
                 chronicles,
             } = ep;
-            let st = st;
 
             let names: HashSet<String> = Default::default();
             let tasks: HashSet<String> = Default::default();

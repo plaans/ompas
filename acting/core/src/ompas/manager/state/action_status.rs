@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -10,7 +11,7 @@ pub const STATUS_SUCCESS: &str = "success";
 pub const STATUS_FAILURE: &str = "failure";
 pub const STATUS_CANCELLED: &str = "cancelled";
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ProcessStatus {
     Pending,
     Accepted,
@@ -21,6 +22,12 @@ pub enum ProcessStatus {
     Cancelled(bool),
     Planned,
     //True the action has been successfully stopped, false it was a failure to cancel
+}
+
+impl ProcessStatus {
+    pub fn is_failed(&self) -> bool {
+        matches!(self, Self::Failure | Self::Rejected | Self::Cancelled(_))
+    }
 }
 
 impl Display for ProcessStatus {

@@ -73,8 +73,9 @@ pub async fn lisp_interpreter(opt: Opt) {
     let log = if let Some(pb) = &opt.log {
         pb.clone()
     } else {
-        let home = OMPAS_WORKING_DIR.get_ref();
-        PathBuf::from(format!("{}benchmark", home))
+        let mut home: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+        home.push("benchmark");
+        home
     };
 
     //println!("log path: {:?}", log);

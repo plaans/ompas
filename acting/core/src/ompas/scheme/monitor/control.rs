@@ -25,7 +25,7 @@ use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_STOP_OMPAS, PROCESS_TOPIC
 use ompas_language::select::*;
 use ompas_language::supervisor::*;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::{Master, ProcessInterface, OMPAS_WORKING_DIR};
+use ompas_middleware::{Master, ProcessInterface};
 use sompas_core::{eval_init, get_root_env};
 use sompas_macros::*;
 use sompas_modules::io::LogOutput;
@@ -154,12 +154,6 @@ impl From<ModControl> for LModule {
             false,
         );
         module.add_async_fn(
-            GET_TASK_NETWORK,
-            print_process_network,
-            DOC_GET_TASK_NETWORK,
-            false,
-        );
-        module.add_async_fn(
             GET_TYPE_HIERARCHY,
             get_type_hierarchy,
             DOC_GET_TYPE_HIERARCHY,
@@ -186,8 +180,12 @@ impl From<ModControl> for LModule {
         module.add_async_fn(EXPORT_STATS, export_stats, DOC_EXPORT_STATS, false);
         module.add_async_fn(EXPORT_TO_CSV, export_to_csv, DOC_EXPORT_TO_CSV, false);
 
-        module.add_async_fn(DUMP_TRACE, dump_trace, DOC_DUMP_TRACE, false);
-        module.add_macro(DEBUG_OMPAS, MACRO_DEBUG_OMPAS, DOC_DEBUG_OMPAS);
+        module.add_async_fn(
+            DUMP_ACTING_TREE,
+            dump_acting_tree,
+            DOC_DUMP_ACTING_TREE,
+            false,
+        );
         module.add_async_fn(
             START_ACTING_TREE_DISPLAY,
             start_acting_tree_display,
@@ -200,6 +198,11 @@ impl From<ModControl> for LModule {
             DOC_STOP_ACTING_TREE_DISPLAY,
             false,
         );
+
+        module.add_async_fn(EXPORT_REPORT, export_report, DOC_EXPORT_REPORT, false);
+
+        // Macros
+        module.add_macro(DEBUG_OMPAS, MACRO_DEBUG_OMPAS, DOC_DEBUG_OMPAS);
 
         module
     }
@@ -578,13 +581,6 @@ pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-pub async fn print_process_network(env: &LEnv) -> String {
-    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-
-    ctx.acting_manager.format_task_network().await
-}
-
-#[async_scheme_fn]
 pub async fn get_type_hierarchy(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     format!("{:?}", ctx.acting_manager.st.get_lattice())
@@ -597,11 +593,11 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
 
     for arg in args {
         match arg.to_string().as_str() {
-            TASK => task_filter.task_type = Some(ActingProcessKind::Task),
-            COMMAND => task_filter.task_type = Some(ActingProcessKind::Command),
-            ARBITRARY => task_filter.task_type = Some(ActingProcessKind::Arbitrary),
-            ACQUIRE => task_filter.task_type = Some(ActingProcessKind::Acquire),
-            METHOD => task_filter.task_type = Some(ActingProcessKind::Method),
+            TASK => task_filter.kind = Some(ActingProcessKind::Task),
+            COMMAND => task_filter.kind = Some(ActingProcessKind::Command),
+            ARBITRARY => task_filter.kind = Some(ActingProcessKind::Arbitrary),
+            ACQUIRE => task_filter.kind = Some(ActingProcessKind::Acquire),
+            METHOD => task_filter.kind = Some(ActingProcessKind::Method),
             STATUS_PENDING => task_filter.status = Some(ProcessStatus::Pending),
             STATUS_ACCEPTED => task_filter.status = Some(ProcessStatus::Accepted),
             STATUS_REJECTED => task_filter.status = Some(ProcessStatus::Rejected),
@@ -622,7 +618,7 @@ pub async fn print_processes(env: &LEnv, args: &[LValue]) -> LResult {
         }
     }
 
-    let string = ctx.acting_manager.print_processes(task_filter).await;
+    let string = ctx.acting_manager.format_processes(task_filter).await;
     Ok(string.into())
 }
 
@@ -714,7 +710,7 @@ pub async fn export_to_csv(env: &LEnv, args: &[LValue]) -> LResult {
     };
     let content = ctx.acting_manager.export_to_csv().await;
 
-    let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    let mut path: PathBuf = Master::get_run_dir();
     path.push(OMPAS_STATS);
 
     fs::create_dir_all(&path).expect("could not create stats directory");
@@ -782,7 +778,7 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
         }
     }
 
-    let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    let mut path: PathBuf = Master::get_run_dir();
     path.push(OMPAS_STATS);
 
     fs::create_dir_all(&path).expect("could not create stats directory");
@@ -813,12 +809,14 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
 }
 
 #[async_scheme_fn]
-pub async fn dump_trace(env: &LEnv) -> Result<(), LRuntimeError> {
+pub async fn dump_acting_tree(env: &LEnv) -> Result<(), LRuntimeError> {
     env.get_context::<ModControl>(MOD_CONTROL)?
         .acting_manager
-        .dump_trace(Some(
-            format!("{}/traces", OMPAS_WORKING_DIR.get_ref()).into(),
-        ))
+        .dump_trace(Some({
+            let mut path = Master::get_run_dir();
+            path.push("traces");
+            path
+        }))
         .await;
 
     Ok(())
@@ -840,6 +838,41 @@ pub async fn stop_acting_tree_display(env: &LEnv) -> Result<(), LRuntimeError> {
         .acting_manager
         .stop_acting_tree_display()
         .await;
+
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn export_report(env: &LEnv) -> Result<(), LRuntimeError> {
+    let acting_manager = &env.get_context::<ModControl>(MOD_CONTROL)?.acting_manager;
+    let mut run_dir = Master::get_run_dir();
+    run_dir.push("report");
+    fs::create_dir_all(run_dir.clone()).unwrap();
+
+    let acting_tree = acting_manager.acting_tree_as_dot().await;
+    let stats = acting_manager.get_run_stat().await;
+
+    let mut acting_tree_file_path = run_dir.clone();
+    acting_tree_file_path.push("acting_tree.dot");
+    let mut acting_tree_file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open(acting_tree_file_path)
+        .unwrap();
+    acting_tree_file.write_all(acting_tree.as_bytes()).unwrap();
+
+    let mut stats_file_path = run_dir.clone();
+    stats_file_path.push("stats.json");
+    let mut stats_file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open(stats_file_path)
+        .unwrap();
+    stats_file
+        .write_all(serde_json::to_string(&stats).unwrap().as_bytes())
+        .unwrap();
 
     Ok(())
 }

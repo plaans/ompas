@@ -8,6 +8,6 @@
         --environment (concatenate gobot-sim-path "environments/env_6_machines.json")
         --jobshop (concatenate gobot-sim-path "jobshop/instances/j01.txt")
         ;--robot_controller teleport
-        --robot_controller pf
+        ;--robot_controller pf
         ;--time_scale 4
     ))

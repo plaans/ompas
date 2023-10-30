@@ -142,7 +142,7 @@ impl Display for TaskProcess {
 pub struct RefinementTrace {
     pub selected: Selected,
     pub candidates: Vec<LValue>,
-    pub duration: Interval,
+    pub interval: Interval,
 }
 
 #[derive(Clone, Debug)]

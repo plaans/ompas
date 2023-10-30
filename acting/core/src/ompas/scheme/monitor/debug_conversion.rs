@@ -11,7 +11,7 @@ use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::debug_conversion::*;
 use ompas_language::monitor::model::MOD_MODEL;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::{Master, OMPAS_WORKING_DIR};
+use ompas_middleware::Master;
 use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
@@ -84,7 +84,7 @@ pub async fn export_type_lattice(env: &LEnv) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let ctx: ConversionContext = ctx.get_conversion_context().await;
 
-    let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    let mut path: PathBuf = Master::get_run_dir();
     path.push("lattice_of_type");
     path.push(format!("lattice_of_type_{}", Master::get_string_date()));
     fs::create_dir_all(&path).unwrap();

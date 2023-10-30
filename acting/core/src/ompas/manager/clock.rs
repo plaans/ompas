@@ -24,7 +24,7 @@ impl Default for ClockManager {
 
 impl ClockManager {
     pub fn now(&self) -> Timepoint {
-        self.instant.elapsed().as_millis().into()
+        Timepoint::new_micros(self.instant.elapsed().as_micros())
     }
 
     /*pub async fn reset(&self) {

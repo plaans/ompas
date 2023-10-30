@@ -198,7 +198,7 @@ async fn check_refinement_trace(
         }
     };
 
-    rt.duration.set_end(acting_manager.clock_manager.now());
+    rt.interval.set_end(acting_manager.clock_manager.now());
 
     acting_manager
         .set_executed_refinement(task_id, &method_id, rt)
@@ -274,6 +274,7 @@ pub async fn select(
     /*
     Each function return an ordered list of methods
      */
+
     let mod_refinement = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let duration = Interval::new_instant(mod_refinement.clock_manager.now());
     let log = mod_refinement.log.clone();
@@ -289,12 +290,32 @@ pub async fn select(
         .state_manager
         .get_snapshot()
         .await;
+    /*println!(
+        "select.t_init({}) = {} µs",
+        task_id,
+        now.elapsed().unwrap().as_micros()
+    );*/
 
     let mut candidates = applicable(&state, &task, env).await?;
+    /*println!(
+        "select.t_applicable({}) = {} µs",
+        task_id,
+        now.elapsed().unwrap().as_micros()
+    );*/
 
     let tried: Vec<LValue> = acting_manager.get_tried(&task_id).await;
+    /*println!(
+        "select.t_tried({}) = {} µs",
+        task_id,
+        now.elapsed().unwrap().as_micros()
+    );*/
 
     candidates.retain(|m| !tried.contains(m));
+    /*println!(
+        "select.t_candidates({}) = {} µs",
+        task_id,
+        now.elapsed().unwrap().as_micros()
+    );*/
 
     log.debug(format!(
         "({}) Candidates = {}",
@@ -369,8 +390,14 @@ pub async fn select(
     let rt = RefinementTrace {
         selected: selected.unwrap(),
         candidates,
-        duration,
+        interval: duration,
     };
+
+    // println!(
+    //     "select.r_refinement({}) = {} µs",
+    //     task_id,
+    //     now.elapsed().unwrap().as_micros()
+    // );
 
     log.debug(format!("({task_id}) selected: {}", rt.selected));
 

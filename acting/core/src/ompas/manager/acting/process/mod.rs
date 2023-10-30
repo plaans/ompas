@@ -53,52 +53,6 @@ pub struct ActingProcess {
 }
 
 impl ActingProcess {
-    #[allow(unused)]
-    fn format(&self, acting_vars: &ActingVarCollection) -> String {
-        let mut f = String::new();
-        write!(
-            f,
-            "({}, {})[{},{}]",
-            self.id,
-            self.status,
-            acting_vars.format_acting_var(&self.start),
-            acting_vars.format_acting_var(&self.end)
-        )
-        .unwrap();
-        let debug = if let Some(debug) = &self.debug {
-            debug.to_string()
-        } else {
-            "".to_string()
-        };
-        match &self.inner {
-            ActingProcessInner::RootTask(_) => {
-                write!(f, "root").unwrap();
-            }
-            ActingProcessInner::Method(_)
-            | ActingProcessInner::AbstractModel(_)
-            | ActingProcessInner::Task(_)
-            | ActingProcessInner::Command(_) => {
-                write!(f, "{}", debug).unwrap();
-            }
-            ActingProcessInner::Arbitrary(arb) => {
-                write!(f, "arb({})", acting_vars.format_acting_var(&arb.var)).unwrap();
-            }
-            ActingProcessInner::Acquire(acq) => {
-                write!(
-                    f,
-                    "{}: acq({},{})",
-                    acting_vars.format_acting_var(&acq.s_acq),
-                    acting_vars.format_acting_var(&acq.resource),
-                    acting_vars.format_acting_var(&acq.quantity)
-                )
-                .unwrap();
-            }
-        }
-        f
-    }
-}
-
-impl ActingProcess {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: ActingProcessId,
@@ -177,6 +131,49 @@ impl ActingProcess {
 
     pub fn get_mut_inner(&mut self) -> &mut ActingProcessInner {
         &mut self.inner
+    }
+
+    pub fn format(&self, acting_vars: &ActingVarCollection) -> String {
+        let mut f = String::new();
+        write!(
+            f,
+            "({}, {})[{},{}]",
+            self.id,
+            self.status,
+            acting_vars.format_acting_var(&self.start),
+            acting_vars.format_acting_var(&self.end)
+        )
+        .unwrap();
+        let debug = if let Some(debug) = &self.debug {
+            debug.to_string()
+        } else {
+            "".to_string()
+        };
+        match &self.inner {
+            ActingProcessInner::RootTask(_) => {
+                write!(f, "root").unwrap();
+            }
+            ActingProcessInner::Method(_)
+            | ActingProcessInner::AbstractModel(_)
+            | ActingProcessInner::Task(_)
+            | ActingProcessInner::Command(_) => {
+                write!(f, "{}", debug).unwrap();
+            }
+            ActingProcessInner::Arbitrary(arb) => {
+                write!(f, "arb({})", acting_vars.format_acting_var(&arb.var)).unwrap();
+            }
+            ActingProcessInner::Acquire(acq) => {
+                write!(
+                    f,
+                    "{}: acq({},{})",
+                    acting_vars.format_acting_var(&acq.s_acq),
+                    acting_vars.format_acting_var(&acq.resource),
+                    acting_vars.format_acting_var(&acq.quantity)
+                )
+                .unwrap();
+            }
+        }
+        f
     }
 }
 

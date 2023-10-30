@@ -12,6 +12,7 @@ use crate::ompas::manager::acting::acting_stat::ActingStat;
 use crate::ompas::manager::acting::acting_var::{
     ActingVal, ActingValUpdate, ActingVarCollection, ActingVarId, ActingVarRef, AsCst, PlanVarRef,
 };
+use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::interval::{Duration, Interval, Timepoint};
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
@@ -45,13 +46,11 @@ use serde::{Deserialize, Serialize};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::any::Any;
-use std::env::set_current_dir;
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::fs;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
-use std::time::SystemTime;
 use tokio::sync::{broadcast, watch};
 
 const TASK_NAME: &str = "task_name";
@@ -155,18 +154,6 @@ impl InnerActingManager {
         self.models = vec![model];
     }
 
-    pub fn notify_planner(&mut self, pu: PlannerUpdate) {
-        if let Some(planner) = &self.planner_manager_interface {
-            planner.send_update(pu);
-        }
-    }
-
-    pub fn plan(&mut self) {
-        if let Some(planner) = &self.planner_manager_interface {
-            planner.send_update(PlannerUpdate::Plan);
-        }
-    }
-
     pub async fn clear(&mut self) {
         self.processes.clear();
         self.models.clear();
@@ -174,31 +161,12 @@ impl InnerActingManager {
         self.st.clear();
         self.init();
     }
+}
 
+// Getters
+impl InnerActingManager {
     pub fn st(&self) -> RefSymTable {
         self.st.clone()
-    }
-
-    fn new_model(&mut self, model: ActingModel) -> AMId {
-        self.models.push(model);
-        self.models.len() - 1
-    }
-
-    fn new_acting_var_with_ref<
-        T: Clone + Any + Send + Sync + AsCst + Display + Debug + PartialEq,
-    >(
-        &mut self,
-        var_id: &VarId,
-        am_id: &AMId,
-    ) -> ActingVarRef<T> {
-        self.acting_vars
-            .new_acting_var_with_ref(PlanVarRef::new(*var_id, *am_id))
-    }
-
-    fn new_acting_var<T: Clone + Any + Send + Sync + AsCst + Display + Debug + PartialEq>(
-        &mut self,
-    ) -> ActingVarRef<T> {
-        self.acting_vars.new_acting_var()
     }
 
     pub fn get_id(&self, pr: impl Into<ProcessRef>) -> Option<ActingProcessId> {
@@ -303,6 +271,114 @@ impl InnerActingManager {
         self.processes[*id].am_id()
     }
 
+    fn get_acting_var_acting_val(&self, acting_var_id: &ActingVarId) -> &ActingVal {
+        self.acting_vars.get_acting_val(acting_var_id)
+    }
+
+    fn get_acting_var_val<T: Any + Sync + Send + Clone + PartialEq + AsCst + Display + Debug>(
+        &self,
+        r: &ActingVarRef<T>,
+    ) -> Option<T> {
+        self.acting_vars.get_val(r)
+    }
+
+    pub fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
+        self.processes[*id]
+            .inner
+            .as_action()
+            .unwrap()
+            .get_args()
+            .iter()
+            .map(|r| self.get_acting_var_val(r).unwrap())
+            .collect()
+    }
+
+    /*
+    Get process inner struct
+     */
+    pub fn get(&self, process_ref: impl Into<ProcessRef>) -> Option<&ActingProcess> {
+        self.get_id(process_ref.into())
+            .map(|id| &self.processes[id])
+    }
+
+    pub fn get_mut(&mut self, process_ref: impl Into<ProcessRef>) -> Option<&mut ActingProcess> {
+        self.get_id(process_ref.into())
+            .map(|id| &mut self.processes[id])
+    }
+
+    pub fn get_last_planned_refinement(&self, id: &ActingProcessId) -> Option<ActingProcessId> {
+        let refinements = &self.processes[*id].inner.as_action().unwrap().refinements;
+        match refinements.last() {
+            Some(refinement) => refinement.get_suggested().cloned(),
+            None => None,
+        }
+    }
+
+    pub fn get_last_executed_refinement(&self, id: &ActingProcessId) -> Option<ActingProcessId> {
+        match self.processes[*id]
+            .inner
+            .as_action()
+            .unwrap()
+            .refinements
+            .last()
+        {
+            Some(refinement) => refinement.get_executed().cloned(),
+            None => None,
+        }
+    }
+
+    pub fn get_lv(&self, id: &ActingProcessId) -> LValue {
+        if self.get_kind(id) == ActingProcessKind::Method {
+            let om_id = self.get_am_id(id);
+            self.models[om_id].lv.clone()
+        } else {
+            panic!()
+        }
+    }
+
+    pub fn get_refinement_lv(&self, id: &ActingProcessId) -> LValue {
+        let mut list = vec![];
+        for arg in &self.processes[*id].inner.as_method().unwrap().args {
+            list.push(self.get_acting_var_acting_val(&arg.id).as_cst().unwrap())
+        }
+        list.into()
+    }
+
+    pub fn get_om(&self, id: &ActingProcessId) -> LValue {
+        if self.get_kind(id) == ActingProcessKind::Method {
+            let om_id = self.get_am_id(id);
+            self.models[om_id].lv_om.clone()
+        } else {
+            panic!()
+        }
+    }
+
+    pub fn get_tried(&self, id: &ActingProcessId) -> Vec<LValue> {
+        let refinements = self.processes[*id]
+            .inner
+            .as_action()
+            .unwrap()
+            .get_refinements();
+
+        refinements
+            .iter()
+            .filter_map(|refinement| {
+                refinement
+                    .get_executed()
+                    .map(|id| self.processes[*id].am_id())
+                /*if self.processes[*refinement.get_chosen()].origin.is_exec() {
+                    Some(self.processes[*refinement.get_chosen()].am_id())
+                } else {
+                    None
+                }*/
+            })
+            .map(|id| self.models[id].lv.clone())
+            .collect()
+    }
+}
+
+//Setters
+impl InnerActingManager {
     fn set_execution_val<T: Any + Sync + Send + Clone + PartialEq + AsCst + Display + Debug>(
         &mut self,
         acting_var_ref: &ActingVarRef<T>,
@@ -334,11 +410,6 @@ impl InnerActingManager {
         }
     }
 
-    fn add_new_plan_var_ref(&mut self, acting_var_id: &ActingVarId, plan_var_ref: PlanVarRef) {
-        self.acting_vars
-            .add_new_plan_var_ref(acting_var_id, plan_var_ref)
-    }
-
     fn set_val<T: Any + Sync + Send + Clone + PartialEq + AsCst + Display + Debug>(
         &mut self,
         acting_var_ref: &ActingVarRef<T>,
@@ -353,17 +424,6 @@ impl InnerActingManager {
             ProcessOrigin::Execution => self.set_execution_val(acting_var_ref, val),
             _ => unreachable!(),
         }
-    }
-
-    fn get_acting_var_acting_val(&self, acting_var_id: &ActingVarId) -> &ActingVal {
-        self.acting_vars.get_acting_val(acting_var_id)
-    }
-
-    fn get_acting_var_val<T: Any + Sync + Send + Clone + PartialEq + AsCst + Display + Debug>(
-        &self,
-        r: &ActingVarRef<T>,
-    ) -> Option<T> {
-        self.acting_vars.get_val(r)
     }
 
     pub fn set_start(&mut self, id: &ActingProcessId, t: Option<Timepoint>) {
@@ -393,17 +453,6 @@ impl InnerActingManager {
             }
         }
         self.set_status(id, status)
-    }
-
-    pub fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
-        self.processes[*id]
-            .inner
-            .as_action()
-            .unwrap()
-            .get_args()
-            .iter()
-            .map(|r| self.get_acting_var_val(r).unwrap())
-            .collect()
     }
 
     pub fn set_action_args(&mut self, id: &ActingProcessId, args: Vec<Cst>) {
@@ -442,6 +491,131 @@ impl InnerActingManager {
                 };
             }
         }
+    }
+
+    pub fn set_failed_method(&mut self, method: &ActingProcessId) {
+        self.set_end(method, None, ProcessStatus::Failure);
+        let parent = self.processes[*method].parent();
+        self.new_refinement(&parent);
+    }
+
+    pub fn set_executed_refinement(
+        &mut self,
+        action: &ActingProcessId,
+        method: &ActingProcessId,
+        refinement_trace: RefinementTrace,
+    ) {
+        let refinement_label = self.processes[*method].inner.as_method().unwrap().label;
+        self.processes[*action]
+            .inner
+            .as_mut_action()
+            .unwrap()
+            .set_executed(refinement_label.refinement_id, method, refinement_trace);
+        let instant = self.clock_manager.now();
+        if self.get_status(action) == ProcessStatus::Pending {
+            self.set_status(action, ProcessStatus::Running(None));
+            self.set_start(action, Some(instant));
+        }
+        self.set_status(method, ProcessStatus::Running(None));
+        self.set_start(method, Some(instant));
+    }
+
+    pub fn set_s_acq(&mut self, id: &ActingProcessId, instant: Option<Timepoint>) {
+        let instant = instant.unwrap_or(self.clock_manager.now());
+        let Label::ResourceAcquisition(acquire_id) = self.processes[*id].label().unwrap() else {
+            todo!()
+        };
+        let var = self.processes[*id]
+            .inner
+            .as_acquire()
+            .unwrap()
+            .s_acq
+            .clone();
+        self.remove_process_from_model(id, Some(ActingProcessModelLabel::Acquire(acquire_id)));
+        self.set_execution_val(&var, instant)
+    }
+
+    pub fn set_arbitrary_value(
+        &mut self,
+        id: &ActingProcessId,
+        set: Vec<LValue>,
+        greedy: LValue,
+    ) -> LValue {
+        let acting_var_ref = self.processes[*id]
+            .inner
+            .as_arbitrary()
+            .unwrap()
+            .var
+            .clone();
+        let value = match self.get_acting_var_acting_val(&acting_var_ref.id) {
+            ActingVal::Planned(val) => {
+                let value: LValue = val.clone().into();
+                if set.contains(&value) {
+                    //println!("{}.arb = {}", id, value);
+                    value
+                } else {
+                    greedy
+                }
+            }
+            ActingVal::None => greedy,
+            _ => unreachable!(),
+        };
+
+        let arbitrary = &mut self.processes[*id];
+        let arbitrary = arbitrary.inner.as_mut_arbitrary().unwrap();
+        arbitrary.set_set(set);
+        let var_ref = arbitrary.var.clone();
+        let now = self.clock_manager.now();
+        self.set_start(id, Some(now));
+        self.set_execution_val(&var_ref, value.clone());
+        self.executed(id);
+        self.set_end(id, Some(now), ProcessStatus::Success);
+
+        value
+    }
+
+    pub fn executed(&mut self, id: &ActingProcessId) {
+        let origin = &mut self.processes[*id].origin;
+        if ProcessOrigin::Planner == *origin {
+            *origin = ProcessOrigin::ExecPlanInherited
+        }
+    }
+
+    pub fn dropped(&mut self, id: &ActingProcessId) {
+        let origin = &mut self.processes[*id].origin;
+        if ProcessOrigin::Planner == *origin {
+            *origin = ProcessOrigin::PlannerDropped
+        }
+    }
+}
+
+// New methods
+impl InnerActingManager {
+    fn new_model(&mut self, model: ActingModel) -> AMId {
+        self.models.push(model);
+        self.models.len() - 1
+    }
+
+    fn new_acting_var_with_ref<
+        T: Clone + Any + Send + Sync + AsCst + Display + Debug + PartialEq,
+    >(
+        &mut self,
+        var_id: &VarId,
+        am_id: &AMId,
+    ) -> ActingVarRef<T> {
+        self.acting_vars
+            .new_acting_var_with_ref(PlanVarRef::new(*var_id, *am_id))
+    }
+
+    fn new_acting_var<T: Clone + Any + Send + Sync + AsCst + Display + Debug + PartialEq>(
+        &mut self,
+    ) -> ActingVarRef<T> {
+        self.acting_vars.new_acting_var()
+    }
+
+    fn add_new_plan_var_ref(&mut self, acting_var_id: &ActingVarId, plan_var_ref: PlanVarRef) {
+        self.acting_vars
+            .add_new_plan_var_ref(acting_var_id, plan_var_ref)
     }
 
     //New processes
@@ -737,33 +911,6 @@ impl InnerActingManager {
         action.get_refinements().len()
     }
 
-    pub fn set_failed_method(&mut self, method: &ActingProcessId) {
-        self.set_end(method, None, ProcessStatus::Failure);
-        let parent = self.processes[*method].parent();
-        self.new_refinement(&parent);
-    }
-
-    pub fn set_executed_refinement(
-        &mut self,
-        action: &ActingProcessId,
-        method: &ActingProcessId,
-        refinement_trace: RefinementTrace,
-    ) {
-        let refinement_label = self.processes[*method].inner.as_method().unwrap().label;
-        self.processes[*action]
-            .inner
-            .as_mut_action()
-            .unwrap()
-            .set_executed(refinement_label.refinement_id, method, refinement_trace);
-        let instant = self.clock_manager.now();
-        if self.get_status(action) == ProcessStatus::Pending {
-            self.set_status(action, ProcessStatus::Running(None));
-            self.set_start(action, Some(instant));
-        }
-        self.set_status(method, ProcessStatus::Running(None));
-        self.set_start(method, Some(instant));
-    }
-
     pub async fn new_executed_method(
         &mut self,
         parent: &ActingProcessId,
@@ -797,128 +944,6 @@ impl InnerActingManager {
             model,
             origin,
         )
-    }
-
-    async fn generate_acting_model_for_method(
-        &mut self,
-        task_id: &ActingProcessId,
-        lv: LValue,
-        mut p_env: PLEnv,
-    ) -> Result<ActingModel, LRuntimeError> {
-        let debug = lv.to_string();
-        let p_eval_lv = p_eval(&lv, &mut p_env).await?;
-        let lv_om = annotate(p_eval_lv);
-
-        let mut lv_expanded = None;
-        let mut chronicle = None;
-
-        let task = self.processes[*task_id].inner.as_action().unwrap();
-
-        let mut task_name: Vec<_> = task
-            .args
-            .iter()
-            .map(|var_ref| self.get_acting_var_val(var_ref).unwrap())
-            .collect();
-
-        let has_abstract_model = task.abstract_model.is_some();
-
-        if self.is_planner_launched() && !has_abstract_model {
-            let task = self
-                .domain_manager
-                .get_task(&task_name[0].to_string())
-                .await
-                .unwrap();
-            match task.get_model(&PlanModel) {
-                Some(model) => {
-                    let mut lv = vec![model];
-                    for arg in &task_name[1..] {
-                        lv.push(arg.clone().into())
-                    }
-                    let lv = lv.into();
-                    let p_eval_lv = p_eval(&lv, &mut p_env).await?;
-                    let lv_om = annotate(p_eval_lv);
-
-                    let st = self.st.clone();
-                    let mut ch = Chronicle::new(debug, ChronicleKind::Task, st.clone());
-                    let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
-                    let mut name = vec![];
-                    if let LValue::List(list) = &lv {
-                        let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
-                        for arg in list.as_slice() {
-                            let id = st.new_cst(arg.clone());
-                            ch.add_var(id);
-                            name.push(id);
-                        }
-                    } else {
-                        panic!()
-                    };
-                    ch.set_task(task_name);
-                    ch.set_name(name);
-
-                    let ch = Some(ch);
-                    let pp_lv = pre_processing(&lv_om, &p_env).await?;
-
-                    let chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
-                        Ok(ch) => Some(ch),
-                        Err(e) => {
-                            println!("convert error: {}", e);
-                            ch
-                        }
-                    };
-                    let lv_expanded = None;
-
-                    let model = ActingModel {
-                        lv,
-                        lv_om,
-                        lv_expanded,
-                        runtime_info: Default::default(),
-                        chronicle,
-                    };
-
-                    self.new_abstract_model(task_id, model);
-                }
-                None => {
-                    let st = self.st.clone();
-                    let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
-                    let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
-                    let mut name = vec![];
-                    if let LValue::List(list) = &lv {
-                        let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
-                        for arg in list.as_slice() {
-                            let id = st.new_cst(arg.clone());
-                            ch.add_var(id);
-                            name.push(id);
-                        }
-                    } else {
-                        panic!()
-                    };
-                    ch.set_task(task_name);
-                    ch.set_name(name);
-
-                    let ch = Some(ch);
-                    let pp_lv = pre_processing(&lv_om, &p_env).await?;
-                    //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
-
-                    chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
-                        Ok(ch) => Some(ch),
-                        Err(e) => {
-                            println!("convert error: {}", e);
-                            ch
-                        }
-                    };
-
-                    lv_expanded = Some(pp_lv);
-                }
-            }
-        }
-
-        Ok(ActingModel {
-            lv: lv.clone(),
-            lv_om,
-            lv_expanded,
-            runtime_info: Default::default(),
-            chronicle,
-        })
     }
 
     pub fn new_method(
@@ -1115,102 +1140,130 @@ impl InnerActingManager {
             }
         }
     }
+}
 
-    /*
-    Get process inner struct
-     */
-    pub fn get(&self, process_ref: impl Into<ProcessRef>) -> Option<&ActingProcess> {
-        self.get_id(process_ref.into())
-            .map(|id| &self.processes[id])
-    }
+// Methods on acting model
+impl InnerActingManager {
+    async fn generate_acting_model_for_method(
+        &mut self,
+        task_id: &ActingProcessId,
+        lv: LValue,
+        mut p_env: PLEnv,
+    ) -> Result<ActingModel, LRuntimeError> {
+        let debug = lv.to_string();
+        let p_eval_lv = p_eval(&lv, &mut p_env).await?;
+        let lv_om = annotate(p_eval_lv);
 
-    pub fn get_mut(&mut self, process_ref: impl Into<ProcessRef>) -> Option<&mut ActingProcess> {
-        self.get_id(process_ref.into())
-            .map(|id| &mut self.processes[id])
-    }
+        let mut lv_expanded = None;
+        let mut chronicle = None;
 
-    pub fn get_last_planned_refinement(&self, id: &ActingProcessId) -> Option<ActingProcessId> {
-        let refinements = &self.processes[*id].inner.as_action().unwrap().refinements;
-        match refinements.last() {
-            Some(refinement) => refinement.get_suggested().cloned(),
-            None => None,
-        }
-    }
+        let task = self.processes[*task_id].inner.as_action().unwrap();
 
-    pub fn get_last_executed_refinement(&self, id: &ActingProcessId) -> Option<ActingProcessId> {
-        match self.processes[*id]
-            .inner
-            .as_action()
-            .unwrap()
-            .refinements
-            .last()
-        {
-            Some(refinement) => refinement.get_executed().cloned(),
-            None => None,
-        }
-    }
-
-    pub fn executed(&mut self, id: &ActingProcessId) {
-        let origin = &mut self.processes[*id].origin;
-        if ProcessOrigin::Planner == *origin {
-            *origin = ProcessOrigin::ExecPlanInherited
-        }
-    }
-
-    pub fn dropped(&mut self, id: &ActingProcessId) {
-        let origin = &mut self.processes[*id].origin;
-        if ProcessOrigin::Planner == *origin {
-            *origin = ProcessOrigin::PlannerDropped
-        }
-    }
-
-    pub fn get_lv(&self, id: &ActingProcessId) -> LValue {
-        if self.get_kind(id) == ActingProcessKind::Method {
-            let om_id = self.get_am_id(id);
-            self.models[om_id].lv.clone()
-        } else {
-            panic!()
-        }
-    }
-
-    pub fn get_refinement_lv(&self, id: &ActingProcessId) -> LValue {
-        let mut list = vec![];
-        for arg in &self.processes[*id].inner.as_method().unwrap().args {
-            list.push(self.get_acting_var_acting_val(&arg.id).as_cst().unwrap())
-        }
-        list.into()
-    }
-
-    pub fn get_om(&self, id: &ActingProcessId) -> LValue {
-        if self.get_kind(id) == ActingProcessKind::Method {
-            let om_id = self.get_am_id(id);
-            self.models[om_id].lv_om.clone()
-        } else {
-            panic!()
-        }
-    }
-
-    pub fn get_tried(&self, id: &ActingProcessId) -> Vec<LValue> {
-        let refinements = self.processes[*id]
-            .inner
-            .as_action()
-            .unwrap()
-            .get_refinements();
-
-        refinements
+        let mut task_name: Vec<_> = task
+            .args
             .iter()
-            .filter_map(|refinement| {
-                refinement
-                    .get_executed()
-                    .map(|id| self.processes[*id].am_id())
-                /*if self.processes[*refinement.get_chosen()].origin.is_exec() {
-                    Some(self.processes[*refinement.get_chosen()].am_id())
-                } else {
-                    None
-                }*/
-            })
-            .map(|id| self.models[id].lv.clone())
-            .collect()
+            .map(|var_ref| self.get_acting_var_val(var_ref).unwrap())
+            .collect();
+
+        let has_abstract_model = task.abstract_model.is_some();
+
+        if self.is_planner_launched() && !has_abstract_model {
+            let task = self
+                .domain_manager
+                .get_task(&task_name[0].to_string())
+                .await
+                .unwrap();
+            match task.get_model(&PlanModel) {
+                Some(model) => {
+                    let mut lv = vec![model];
+                    for arg in &task_name[1..] {
+                        lv.push(arg.clone().into())
+                    }
+                    let lv = lv.into();
+                    let p_eval_lv = p_eval(&lv, &mut p_env).await?;
+                    let lv_om = annotate(p_eval_lv);
+
+                    let st = self.st.clone();
+                    let mut ch = Chronicle::new(debug, ChronicleKind::Task, st.clone());
+                    let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
+                    let mut name = vec![];
+                    if let LValue::List(list) = &lv {
+                        let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
+                        for arg in list.as_slice() {
+                            let id = st.new_cst(arg.clone());
+                            ch.add_var(id);
+                            name.push(id);
+                        }
+                    } else {
+                        panic!()
+                    };
+                    ch.set_task(task_name);
+                    ch.set_name(name);
+
+                    let ch = Some(ch);
+                    let pp_lv = pre_processing(&lv_om, &p_env).await?;
+
+                    let chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
+                        Ok(ch) => Some(ch),
+                        Err(e) => {
+                            println!("convert error: {}", e);
+                            ch
+                        }
+                    };
+                    let lv_expanded = None;
+
+                    let model = ActingModel {
+                        lv,
+                        lv_om,
+                        lv_expanded,
+                        runtime_info: Default::default(),
+                        chronicle,
+                    };
+
+                    self.new_abstract_model(task_id, model);
+                }
+                None => {
+                    let st = self.st.clone();
+                    let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
+                    let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
+                    let mut name = vec![];
+                    if let LValue::List(list) = &lv {
+                        let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
+                        for arg in list.as_slice() {
+                            let id = st.new_cst(arg.clone());
+                            ch.add_var(id);
+                            name.push(id);
+                        }
+                    } else {
+                        panic!()
+                    };
+                    ch.set_task(task_name);
+                    ch.set_name(name);
+
+                    let ch = Some(ch);
+                    let pp_lv = pre_processing(&lv_om, &p_env).await?;
+                    //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
+
+                    chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
+                        Ok(ch) => Some(ch),
+                        Err(e) => {
+                            println!("convert error: {}", e);
+                            ch
+                        }
+                    };
+
+                    lv_expanded = Some(pp_lv);
+                }
+            }
+        }
+
+        Ok(ActingModel {
+            lv: lv.clone(),
+            lv_om,
+            lv_expanded,
+            runtime_info: Default::default(),
+            chronicle,
+        })
     }
 
     pub fn remove_process_from_model(
@@ -1226,61 +1279,10 @@ impl InnerActingManager {
         };
         self.models[am_id].runtime_info.add_to_remove(label);
     }
+}
 
-    pub fn set_s_acq(&mut self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        let instant = instant.unwrap_or(self.clock_manager.now());
-        let Label::ResourceAcquisition(acquire_id) = self.processes[*id].label().unwrap() else {
-            todo!()
-        };
-        let var = self.processes[*id]
-            .inner
-            .as_acquire()
-            .unwrap()
-            .s_acq
-            .clone();
-        self.remove_process_from_model(id, Some(ActingProcessModelLabel::Acquire(acquire_id)));
-        self.set_execution_val(&var, instant)
-    }
-
-    pub fn set_arbitrary_value(
-        &mut self,
-        id: &ActingProcessId,
-        set: Vec<LValue>,
-        greedy: LValue,
-    ) -> LValue {
-        let acting_var_ref = self.processes[*id]
-            .inner
-            .as_arbitrary()
-            .unwrap()
-            .var
-            .clone();
-        let value = match self.get_acting_var_acting_val(&acting_var_ref.id) {
-            ActingVal::Planned(val) => {
-                let value: LValue = val.clone().into();
-                if set.contains(&value) {
-                    //println!("{}.arb = {}", id, value);
-                    value
-                } else {
-                    greedy
-                }
-            }
-            ActingVal::None => greedy,
-            _ => unreachable!(),
-        };
-
-        let arbitrary = &mut self.processes[*id];
-        let arbitrary = arbitrary.inner.as_mut_arbitrary().unwrap();
-        arbitrary.set_set(set);
-        let var_ref = arbitrary.var.clone();
-        let now = self.clock_manager.now();
-        self.set_start(id, Some(now));
-        self.set_execution_val(&var_ref, value.clone());
-        self.executed(id);
-        self.set_end(id, Some(now), ProcessStatus::Success);
-
-        value
-    }
-
+// Link with ResourceManager
+impl InnerActingManager {
     pub async fn acquire(
         &mut self,
         id: &ActingProcessId,
@@ -1399,6 +1401,41 @@ impl InnerActingManager {
         for resource in resources {
             self.resource_manager.update_queue(&resource).await.unwrap();
         }
+    }
+}
+
+// methods to link acting manager to planner manager
+impl InnerActingManager {
+    pub async fn set_planner_manager_interface(&mut self, pmi: PlannerManagerInterface) {
+        self.planner_manager_interface = Some(pmi);
+    }
+
+    pub fn is_planner_launched(&self) -> bool {
+        self.planner_manager_interface.is_some()
+    }
+
+    pub fn notify_planner_tree_update(&mut self) {
+        if let Some(planner) = &self.planner_manager_interface {
+            planner.notify_update_tree();
+        }
+    }
+
+    pub fn notify_planner(&mut self, pu: PlannerUpdate) {
+        if let Some(planner) = &self.planner_manager_interface {
+            planner.send_update(pu);
+        }
+    }
+
+    pub fn plan(&mut self) {
+        if let Some(planner) = &self.planner_manager_interface {
+            planner.send_update(PlannerUpdate::Plan);
+        }
+    }
+
+    pub async fn subscribe_on_planner_tree_update(&self) -> Option<broadcast::Receiver<bool>> {
+        self.planner_manager_interface
+            .as_ref()
+            .map(|pmi| pmi.subscribe_on_update())
     }
 
     pub fn get_current_chronicles(&self) -> Vec<ChronicleInstance> {
@@ -1528,180 +1565,6 @@ impl InnerActingManager {
         //Add all chronicles of the problem
 
         chronicles
-    }
-
-    fn get_shape(ap: &ActingProcess) -> String {
-        let mut str = "shape=rectangle,".to_string();
-        match ap.status {
-            ProcessStatus::Pending | ProcessStatus::Planned => {
-                write!(str, "fillcolor=\"#ceceff\",")
-            }
-            ProcessStatus::Running(_) | ProcessStatus::Accepted => {
-                write!(str, "fillcolor=\"#ffffce\",")
-            }
-            ProcessStatus::Success => {
-                write!(str, "fillcolor=\"#ceffce\",")
-            }
-            ProcessStatus::Failure | ProcessStatus::Cancelled(_) | ProcessStatus::Rejected => {
-                write!(str, "fillcolor = \"#ffcece\",")
-            }
-        }
-        .unwrap();
-        match ap.inner {
-            ActingProcessInner::RootTask(_) => {
-                write!(
-                    str,
-                    "style=\"rounded, dashed, filled\", fillcolor=\"#cecece\""
-                )
-            }
-            ActingProcessInner::Task(_) => {
-                write!(str, "style=\"rounded, filled, dashed\"")
-            }
-            ActingProcessInner::AbstractModel(_) => {
-                todo!()
-            }
-            ActingProcessInner::Method(_) => {
-                write!(str, "style = \"dashed, filled\", peripheries=2")
-            }
-            ActingProcessInner::Arbitrary(_) => {
-                write!(str, "style=\"filled\"")
-            }
-            ActingProcessInner::Acquire(_) => {
-                write!(str, "style=\"filled\", peripheries=2")
-            }
-            ActingProcessInner::Command(_) => {
-                write!(str, "style=\"rounded, filled\"")
-            }
-        }
-        .unwrap();
-        str
-    }
-
-    pub fn export_trace_dot_graph(&self) -> Dot {
-        let mut dot: Dot = "digraph {\n".to_string();
-        let mut queue = vec![0];
-
-        while let Some(id) = queue.pop() {
-            let ap = &self.processes[id];
-            let shape = Self::get_shape(ap);
-            let label = format_acting_process(&self.acting_vars, ap);
-
-            writeln!(dot, "P{id} [label = \"{label}\", {shape}];").unwrap();
-            match &ap.inner {
-                ActingProcessInner::RootTask(rt) => {
-                    for st in &rt.tasks {
-                        writeln!(dot, "P{id} -> P{st};").unwrap();
-                        queue.push(*st)
-                    }
-                }
-                ActingProcessInner::Task(t) => {
-                    for (_i, r) in t.refinements.iter().enumerate() {
-                        if let Some(executed) = r.get_executed() {
-                            writeln!(dot, "P{id} -> P{};", executed).unwrap();
-                            queue.push(*executed)
-                        } else {
-                            let mut possibilites = r.get_possibilities();
-                            if let Some(s) = r.get_suggested() {
-                                possibilites.retain(|&p| p != s);
-                                writeln!(dot, "P{id} -> P{};", s).unwrap();
-                                queue.push(*s);
-                            }
-
-                            for p in possibilites {
-                                writeln!(dot, "P{id} -> P{};", p).unwrap();
-                                queue.push(*p)
-                            }
-                        }
-                    }
-                }
-                ActingProcessInner::Method(m) | ActingProcessInner::AbstractModel(m) => {
-                    for sub in m.childs.values() {
-                        writeln!(dot, "P{id} -> P{sub};").unwrap();
-                        queue.push(*sub)
-                    }
-                }
-                ActingProcessInner::Arbitrary(_) => {}
-                ActingProcessInner::Acquire(_) => {}
-                ActingProcessInner::Command(_) => {}
-            }
-        }
-
-        dot.push('}');
-        dot
-    }
-
-    pub fn dump_acting_tree(&self, path: Option<PathBuf>) {
-        let mut path = match path {
-            None => "/tmp".into(),
-            Some(p) => p,
-        };
-        path.push(format!("acting_tree_{}", Master::get_string_date()));
-        fs::create_dir_all(&path).unwrap();
-
-        let mut path_dot = path.clone();
-        let dot_file_name = "acting_tree.dot";
-        path_dot.push(dot_file_name);
-        let mut file = File::create(&path_dot).unwrap();
-        let now = SystemTime::now();
-        let dot = self.export_trace_dot_graph();
-        println!(
-            "export to dot time: {} µs",
-            now.elapsed().unwrap().as_micros()
-        );
-        file.write_all(dot.as_bytes()).unwrap();
-        println!("write to file: {} µs", now.elapsed().unwrap().as_micros());
-        set_current_dir(&path).unwrap();
-        let trace = "acting_tree.png";
-        std::process::Command::new("dot")
-            .args(["-Tpng", dot_file_name, "-o", trace])
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-        println!(
-            "export and generate png time: {} µs",
-            now.elapsed().unwrap().as_micros()
-        );
-
-        let mut md_path = path.clone();
-        let md_file_name = "acting_tree.md";
-        md_path.push(md_file_name);
-        let mut md_file = File::create(&md_path).unwrap();
-        let md: String = format!(
-            "
-## Trace
-\n
-![]({})
-\n",
-            trace
-        );
-
-        md_file.write_all(md.as_bytes()).unwrap();
-
-        std::process::Command::new("google-chrome")
-            .arg(md_file_name)
-            .spawn()
-            .unwrap();
-    }
-
-    pub async fn set_planner_manager_interface(&mut self, pmi: PlannerManagerInterface) {
-        self.planner_manager_interface = Some(pmi);
-    }
-
-    pub fn is_planner_launched(&self) -> bool {
-        self.planner_manager_interface.is_some()
-    }
-
-    pub fn notify_planner_tree_update(&mut self) {
-        if let Some(planner) = &self.planner_manager_interface {
-            planner.notify_update_tree();
-        }
-    }
-
-    pub async fn subscribe_on_planner_tree_update(&self) -> Option<broadcast::Receiver<bool>> {
-        self.planner_manager_interface
-            .as_ref()
-            .map(|pmi| pmi.subscribe_on_update())
     }
 
     pub(crate) async fn update_acting_tree(&mut self, update: ActingTreeUpdate) {
@@ -1884,10 +1747,14 @@ impl InnerActingManager {
         self.reserve_all(reservations).await;
         self.set_planner_vals(updates)
     }
+}
 
+///Export functions
+impl InnerActingManager {
     pub fn get_acting_stat(&self) -> ActingStat {
         ActingStat {
             n_root_task: self.processes[0].inner.as_root().unwrap().tasks.len() as u32,
+            n_command_task: self.processes[0].inner.as_root().unwrap().commands.len() as u32,
         }
     }
 
@@ -1914,8 +1781,13 @@ impl InnerActingManager {
             id: *id,
             kind: process.inner.kind(),
             label: process.debug().clone().unwrap(),
-            execution_time: self.get_execution_time(id),
+            status: process.status,
+            start: self.get_acting_var_val(&process.start).unwrap(),
+            end: self.get_acting_var_val(&process.end).unwrap(),
             deliberation_time: self.get_deliberation_time(id),
+            n_refinement: self.get_number_refinement(id),
+            n_failure: self.get_number_failures(id),
+            n_retry: self.get_number_retry(id),
             number_subprocesses: self.get_number_subprocesses(id),
         }
     }
@@ -1930,7 +1802,7 @@ impl InnerActingManager {
     }
 
     pub fn get_deliberation_time(&self, id: &ActingProcessId) -> Duration {
-        let mut duration = Duration::zero();
+        let mut total_duration = Duration::zero();
         let mut queue = vec![*id];
 
         while let Some(id) = queue.pop() {
@@ -1939,19 +1811,20 @@ impl InnerActingManager {
                 ActingProcessInner::Task(t) => {
                     for r in &t.refinements {
                         if let Some(trace) = &r.refinement_trace {
-                            duration += trace.duration.duration()
+                            let duration = trace.interval.duration();
+                            total_duration += duration;
+                        }
+                        if let Some(executed) = r.get_executed() {
+                            queue.push(*executed)
                         }
                     }
                 }
-                ActingProcessInner::Command(_) => {}
-                ActingProcessInner::AbstractModel(_) => {}
-                ActingProcessInner::Method(_) => {}
-                ActingProcessInner::Arbitrary(_) => {}
-                ActingProcessInner::Acquire(_) => {}
+                ActingProcessInner::Method(m) => m.childs.values().for_each(|&id| queue.push(id)),
+                _ => {}
             }
         }
 
-        duration
+        total_duration
     }
 
     pub fn get_number_subprocesses(
@@ -1985,13 +1858,92 @@ impl InnerActingManager {
                     unreachable!()
                 }
                 ActingProcessInner::Method(m) => m.childs.values().for_each(|&id| queue.push(id)),
-                ActingProcessInner::Arbitrary(_)
-                | ActingProcessInner::Acquire(_)
-                | ActingProcessInner::Command(_) => {}
+                _ => {}
             }
         }
 
         map
+    }
+
+    pub fn get_number_failures(&self, id: &ActingProcessId) -> u32 {
+        let mut number_failures = 0;
+        let mut queue = vec![*id];
+
+        while let Some(id) = queue.pop() {
+            let process = &self.processes[id];
+            if process.status.is_failed() {
+                number_failures += 1;
+            }
+
+            match &self.processes[id].inner {
+                ActingProcessInner::RootTask(_) => {}
+                ActingProcessInner::Task(t) => {
+                    for r in &t.refinements {
+                        if let Some(executed) = r.get_executed() {
+                            queue.push(*executed)
+                        }
+                    }
+                }
+                ActingProcessInner::Method(m) => {
+                    m.childs.values().for_each(|c| queue.push(*c));
+                }
+                _ => {}
+            }
+        }
+
+        number_failures
+    }
+
+    pub fn get_number_retry(&self, id: &ActingProcessId) -> u32 {
+        let mut number_retry = 0;
+        let mut queue = vec![*id];
+
+        while let Some(id) = queue.pop() {
+            match &self.processes[id].inner {
+                ActingProcessInner::RootTask(_) => {}
+                ActingProcessInner::Task(t) => {
+                    number_retry += (t.refinements.len() - 1) as u32;
+
+                    for r in &t.refinements {
+                        if let Some(executed) = r.get_executed() {
+                            queue.push(*executed)
+                        }
+                    }
+                }
+                ActingProcessInner::Method(m) => {
+                    m.childs.values().for_each(|c| queue.push(*c));
+                }
+                _ => {}
+            }
+        }
+
+        number_retry
+    }
+
+    pub fn get_number_refinement(&self, id: &ActingProcessId) -> u32 {
+        let mut number_refinement = 0;
+        let mut queue = vec![*id];
+
+        while let Some(id) = queue.pop() {
+            match &self.processes[id].inner {
+                ActingProcessInner::RootTask(_) => {}
+                ActingProcessInner::Task(t) => {
+                    number_refinement += t.refinements.len() as u32;
+
+                    for r in &t.refinements {
+                        if let Some(executed) = r.get_executed() {
+                            queue.push(*executed)
+                        }
+                    }
+                }
+                ActingProcessInner::Method(m) => {
+                    m.childs.values().for_each(|c| queue.push(*c));
+                }
+                _ => {}
+            }
+        }
+
+        number_refinement
     }
 
     pub fn get_header_stat() -> String {
@@ -2027,6 +1979,174 @@ impl InnerActingManager {
             .expect("could not write to stat file");
         }
         str
+    }
+}
+
+// Display functions
+impl InnerActingManager {
+    fn get_shape(ap: &ActingProcess) -> String {
+        let mut str = "shape=rectangle,".to_string();
+        match ap.status {
+            ProcessStatus::Pending | ProcessStatus::Planned => {
+                write!(str, "fillcolor=\"#ceceff\",")
+            }
+            ProcessStatus::Running(_) | ProcessStatus::Accepted => {
+                write!(str, "fillcolor=\"#ffffce\",")
+            }
+            ProcessStatus::Success => {
+                write!(str, "fillcolor=\"#ceffce\",")
+            }
+            ProcessStatus::Failure | ProcessStatus::Cancelled(_) | ProcessStatus::Rejected => {
+                write!(str, "fillcolor = \"#ffcece\",")
+            }
+        }
+        .unwrap();
+        match ap.inner {
+            ActingProcessInner::RootTask(_) => {
+                write!(
+                    str,
+                    "style=\"rounded, dashed, filled\", fillcolor=\"#cecece\""
+                )
+            }
+            ActingProcessInner::Task(_) => {
+                write!(str, "style=\"rounded, filled, dashed\"")
+            }
+            ActingProcessInner::AbstractModel(_) => {
+                todo!()
+            }
+            ActingProcessInner::Method(_) => {
+                write!(str, "style = \"dashed, filled\", peripheries=2")
+            }
+            ActingProcessInner::Arbitrary(_) => {
+                write!(str, "style=\"filled\"")
+            }
+            ActingProcessInner::Acquire(_) => {
+                write!(str, "style=\"filled\", peripheries=2")
+            }
+            ActingProcessInner::Command(_) => {
+                write!(str, "style=\"rounded, filled\"")
+            }
+        }
+        .unwrap();
+        str
+    }
+
+    pub fn acting_tree_as_dot(&self) -> Dot {
+        let mut dot: Dot = "digraph {\n".to_string();
+        let mut queue = vec![0];
+
+        while let Some(id) = queue.pop() {
+            let ap = &self.processes[id];
+            let shape = Self::get_shape(ap);
+            let label = format_acting_process(&self.acting_vars, ap);
+
+            writeln!(dot, "P{id} [label = \"{label}\", {shape}];").unwrap();
+            match &ap.inner {
+                ActingProcessInner::RootTask(rt) => {
+                    for st in &rt.tasks {
+                        writeln!(dot, "P{id} -> P{st};").unwrap();
+                        queue.push(*st)
+                    }
+                }
+                ActingProcessInner::Task(t) => {
+                    for (_i, r) in t.refinements.iter().enumerate() {
+                        if let Some(executed) = r.get_executed() {
+                            writeln!(dot, "P{id} -> P{};", executed).unwrap();
+                            queue.push(*executed)
+                        } else {
+                            let mut possibilites = r.get_possibilities();
+                            if let Some(s) = r.get_suggested() {
+                                possibilites.retain(|&p| p != s);
+                                writeln!(dot, "P{id} -> P{};", s).unwrap();
+                                queue.push(*s);
+                            }
+
+                            for p in possibilites {
+                                writeln!(dot, "P{id} -> P{};", p).unwrap();
+                                queue.push(*p)
+                            }
+                        }
+                    }
+                }
+                ActingProcessInner::Method(m) | ActingProcessInner::AbstractModel(m) => {
+                    for sub in m.childs.values() {
+                        writeln!(dot, "P{id} -> P{sub};").unwrap();
+                        queue.push(*sub)
+                    }
+                }
+                ActingProcessInner::Arbitrary(_) => {}
+                ActingProcessInner::Acquire(_) => {}
+                ActingProcessInner::Command(_) => {}
+            }
+        }
+
+        dot.push('}');
+        dot
+    }
+
+    pub fn dump_acting_tree(&self, path: Option<PathBuf>) {
+        let path = match path {
+            Some(path) => path,
+            None => {
+                let mut path = Master::get_run_dir();
+                path.push("acting_tree");
+                path
+            }
+        };
+
+        fs::create_dir_all(&path).unwrap();
+
+        let mut path_dot = path.clone();
+        let dot_file_name = "acting_tree.dot";
+        path_dot.push(dot_file_name);
+        let mut file = OpenOptions::new()
+            .truncate(true)
+            .create(true)
+            .open(path_dot)
+            .unwrap();
+        file.write_all(self.acting_tree_as_dot().as_bytes())
+            .unwrap();
+    }
+
+    pub fn format_processes(&self, pf: ProcessFilter) -> String {
+        let mut string = "--- Processes".to_string();
+        match &pf {
+            ProcessFilter {
+                status: Some(status),
+                kind: None,
+            } => {
+                write!(string, "(status = {})", status).unwrap();
+            }
+            ProcessFilter {
+                status: None,
+                kind: Some(kind),
+            } => {
+                write!(string, "(kind = {})", kind).unwrap();
+            }
+            ProcessFilter {
+                status: Some(status),
+                kind: Some(kind),
+            } => {
+                write!(string, "(kind = {}, status = {})", kind, status).unwrap();
+            }
+            _ => {}
+        }
+        string.push_str(" ---");
+        let filtered = self.processes.iter().filter(|p| if let Some(kind) = pf.kind {
+            p.get_inner().kind() == kind
+        } else {
+            true
+        } && if let Some(status) = pf.status {
+            p.status == status
+        } else {
+            true
+        });
+
+        for process in filtered {
+            writeln!(string, "- {}", process.format(&self.acting_vars)).unwrap();
+        }
+
+        string
     }
 }
 

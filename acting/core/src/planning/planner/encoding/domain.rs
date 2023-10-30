@@ -703,14 +703,16 @@ pub fn read_chronicle(
             EffectOperationInner::Assign => EffectOp::Assign(value),
             EffectOperationInner::Increase => {
                 if let Atom::Int(iatom) = value {
-                    EffectOp::Increase(iatom)
+                    let sum = LinearSum::from(iatom);
+                    EffectOp::Increase(sum)
                 } else {
                     panic!("Increase support only integer variable.");
                 }
             }
             EffectOperationInner::Decrease => {
                 if let Atom::Int(iatom) = value {
-                    EffectOp::Decrease(iatom)
+                    let sum = -LinearSum::from(iatom);
+                    EffectOp::Increase(sum)
                 } else {
                     panic!("Decrease support only integer variable.");
                 }

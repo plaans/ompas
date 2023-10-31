@@ -235,7 +235,7 @@ impl ActingModel {
         chronicle.add_condition(condition)
     }
 
-    pub fn add_new_task(&mut self, mut task: NewTask) -> TaskRef {
+    pub fn add_new_task(&mut self, mut task: NewTask, label: Label) -> TaskRef {
         let chronicle = self.chronicle.as_mut().unwrap();
 
         let st = chronicle.st.clone();
@@ -255,9 +255,6 @@ impl ActingModel {
         st.set_domain(&st.get_domain_id(&result), Domain::nil());
 
         let name: Vec<VarId> = task.args.drain(..).map(|cst| st.new_cst(cst)).collect();
-
-        let n_subtask = chronicle.get_subtasks().len();
-        let label = Label::Task(n_subtask);
 
         let subtask = SubTask {
             interval,

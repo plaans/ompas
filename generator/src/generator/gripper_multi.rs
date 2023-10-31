@@ -1,6 +1,6 @@
 use crate::config::{GetElement, Recipe};
 use crate::generator::gripper::GripperTask::Place;
-use crate::generator::gripper::{GripperConfig, GripperTask, Room, BALL, POS, ROOM};
+use crate::generator::gripper::{GripperConfig, GripperTask, Room, BALL, POS, ROOM, LEFT, RIGHT, CARRY, EMPTY};
 use crate::generator::gripper_door::{Door, GripperDoorConfig, CONNECTS, DOOR, OPENED};
 use crate::generator::gripper_multi::Object::{Ball, Robot};
 use crate::generator::{populate_topology, write_dot_to_file};
@@ -190,7 +190,12 @@ impl Problem for GripperMultiProblem {
             for o in &node.contains {
                 let label: LValue = o.to_string().into();
                 match o {
-                    Robot(_) => facts.push((list![AT_ROB.into(), label], room_lv.clone())),
+                    Robot(_) => {
+                        facts.push((list![AT_ROB.into(), label.clone()], room_lv.clone()));
+                        facts.push((list![CARRY.into(), label.clone(), LEFT.into()], EMPTY.into()));
+                        facts.push((list![CARRY.into(), label.clone(), RIGHT.into()], EMPTY.into()));
+
+                    },
                     _ => facts.push((list!(POS.into(), label), room_lv.clone())),
                 }
             }

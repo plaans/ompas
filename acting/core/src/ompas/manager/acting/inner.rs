@@ -621,10 +621,14 @@ impl InnerActingManager {
     //New processes
     pub fn new_high_level_task(&mut self, debug: String, mut args: Vec<Cst>) -> ProcessRef {
         let id = self.processes.len();
+        let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
+        let rank = root.add_top_level_task(id);
+
+        let label = Label::Task(rank);
         let task_ref = self.models[0].add_new_task(NewTask {
             start: None,
             args: args.clone(),
-        });
+        }, label);
 
         let start = self.new_acting_var_with_ref(&task_ref.start, &0);
         let end = self.new_acting_var_with_ref(&task_ref.end, &0);
@@ -637,10 +641,7 @@ impl InnerActingManager {
             new_args.push(arg)
         }
 
-        let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
-        let rank = root.add_top_level_task(id);
 
-        let label = Label::Task(rank);
         self.processes.push(ActingProcess::new(
             id,
             0,
@@ -658,11 +659,16 @@ impl InnerActingManager {
     }
 
     pub fn new_high_level_command(&mut self, debug: String, mut args: Vec<Cst>) -> ProcessRef {
+
         let id = self.processes.len();
+        let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
+        let rank = root.add_top_level_command(id);
+
+        let label = Label::Command(rank);
         let task_ref = self.models[0].add_new_task(NewTask {
             start: None,
             args: args.clone(),
-        });
+        },label);
 
         let start = self.new_acting_var_with_ref(&task_ref.start, &0);
         let end = self.new_acting_var_with_ref(&task_ref.end, &0);
@@ -675,10 +681,7 @@ impl InnerActingManager {
             new_args.push(arg)
         }
 
-        let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
-        let rank = root.add_top_level_command(id);
 
-        let label = Label::Command(rank);
         self.processes.push(ActingProcess::new(
             id,
             0,

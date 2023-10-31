@@ -929,7 +929,7 @@ pub async fn wait_end_all(env: &LEnv, args:&[LValue]) -> Result<(), LRuntimeErro
                 if sub.borrow().is_terminated() {
                     break 'loop_sub;
                 }
-                sub.changed().await;
+                let _= sub.changed().await;
             }
         }
     });

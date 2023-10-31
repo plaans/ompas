@@ -3,7 +3,7 @@ use crate::model::acting_domain::model::{ActingModel, Event, Goal, NewTask};
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
 use crate::model::chronicle::Chronicle;
-use crate::model::process_ref::{MethodLabel, ProcessRef, RefinementLabel};
+use crate::model::process_ref::{Label, MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
@@ -36,13 +36,13 @@ pub struct ChronicleInstance {
 
 pub fn new_problem_chronicle_instance(
     st: &RefSymTable,
-    tasks: Vec<NewTask>,
+    mut tasks: Vec<NewTask>,
     goals: Vec<Goal>,
     events: Vec<Event>,
 ) -> ChronicleInstance {
     let mut am = ActingModel::root(st);
-    for task in tasks {
-        am.add_new_task(task);
+    for (i, task) in tasks.drain(..).enumerate() {
+        am.add_new_task(task, Label::Task(i));
     }
     for goal in goals {
         am.add_goal(goal);

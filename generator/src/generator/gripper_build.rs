@@ -1,5 +1,5 @@
 use crate::config::{GetElement, Recipe};
-use crate::generator::gripper::{GripperConfig, GripperTask, Room, BALL, POS, ROOM};
+use crate::generator::gripper::{GripperConfig, GripperTask, Room, BALL, POS, ROOM, CARRY, LEFT, RIGHT, EMPTY};
 use crate::generator::gripper_build::ToyPart::{Head, LeftArm, LeftLeg, RightArm, RightLeg, Torso};
 use crate::generator::gripper_door::{Door, GripperDoorConfig, CONNECTS, DOOR, OPENED};
 use crate::generator::gripper_multi::{GripperMultiConfig, AT_ROB};
@@ -363,7 +363,9 @@ impl Problem for GripperBuildProblem {
                 let label: LValue = o.to_string().into();
                 match o {
                     Object::OtherObject(OtherObject::Robot(_)) => {
-                        facts.push((list![AT_ROB.into(), label], room_lv.clone()))
+                        facts.push((list![AT_ROB.into(), label.clone()], room_lv.clone()));
+                        facts.push((list![CARRY.into(), label.clone(), LEFT.into()], EMPTY.into()));
+                        facts.push((list![CARRY.into(), label, RIGHT.into()], EMPTY.into()));
                     }
                     other => {
                         if let Object::Toy(t) = other {

@@ -21,6 +21,6 @@
 
     (wait-task (exec-task t_jobshop))
     (sleep 2)
-    (export-report)
+    (export-report gobot-sim.jobshop)
     (exit 0)
 )

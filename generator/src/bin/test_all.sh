@@ -1,1 +1,1 @@
-cargo run --bin generator -- -c config/gripper_all.yml
+cargo run --bin generator -- -c config/all.yml

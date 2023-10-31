@@ -28,6 +28,10 @@ impl ProcessStatus {
     pub fn is_failed(&self) -> bool {
         matches!(self, Self::Failure | Self::Rejected | Self::Cancelled(_))
     }
+
+    pub fn is_terminated(&self) -> bool {
+        matches!(self, Self::Success) || self.is_failed()
+    }
 }
 
 impl Display for ProcessStatus {

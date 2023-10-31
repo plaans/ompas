@@ -281,8 +281,8 @@ impl Problem for GripperBuildProblem {
             .collect();
         available.append(&mut (0..n_toy).map(GripperBuildTask::BuildToy).collect());
         available.shuffle(rg);
-        pb.tasks = available.split_off(n_task as usize);
-
+        let _ = available.split_off(n_task as usize);
+        pb.tasks = available;
         Ok(pb)
     }
 

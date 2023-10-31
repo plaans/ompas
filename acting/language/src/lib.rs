@@ -980,6 +980,9 @@ pub mod monitor {
         pub const EXPORT_REPORT: &str = "export-report";
         pub const DOC_EXPORT_REPORT: &str =
             "Exports the acting tree and the state of the current run.";
+
+        pub const WAIT_END_ALL: &str= "wait-end-all";
+        pub const DOC_WAIT_END_ALL: &str= "Wait that all current high-level tasks are terminated.";
     }
 }
 

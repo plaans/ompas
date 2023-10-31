@@ -12,7 +12,7 @@ pub struct ActingProcessStat {
     pub label: String,
     pub status: ProcessStatus,
     pub start: Timepoint,
-    pub end: Timepoint,
+    pub duration: Duration,
     pub deliberation_time: Duration,
     pub n_refinement: u32,
     pub n_failure: u32,

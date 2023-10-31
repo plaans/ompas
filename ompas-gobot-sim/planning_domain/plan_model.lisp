@@ -100,10 +100,14 @@
                                    ))
                                (package.all_processes ?p)))
                             (define last_task
-                                 `(begin
+                                 `(do
                                      (define ?r (arbitrary (instances robot)))
                                      (define h_r (acquire ?r))
-                                     (t_carry_to_machine ?r ,?p ,(find_output_machine))))
+                                     (define om ,(find_output_machine))
+                                     (t_carry_to_machine ?r ,?p om)
+                                     (release h_r)
+                                     ;(wait-for (!= (package.location ,?p) om))
+                                    ))
                             (define tasks (append tasks (list last_task)))
                             `(apply seq ',tasks)))
                         (instances package)))

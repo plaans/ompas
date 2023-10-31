@@ -134,7 +134,8 @@ impl Problem for GripperMultiProblem {
             .map(|id| Place(id, (0..n_room).choose(rg).unwrap()))
             .collect();
         available.shuffle(rg);
-        pb.tasks = available.split_off(n_task as usize);
+        let _ = available.split_off(n_task as usize);
+        pb.tasks = available;
         Ok(pb)
     }
 

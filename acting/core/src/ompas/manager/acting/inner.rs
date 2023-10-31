@@ -1134,7 +1134,7 @@ impl InnerActingManager {
         match &p.status_update {
             Some(update) => update.subscribe(),
             None => {
-                let (tx, rx) = watch::channel(ProcessStatus::Pending);
+                let (tx, rx) = watch::channel(p.status);
                 p.status_update = Some(tx);
                 rx
             }
@@ -1783,7 +1783,7 @@ impl InnerActingManager {
             label: process.debug().clone().unwrap(),
             status: process.status,
             start: self.get_acting_var_val(&process.start).unwrap(),
-            end: self.get_acting_var_val(&process.end).unwrap(),
+            duration: self.get_execution_time(id),
             deliberation_time: self.get_deliberation_time(id),
             n_refinement: self.get_number_refinement(id),
             n_failure: self.get_number_failures(id),

@@ -566,4 +566,8 @@ impl ActingManager {
     pub async fn acting_tree_as_dot(&self) -> Dot {
         self.inner.read().await.acting_tree_as_dot()
     }
+
+    pub async fn get_all_high_level_tasks(&self) -> Vec<ActingProcessId> {
+        self.inner.read().await.processes[0].inner.as_root().unwrap().tasks.clone()
+    }
 }

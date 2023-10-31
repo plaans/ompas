@@ -200,6 +200,7 @@ impl From<ModControl> for LModule {
         );
 
         module.add_async_fn(EXPORT_REPORT, export_report, DOC_EXPORT_REPORT, false);
+        module.add_async_fn(WAIT_END_ALL, wait_end_all, DOC_WAIT_END_ALL, false);
 
         // Macros
         module.add_macro(DEBUG_OMPAS, MACRO_DEBUG_OMPAS, DOC_DEBUG_OMPAS);
@@ -526,6 +527,7 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
     let select_mode = match m.as_str() {
+        RANDOM => SelectMode::Random,
         GREEDY => SelectMode::Greedy,
         PLANNING | ARIES => SelectMode::Planning(Planner::Aries(false)),
         ARIES_OPT => SelectMode::Planning(Planner::Aries(true)),
@@ -538,8 +540,8 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
             return Err(lruntimeerror!(
                 SET_SELECT,
                 format!(
-                    "Select mode is either {}, {}, {} or {}.",
-                    GREEDY, PLANNING, HEURISTIC, LEARNING
+                    "Select mode is either {}, {}, {}, {} or {}.",
+                    GREEDY, RANDOM, PLANNING, HEURISTIC, LEARNING
                 )
             ))
         }
@@ -843,17 +845,32 @@ pub async fn stop_acting_tree_display(env: &LEnv) -> Result<(), LRuntimeError> {
 }
 
 #[async_scheme_fn]
-pub async fn export_report(env: &LEnv) -> Result<(), LRuntimeError> {
+pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let acting_manager = &env.get_context::<ModControl>(MOD_CONTROL)?.acting_manager;
+
     let mut run_dir = Master::get_run_dir();
     run_dir.push("report");
     fs::create_dir_all(run_dir.clone()).unwrap();
 
+    let mut file_name = None;
+    if args.len() == 1 {
+        let arg: String = (&args[0])
+            .try_into()
+            .map_err(|e: LRuntimeError| e.chain("Expected a file_name"))?;
+
+        file_name = Some(arg.replace("(", "").replace(")", "").replace(" ", "."));
+    }
+
     let acting_tree = acting_manager.acting_tree_as_dot().await;
-    let stats = acting_manager.get_run_stat().await;
 
     let mut acting_tree_file_path = run_dir.clone();
-    acting_tree_file_path.push("acting_tree.dot");
+    acting_tree_file_path.push(format!(
+        "{}.dot",
+        match &file_name {
+            Some(f) => f.as_str(),
+            None => "acting_tree",
+        }
+    ));
     let mut acting_tree_file = OpenOptions::new()
         .truncate(true)
         .write(true)
@@ -862,8 +879,16 @@ pub async fn export_report(env: &LEnv) -> Result<(), LRuntimeError> {
         .unwrap();
     acting_tree_file.write_all(acting_tree.as_bytes()).unwrap();
 
+    let stats = acting_manager.get_run_stat().await;
+
     let mut stats_file_path = run_dir.clone();
-    stats_file_path.push("stats.json");
+    stats_file_path.push(format!(
+        "{}.json",
+        match &file_name {
+            Some(f) => f.as_str(),
+            None => "stats",
+        }
+    ));
     let mut stats_file = OpenOptions::new()
         .truncate(true)
         .write(true)
@@ -876,3 +901,56 @@ pub async fn export_report(env: &LEnv) -> Result<(), LRuntimeError> {
 
     Ok(())
 }
+
+#[async_scheme_fn]
+pub async fn wait_end_all(env: &LEnv, args:&[LValue]) -> Result<(), LRuntimeError> {
+    let timeout: Option<i64> = if args.len() == 1 {
+        Some(args[0].clone().try_into()?)
+    }else {
+        None
+    };
+
+
+    let acting_manager = &env.get_context::<ModControl>(MOD_CONTROL)?
+        .acting_manager;
+
+    let high_level_tasks = acting_manager.get_all_high_level_tasks().await;
+
+    let mut subscriber: Vec<_ > = vec![];
+
+    for task in high_level_tasks {
+        subscriber.push(acting_manager.subscribe(&task).await);
+    }
+
+    let waiter = tokio::spawn(async move {
+        for mut sub in subscriber {
+
+            'loop_sub: loop {
+                if sub.borrow().is_terminated() {
+                    break 'loop_sub;
+                }
+                sub.changed().await;
+            }
+        }
+    });
+
+    match timeout {
+        None => {
+            let _ = waiter.await;
+        }
+        Some(timeout) => {
+            tokio::select! {
+                _ = waiter => {
+
+                }
+                _ = tokio::time::sleep(Duration::from_secs(timeout as u64)) => {
+
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+

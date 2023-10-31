@@ -1,33 +1,54 @@
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
+use ompas_benchmark::config::job_config::{
+    ContinuousPlanningConfig, HeuristicConfig, JobConfig, SelectConfig,
+};
 use ompas_benchmark::config::BenchConfig;
 use ompas_benchmark::{install_binary, send_email, BenchmarkData, RunData};
+use ompas_core::OMPAS_PATH;
+use ompas_middleware::OMPAS_WORKING_DIR;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::fs;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime};
 use structopt::StructOpt;
-use yaml_rust::YamlLoader;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "OMPAS", about = "An acting engine based on RAE.")]
+#[structopt(name = "bench", about = "Program that benchmarks the OMPAS system.")]
 pub struct Opt {
-    //Number of greedy that will be runned as greedy choose randomly on a set of equal scored methods
     #[structopt(short = "c", long = "config")]
     config: PathBuf,
 }
 
+pub fn benchmark_working_dir() -> PathBuf {
+    let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    path.push("benchmark");
+    fs::create_dir_all(&path).unwrap();
+    path
+}
+
+pub struct RunConfig {
+    label: String,
+    start: String,
+    path: PathBuf,
+}
+
+#[derive(Clone)]
+pub struct Problem {
+    label: String,
+    path: PathBuf,
+}
+
 fn main() {
     let opt: Opt = Opt::from_args();
-    let config =
+    let str =
         fs::read_to_string(&opt.config).expect("Something went wrong reading the config file");
-    let configs = YamlLoader::load_from_str(&config).unwrap();
-    let config = &configs[0];
-    let config: BenchConfig = config.try_into().expect("could not read config");
+    let config: BenchConfig = serde_yaml::from_str(&str).expect("Could not parse yaml config");
 
     let mut benchmark_data = BenchmarkData::default();
     let bar = ProgressBar::new(0);
@@ -39,111 +60,256 @@ fn main() {
         .progress_chars("##-"),
     );
 
-    bar.println("GOBOT-SIM+OMPAS BENCHMARK v0.2");
-    //Installation of the last version of benchmark
-    install_binary(config.get_bin_name(), config.bin_path.clone());
+    bar.println("ompas-benchmark");
+    {
+        bar.println("Installing OMPAS binary...");
+        let mut path: PathBuf = OMPAS_PATH.get_ref().into();
+        path.push("acting");
+        path.push("apps");
+        install_binary("ompas".to_string(), path);
+        bar.println("OMPAS installed !");
+    }
 
-    bar.println("Benchmark installed !");
+    bar.println(format!("{} jobs to benchmark.", config.jobs.len()));
+    'loop_job: for JobConfig {
+        domain,
+        problem_config,
+        heuristics,
+        timeout,
+        n_run,
+    } in &config.jobs
+    {
 
-    //let time = opt.time.unwrap_or(DEFAULT_TIME);
+        let mut job_dir =  benchmark_working_dir();
+        job_dir.push(&domain.label);
 
-    //println!("Benchmark for domain: {}", domain.to_str().unwrap());
-    let domain_path: &PathBuf = &config.domain_path;
-    let mut problems = vec![];
-    if config.problems.is_empty() {
+        bar.println(format!("Benchmarking {} ", domain.label));
+        if let Some(binary) = &domain.binary {
+            bar.println("Specific ompas binary to install...");
+            install_binary(&binary.label, binary.path.clone());
+            bar.println("Binary installed !");
+        }
+
+        // Getting all the problem files
+        let problem_dir_path = problem_config.problem_dir_path.clone();
         bar.println("Searching for problem files...");
-        let mut problem_path = domain_path.clone();
-        problem_path.push("problems");
-        let paths = fs::read_dir(problem_path).expect("directory of domain not found...");
-        for path in paths {
-            problems.push(path.unwrap().path())
+        let mut problems = get_all_problems_files(&problem_dir_path);
+        if let Some(specific_problems) = &problem_config.specific_problems {
+            bar.println("Getting specific problems");
+            let mut filtered = vec![];
+            for problem in specific_problems {
+                match problems.iter().find(|p| &p.label == problem) {
+                    Some(p) => filtered.push(p.clone()),
+                    None => bar.println(format!("Could not find problem {}", problem)),
+                }
+            }
+            problems = filtered
         }
-    } else {
-        problems = config.problems.clone();
-        let mut problem_path = domain_path.clone();
-        problem_path.push("problems");
-        for p in &mut problems {
-            //println!("problem: {:#?}", p);
-            //println!("parent:{:#?}", p.parent());
-            if p.parent().unwrap().parent().is_none() {
-                println!("gonna transform into a complete path");
-                let mut new_path = problem_path.clone();
-                new_path.push(p.clone());
-                *p = new_path;
+
+        if problems.is_empty() {
+            continue 'loop_job;
+        } else {
+            bar.println(format!("Found following problems for job {}", domain.label));
+            for p in &problems {
+                bar.println(format!("- {}", p.path.display()));
+            }
+        }
+
+        //Generate lisp code for all possible configs
+        bar.println("Generating files for heuristics...");
+        let mut configs: Vec<RunConfig> = vec![];
+        let mut run_config_path = job_dir.clone();
+        run_config_path.push("run_config");
+        fs::create_dir_all(&run_config_path).unwrap();
+        for heuristic in heuristics {
+            let (label, code, start) = generate_config(heuristic, &domain.domain_path);
+            //Store in file
+            let mut config_path = run_config_path.clone();
+            config_path.push(format!("{}.lisp", label));
+            let mut file = OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(config_path.clone())
+                .unwrap();
+            file.write_all(code.as_bytes()).unwrap();
+
+            //Store file name in run_configs
+            configs.push(RunConfig {
+                label,
+                start,
+                path: config_path,
+            })
+        }
+        bar.println("Done!");
+
+        let n_problem = configs.len() * problems.len() * (*n_run as usize);
+        bar.println(format!("{} run to do...", n_problem));
+        bar.enable_steady_tick(Duration::from_secs(1));
+        bar.reset();
+        bar.set_length(n_problem.try_into().unwrap());
+
+        let mut first = true;
+        let mut i = 1;
+        let mut problems_path = job_dir.clone();
+        problems_path.push("problems");
+        fs::create_dir_all(&problems_path).unwrap();
+
+        for problem in &problems {
+            let problem_path = problem.path.to_str().unwrap();
+            for config in &configs {
+                let config_path = config.path.to_str().unwrap();
+
+                let mut problem_config_path: PathBuf = problems_path.clone();
+                let problem_config_name = format!("{}_{}", problem.label, config.label);
+                problem_config_path.push(format!("{}.lisp", problem_config_name));
+                let mut file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(problem_config_path.clone())
+                    .unwrap();
+                let content = format!(
+"(begin\
+    (read \"{}\")
+    (read \"{}\")
+    {}
+    (sleep 1)
+    (wait-end-all {})
+    (export-report {})
+    (exit 0))",
+                    config_path, problem_path, config.start, timeout, problem_config_name,
+                );
+                file.write_all(content.as_bytes()).unwrap();
+
+                let config_path = problem_config_path.to_str().unwrap();
+
+                for _ in 0..*n_run {
+                    let start = SystemTime::now();
+                    if !first {
+                        std::thread::sleep(Duration::from_secs(5));
+                    } else {
+                        first = false
+                    }
+                    let mut command = Command::new("timeout");
+                    command.arg((*timeout+10).to_string());
+                    command.arg(domain.get_binary());
+                    command.args(["-d", config_path]);
+                    //command.args(["-t", format!("{}", config.max_time).as_str()]);
+                    let f1 = File::create("benchmark.log").expect("couldn't create file");
+                    let f2 = File::create("benchmark.log").expect("couldn't create file");
+                    command
+                        .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
+                        .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) });
+
+                    if let Ok(mut c) = command.spawn() {
+                        bar.println(format!(
+                            "[{} {}]: problem = {}, config = {}",
+                            "run".bold().green(),
+                            i,
+                            problem_path,
+                            config_path,
+                        ));
+                        let _r = c.wait();
+                    } else {
+                        panic!("panic");
+                    }
+                    let run = RunData {
+                        duration: start.elapsed().unwrap(),
+                    };
+                    benchmark_data.runs.push(run);
+                    bar.inc(1);
+                    i += 1;
+                }
             }
         }
     }
-    if problems.is_empty() {
-        bar.println("No problem found...");
-    } else {
-        bar.println("Problems found:");
-        for p in &problems {
-            bar.println(format!("- {}", p.to_str().unwrap()));
-        }
-    }
 
-    let mut first = true;
-
-    let specific = config.get_specific();
-    let number: usize = config.number as usize;
-    let n_problem = specific.len() * problems.len() * number;
-    bar.enable_steady_tick(Duration::from_secs(1));
-    bar.reset();
-    bar.set_length(n_problem.try_into().unwrap());
-
-    for problem in problems {
-        let mut runs = vec![];
-        for spec in &specific {
-            runs.append(&mut vec![spec; number]);
-        }
-
-        for select in runs {
-            let start = SystemTime::now();
-            if !first {
-                std::thread::sleep(Duration::from_secs(5));
-            } else {
-                first = false
-            }
-            let mut command = Command::new(config.get_bin_name());
-            command.args([
-                "-d",
-                domain_path.to_str().unwrap(),
-                "-p",
-                problem.to_str().unwrap(),
-            ]);
-            command.args(["-t", format!("{}", config.max_time).as_str()]);
-            let f1 = File::create("benchmark.log").expect("couldn't create file");
-            let f2 = File::create("benchmark.log").expect("couldn't create file");
-            command
-                .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
-                .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) });
-            if !select.is_empty() {
-                command.args(select);
-            }
-
-            //println!("{:?}", command);
-            if let Ok(mut c) = command.spawn() {
-                bar.println(format!(
-                    "{} {} {}, config: {:#?}",
-                    "[benchmark]".bold().green(),
-                    config.get_bin_name(),
-                    problem.file_name().unwrap().to_str().unwrap(),
-                    select
-                ));
-                let _r = c.wait();
-            } else {
-                panic!("panic");
-            }
-            let run = RunData {
-                duration: start.elapsed().unwrap(),
-            };
-            benchmark_data.runs.push(run);
-            bar.inc(1);
-        }
-    }
     bar.finish();
+
     send_email(
         &config.mail,
-        benchmark_data.format_data("GOBOT-SIM BENCHMARK".to_string()),
+        benchmark_data.format_data("ompas-bench".to_string()),
     )
+}
+
+fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, String, String) {
+    let select = match heuristic.select {
+        SelectConfig::Greedy => "greedy",
+        SelectConfig::Random => "random",
+        SelectConfig::UPOM => "upom",
+    };
+
+    let mut config_name = select.to_string();
+
+    let start = match heuristic.continuous_planning {
+        ContinuousPlanningConfig::No => {
+            config_name.push_str("_reactive");
+            "(start)"
+        }
+        ContinuousPlanningConfig::Satisfactory => {
+            config_name.push_str("_satisfactory");
+
+            "(start-with-planner false)"
+        }
+        ContinuousPlanningConfig::Optimality => {
+            config_name.push_str("_optimality");
+            "(start-with-planner true)"
+        }
+    };
+
+    let domain = match &heuristic.specific_domain {
+        None => domain.canonicalize().unwrap().to_str().unwrap().to_string(),
+        Some(s) => {
+            config_name.push_str(s.label.as_str());
+            s.domain
+                .canonicalize()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string()
+        }
+    };
+
+    (
+        config_name,
+        format!(
+            "(begin\
+    \
+        (read \"{}\") ; loading domain
+        (set-select {})
+    )",
+            domain, select,
+        ),
+        start.to_string()
+    )
+}
+
+fn get_all_problems_files(path: &Path) -> Vec<Problem> {
+    let mut problem_files = vec![];
+
+    let mut queue = vec![path.to_path_buf()];
+
+    while let Some(path) = queue.pop() {
+        let path = path.canonicalize().unwrap();
+        let dir = fs::read_dir(path).unwrap();
+
+        for entry in dir {
+            let entry = entry.unwrap();
+
+            let path = entry.path();
+            if path.is_dir() {
+                queue.push(path);
+            } else if path.is_file() {
+                let file_name = path.file_name().unwrap().to_str().unwrap();
+                if file_name.contains(".lisp") {
+                    problem_files.push(Problem {
+                        label: file_name.to_string(),
+                        path,
+                    });
+                }
+            }
+        }
+    }
+    problem_files
 }

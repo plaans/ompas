@@ -93,6 +93,8 @@ impl From<ModModel> for LModule {
             DOC_GENERATE_TEST_TYPE_EXPR,
             false,
         );
+
+        //Add functions
         module.add_async_fn(
             ADD_STATE_FUNCTION,
             add_state_function,
@@ -125,6 +127,8 @@ impl From<ModModel> for LModule {
         module.add_async_fn(ADD_OBJECTS, add_objects, DOC_ADD_OBJECTS, false);
         module.add_async_fn(ADD_RESOURCE, add_resource, DOC_ADD_RESOURCE, false);
         module.add_async_fn(ADD_RESOURCES, add_resources, DOC_ADD_RESOURCES, false);
+        module.add_async_fn(ADD_INIT, add_init, DOC_ADD_INIT, false);
+        // Remove functions
         module.add_async_fn(REMOVE_COMMAND, remove_command, DOC_REMOVE_COMMAND, false);
         module.add_async_fn(
             REMOVE_STATE_FUNCTION,
@@ -169,6 +173,7 @@ impl From<ModModel> for LModule {
         );
 
         module.add_macro(DEF_ENV, MACRO_DEF_ENV, (DOC_DEF_ENV, DOC_DEF_ENV_VERBOSE));
+        module.add_macro(DEF_INIT, MACRO_DEF_INIT, (DOC_DEF_INIT, DOC_DEF_INIT_VERBOSE));
 
         module.add_macro(OM_MODEL, MACRO_OM_MODEL, DOC_OM_MODEL);
         module.add_macro(
@@ -964,6 +969,13 @@ pub async fn add_resources(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
         }
     }
 
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn add_init(env: &LEnv, body: LValue) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
+    ctx.domain.add_init(body).await;
     Ok(())
 }
 

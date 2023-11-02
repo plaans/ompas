@@ -35,6 +35,7 @@ pub struct OMPASDomain {
     pub lambdas: HashMap<String, LValue>,
     pub map_symbol_type: HashMap<String, String>,
     pub env: LEnvSymbols,
+    pub init: LValue,
 }
 
 impl OMPASDomain {
@@ -226,6 +227,14 @@ impl OMPASDomain {
 
     pub fn add_env(&mut self, label: String, value: LValue) {
         self.env.insert(label, value);
+    }
+
+    pub fn add_init(&mut self, body: LValue) {
+        self.init = body;
+    }
+
+    pub fn get_init(&self) -> &LValue {
+        &self.init
     }
 
     //List of symbols

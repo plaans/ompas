@@ -579,9 +579,6 @@ pub mod monitor {
         pub const DOC_ADD_STATIC_FACTS: &str =
             "Add a list of facts to the static inner state of the system.";
 
-        /*pub const ADD_CONSTANT: &str = "add-constant";
-        pub const DOC_ADD_CONSTANT: &str = "Add a new constant in the list of instance.";*/
-
         pub const ADD_TYPE: &str = "add-type";
         pub const DOC_ADD_TYPE: &str = "Add a new type to the domain.";
 
@@ -599,6 +596,9 @@ pub mod monitor {
 
         pub const ADD_RESOURCES: &str = "add-resources";
         pub const DOC_ADD_RESOURCES: &str = "Declare a list of new resources";
+
+        pub const ADD_INIT: &str= "add-init";
+        pub const DOC_ADD_INIT: &str= "Defines a program that should be executed at the launch of ompas.";
 
         pub const REMOVE_COMMAND: &str = "remove-command";
         pub const DOC_REMOVE_COMMAND: &str = "Removes command from the domain definition.";
@@ -726,6 +726,12 @@ pub mod monitor {
         pub const DOC_DEF_ENV_VERBOSE: &str = "Example: (def-env x 2)";
         pub const MACRO_DEF_ENV: &str = "(lambda (label value)
             `(add-lambda ',label ',value))";
+
+        pub const DEF_INIT: &str ="def-init";
+        pub const DOC_DEF_INIT: &str= "Wrapper around add-init";
+        pub const DOC_DEF_INIT_VERBOSE: &str= "Example: (def-init (sleep 1))";
+        pub const MACRO_DEF_INIT: &str = "(lambda (body)
+            `(add-init ',body ))";
 
         pub const OM_MODEL: &str = "om-model";
         pub const DOC_OM_MODEL: &str =

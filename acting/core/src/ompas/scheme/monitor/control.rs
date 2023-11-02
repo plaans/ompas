@@ -210,68 +210,17 @@ impl From<ModControl> for LModule {
     }
 }
 
-/// Launch main loop of rae in an other asynchronous task.
-#[async_scheme_fn]
-pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
-    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let acting_manager = ctx.acting_manager.clone();
-    //acting_manager.clock_manager.reset().await;
 
-    let pendings = ctx.jobs.move_pendings().await;
-
-    let (tx, rx) = mpsc::unbounded_channel();
-
-    *ctx.task_stream.write().await = Some(tx);
-
-    let start_result: String = ctx.platform.start(Default::default()).await?;
-
-    let env = ctx.get_exec_env().await;
-    let log = ctx.log.clone();
-
-    let receiver_event_update_state = acting_manager
-        .state_manager
-        .new_subscriber(StateRule::All)
-        .await;
-    let env_clone = env.clone();
-    let monitors = acting_manager.monitor_manager.clone();
-    tokio::spawn(async move {
-        task_check_wait_for(receiver_event_update_state, monitors, env_clone).await
-    });
-
-    tokio::spawn(async move {
-        rae(acting_manager, log, env, rx).await;
-    });
-
-    let sender = ctx.get_sender().await.unwrap();
-
-    for PendingJob { id, r#type, lvalue } in pendings {
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let job = Job::new(tx, r#type, lvalue);
-        let sender = sender.clone();
-        tokio::spawn(async move {
-            sender.send(job.into()).expect("could not send job to rae");
-        });
-        let trigger: Response = rx.recv().await.unwrap()?;
-        if let Response::Process(process) = trigger {
-            ctx.jobs.set_task_process(&id, process).await;
-        } else {
-            unreachable!("{EXEC_TASK} should receive a TaskProcess")
-        }
-    }
-
-    Ok(format!("OMPAS launched successfully: {}", start_result))
-}
-
-/// Launch main loop of rae in an other asynchronous task.
-#[async_scheme_fn]
-pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntimeError> {
+async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let plan_env: LEnv = ctx.get_plan_env().await;
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let acting_manager = ctx.acting_manager.clone();
-    acting_manager
-        .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
-        .await;
+    if let Some(opt) = planner {
+        acting_manager
+            .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
+            .await;
+    }
     let pendings = ctx.jobs.move_pendings().await;
 
     let (tx, rx) = mpsc::unbounded_channel();
@@ -282,6 +231,8 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
 
     let env = ctx.get_exec_env().await;
     let log = ctx.log.clone();
+    let log_2 = log.clone();
+    let acting_manager_2 = acting_manager.clone();
 
     let receiver_event_update_state = acting_manager
         .state_manager
@@ -294,12 +245,32 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
     });
 
     tokio::spawn(async move {
-        rae(acting_manager, log, env, rx).await;
+        rae(acting_manager_2, log_2, env, rx).await;
     });
 
+    log.info(format!("Started OMPAS with config {}", match planner {
+        None => "reactive",
+        Some(false) => "planner = satisfactory",
+        Some(true) => "planner = optimality",
+    }));
     let sender = ctx.get_sender().await.unwrap();
 
+
+    {
+        let init = acting_manager.domain_manager.get_init().await;
+        log.info(format!("Evaluating init: {}", init));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sender.send(Job::new_init(tx, init).into()).expect("could not send job to rae");
+        if let Response::Handle(handle) = rx.recv().await.unwrap()? {
+            let _ = handle.get_future().await;
+        }else {
+            unreachable!("OMPAS's response to init should be a future");
+        }
+    }
+
+
     for PendingJob { id, r#type, lvalue } in pendings {
+        log.info(format!("Sending pending job {}", lvalue));
         let (tx, mut rx) = mpsc::unbounded_channel();
         let job = Job::new(tx, r#type, lvalue);
         let sender = sender.clone();
@@ -315,6 +286,19 @@ pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntim
     }
 
     Ok(format!("OMPAS launched successfully. {}", start_result))
+}
+
+/// Launch main loop of rae in an other asynchronous task.
+#[async_scheme_fn]
+pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
+    _start(env, None).await
+}
+
+
+/// Launch main loop of rae in an other asynchronous task.
+#[async_scheme_fn]
+pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntimeError> {
+    _start(env, Some(opt)).await
 }
 
 #[async_scheme_fn]

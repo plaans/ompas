@@ -29,4 +29,8 @@
                 (define rh (acquire r_building))
                 (go2 r_building ?r)
                 (assemble r_building ?t))))
+
+    (def-init (begin
+        (mapf (lambda (?r) (new-resource ?r)) (instances robot))
+    ))
 )

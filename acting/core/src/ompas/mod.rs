@@ -93,6 +93,9 @@ pub async fn rae(
                             JobType::Debug => {
                                 log.debug(format!("new triggered debug: {}", job_expr));
                             },
+                            JobType::Init => {
+                                log.debug(format!("Received init to evaluate: {}", job_expr));
+                            }
                             JobType::Command => {
                                 let vec: Vec<LValue> = job_lvalue.clone().try_into().unwrap();
                                 let mut vec_cst = vec![];
@@ -144,7 +147,7 @@ pub async fn rae(
                             JobType::Task | JobType::Command => {
                                 Response::Process(TaskProcess::new(pr, async_handle))
                             }
-                            JobType::Debug => {
+                            JobType::Debug | JobType::Init => {
                                 Response::Handle(async_handle)
                             }
                         };

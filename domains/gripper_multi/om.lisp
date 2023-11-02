@@ -1,4 +1,9 @@
 (begin
+
+    (def-init 
+        (begin
+            (mapf (lambda (?r) (new-resource ?r)) (instances robot))))
+
     (def-task go2 (:params (?ro robot) (?r room)))
     (def-method go2_noop
         (:task go2)

@@ -116,6 +116,10 @@ impl DomainManager {
         self.inner.write().await.add_lambda(label, value)
     }
 
+    pub async fn add_init(&self, body: LValue) {
+        self.inner.write().await.add_init(body)
+    }
+
     pub async fn get_command(&self, label: &str) -> Option<Command> {
         self.inner.read().await.commands.get(label).cloned()
     }
@@ -126,6 +130,10 @@ impl DomainManager {
 
     pub async fn get_task(&self, label: &str) -> Option<Task> {
         self.inner.read().await.tasks.get(label).cloned()
+    }
+
+    pub async fn get_init(&self) -> LValue {
+        self.inner.read().await.get_init().clone()
     }
 
     pub async fn remove_command(&self, label: &str) {

@@ -156,7 +156,7 @@ impl OMPASDomain {
                 )
             )),
             Some(task) => {
-                task.add_method(label.clone());
+                task.add_method(&label);
                 self.methods.insert(label.clone(), value);
                 self.map_symbol_type.insert(label, METHOD_TYPE.into());
                 Ok(())

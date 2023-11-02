@@ -7,40 +7,42 @@
 
     (def-method move_direct
         (:task go2)
-        (:params (?r room) (?d door))
+        (:params (?ro robot) (?r room) (?a room) (?n room) (?d door))
         (:pre-conditions
-            (!= (at-robby) ?r)
-            (is_door_of ?d ?r)
+            (= (at-robby) ?a)
+            (!= ?a ?r)
+            (connected ?a ?d ?n)
             (opened ?d))
         (:body
             (do
-                (move (at-robby) ?r ?d)
+                (move ?a ?n ?d)
                 (go2 ?r))))
 
     (def-method open_and_move
         (:task go2)
-        (:params (?r room) (?d door))
+        (:params (?ro robot) (?r room) (?a room) (?n room) (?d door))
         (:pre-conditions
-            (!= (at-robby) ?r)
-            (is_door_of ?d ?r)
+            (= (at-rob ?ro) ?a)
+            (!= ?a ?r)
+            (connected ?a ?d ?n)
             (! (opened ?d)))
         (:body
             (do
-                (t_open ?r ?d)
-                (move (at-robby) ?r ?d)
+                (t_open ?a ?d)
+                (move ?a ?n ?d)
                 (go2 ?r))))
 
-    (def-task t_open (:params (?d door) (?r room)))
+    (def-task t_open (:params (?r room) (?d door)))
     (def-method open_direct
         (:task t_open)
-        (:params (?d door) (?r room) (?g gripper))
+        (:params (?ro robot) (?r room) (?d door) (?g gripper))
         (:pre-conditions (= (carry ?g) empty))
         (:body
             (open ?d ?r ?g)))
 
     (def-method drop_and_open
         (:task t_open)
-        (:params (?d door) (?r room))
+        (:params (?r room) (?d door))
         (:pre-conditions
             (! (exists
                 (instances gripper)

@@ -1905,7 +1905,11 @@ impl InnerActingManager {
             match &self.processes[id].inner {
                 ActingProcessInner::RootTask(_) => {}
                 ActingProcessInner::Task(t) => {
-                    number_retry += (t.refinements.len() - 1) as u32;
+                    number_retry += if t.refinements.is_empty() {
+                        0
+                    } else {
+                        (t.refinements.len() - 1) as u32
+                    };
 
                     for r in &t.refinements {
                         if let Some(executed) = r.get_executed() {

@@ -147,6 +147,9 @@ impl DomainManager {
     }
 
     pub async fn remove_method(&self, label: &str) {
-        self.inner.write().await.methods.remove(label);
+        let mut inner = self.inner.write().await;
+        if let Some(method) = inner.methods.remove(label) {
+            inner.tasks.get_mut(&method.task_label).unwrap().remove_method(label);
+        }
     }
 }

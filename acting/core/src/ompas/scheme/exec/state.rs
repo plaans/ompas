@@ -185,11 +185,25 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
         args[0].clone()
     };
 
-    let LValue::Map(map) = get_facts(env, &[]).await? else {
-        unreachable!()
-    };
+    let key: LValueS = key.try_into()?;
 
-    Ok(map.get(&key).cloned().unwrap_or(UNKNOWN.into()))
+    let ctx = env.get_context::<ModState>(MOD_STATE)?;
+    let state = ctx
+        .state
+        .get_state(None)
+        .await;
+
+    let result: LValue = match state.get(&key) {
+        None => {
+            LValue::Nil
+        }
+        Some(f) => {
+            f.value.clone().into()
+        }
+    };
+    Ok(result)
+
+    //Ok(map.get(&key).cloned().unwrap_or(UNKNOWN.into()))
 }
 
 #[async_scheme_fn]
@@ -202,13 +216,6 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
         ));
     }
 
-    let ctx = env.get_context::<ModState>(MOD_STATE)?;
-
-    let state = ctx
-        .state
-        .get_state(Some(StateType::Static))
-        .await
-        .into_map();
 
     let key: LValue = if args.len() > 1 {
         args.into()
@@ -216,11 +223,24 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
         args[0].clone()
     };
 
-    let LValue::Map(map) = state else {
-        unreachable!()
-    };
+    let key: LValueS = key.try_into()?;
 
-    Ok(map.get(&key).cloned().unwrap_or(LValue::from(UNKNOWN)))
+    let ctx = env.get_context::<ModState>(MOD_STATE)?;
+
+    let state = ctx
+        .state
+        .get_state(Some(StateType::Static))
+        .await;
+
+    let result: LValue = match state.get(&key) {
+        None => {
+            LValue::Nil
+        }
+        Some(f) => {
+            f.value.clone().into()
+        }
+    };
+    Ok(result)
 }
 
 ///2 args: check if an instance is of a certain type

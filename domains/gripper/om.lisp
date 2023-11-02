@@ -1,5 +1,5 @@
 (begin
-
+    (def-resources robby left right)
     (def-task go2 (:params (?r room)))
     (def-method go2_noop
         (:task go2)
@@ -25,13 +25,16 @@
         (:params (?o carriable) (?r room))
         (:pre-conditions (!= (pos ?o) ?r) (!= (pos ?o) robby))
         (:body
-            (do 
+            (do
+                (define rh (acquire 'robby))
                 (define ?a (pos ?o))
                 (go2 ?a)
                 (define ?g (arbitrary (instances gripper)))
                 (pick ?o ?a ?g)
                 (go2 ?r)
-                (drop ?o ?r ?g))))
+                (drop ?o ?r ?g)
+                (release rh)
+                )))
 
 
     (def-method move_and_drop

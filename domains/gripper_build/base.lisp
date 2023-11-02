@@ -2,14 +2,12 @@
     (define gripper-build-path
         (concatenate (get-env-var "OMPAS_PATH") "/domains/gripper_build"))
     (set-current-dir gripper-build-path)
-    (read "../gripper/base.lisp")
-    (read "../gripper_door/base.lisp")
     (read "../gripper_multi/base.lisp")
 
     ; New types
     (def-types
         (toy toypart carriable)
-        (arm leg head torso bodypart))
+        (arm leg head torso toypart))
     ; New const location
     (def-objects (ether location))
 
@@ -37,9 +35,9 @@
                 (check_pos (right_leg_of ?t))
                 (check_pos (left_leg_of ?t))
                 (check_pos (head_of ?t))
-                (check_pos (torso_of ?t))))
+                (check_pos (torso_of ?t))
                 (define new_pos
-                    (lambda (?o) (effects 'pos ?o ?t)))
+                    (lambda (?o) (effect 'pos ?o ?t)))
                 (effect 'built ?t true)
                 (effect 'pos ?t r_pos)
                 (new_pos (right_arm_of ?t))
@@ -47,7 +45,7 @@
                 (new_pos (right_leg_of ?t))
                 (new_pos (left_leg_of ?t))
                 (new_pos (head_of ?t))
-                (new_pos (torso_of ?t)))
+                (new_pos (torso_of ?t)))))
 
     (def-command dismantle (:params (?r robot) (?t toy)))
     (def-command-om-model dismantle
@@ -58,7 +56,7 @@
                     (check (built ?t))
                     (check (= (pos ?t) r_pos))
                     (define new_pos
-                        (lambda (?o) (effects 'pos ?o r_pos)))
+                        (lambda (?o) (effect 'pos ?o r_pos)))
                     (effect 'built ?t false)
                     (effect 'pos ?t 'ether)
                     (new_pos (right_arm_of ?t))

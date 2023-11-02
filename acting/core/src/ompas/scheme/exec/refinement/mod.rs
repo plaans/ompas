@@ -251,7 +251,7 @@ pub async fn _retry(env: &LEnv, err: LValue) -> LResult {
         .unwrap();
     let debug = acting_manager.get_debug(&task_id).await.unwrap();
     let log = ctx.log.clone();
-    log.error(format!("({task_id}) Failed {debug}: {}", err));
+    log.error(format!("({task_id}) Failed {debug}: {}", RaeExecError::format_err(&err)));
     if let Some(refinement_id) = acting_manager.get_last_executed_refinement(&task_id).await {
         acting_manager.set_failed_method(&refinement_id).await;
         let rt: RefinementTrace = select(task_id, env).await?;

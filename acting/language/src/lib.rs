@@ -292,15 +292,18 @@ pub mod exec {
         pub const RETRY: &str = "retry";
         pub const DOC_RETRY: &str = "Retry a given task.";
         pub const LAMBDA_RETRY: &str = "(lambda (r)
-        (begin
-            (define __result__ (_retry r))
-            (if (err? __result__)
-                __result__
-                (begin
-                    (define r (enr __result__))
-                    (if (err? r)
-                        (retry r)
-                        (success))))))";
+	(begin
+	    (define _r_ (_retry r))
+	    (if (err? _r_)
+                _r_
+                (let ((_m_ (first _r_))
+                      (_id_ (second _r_)))
+                    (begin
+                        (def_process_id _id_)
+                        (define r (eval _m_))
+                        (if (err? r)
+                            (retry r)
+                            (set-success-for-task)))))))";
 
         pub const __GET_PRECONDITIONS__: &str = "__get_preconditions__";
         pub const DOC___GET_PRECONDITIONS__: &str =
@@ -843,19 +846,19 @@ pub mod monitor {
         pub const LOG_PLATFORM: &str = "log-platform";
         pub const LOG_OMPAS: &str = "log-ompas";
 
-        pub const ACTIVATE_LOG: &str = "activate_log";
+        pub const ACTIVATE_LOG: &str = "activate-log";
         pub const DOC_ACTIVATE_LOG: &str =
             "Create a new window where the log of the given topic will be printed.\
          Logs = {log-root, log-platform, log-ompas}";
 
-        pub const DEACTIVATE_LOG: &str = "deactivate_log";
+        pub const DEACTIVATE_LOG: &str = "deactivate-log";
         pub const DOC_DEACTIVATE_LOG: &str= "Kill the windows where the log was printed. Logs = {log-root, log-platform, log-ompas}";
 
-        pub const SET_LOG_LEVEL: &str = "set_log_level";
+        pub const SET_LOG_LEVEL: &str = "set-log-level";
         pub const DOC_SET_LOG_LEVEL: &str = "Set the log level used by the system to filter logs.\
         LogLevel = {error, warn, info, debug, trace}.";
 
-        pub const GET_LOG_LEVEL: &str = "get_log_level";
+        pub const GET_LOG_LEVEL: &str = "get-log-level";
         pub const DOC_GET_LOG_LEVEL: &str =
             "Return the actual log level used by the system to filter logs.\
         LogLevel = {error, warn, info, debug, trace}.";

@@ -703,6 +703,10 @@ pub mod error {
 
     pub const CHECK: &str = "check";
     pub const LAMBDA_CHECK: &str = "(lambda (a) (if a nil (err nil)))";
+    pub const MACRO_CHECK: &str= "(lambda (a)
+	`(if ,a
+	    nil
+	    (err (,a \" is false\"))))";
     pub const DOC_CHECK: &str = "Return an LValue::Err if the LValue if false";
 
     pub const DO_T: &str = "do_t";

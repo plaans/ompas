@@ -8,5 +8,4 @@ export RUST_BACKTRACE=0
 #cargo run --release --bin ompas-gobot-sim -- -d ompas-gobot-sim/planning_domain/domain_plan.lisp
 # cargo run --release --bin ompas-gobot-sim -- -d ompas-gobot-sim/planning_domain/domain_plan_extended.lisp
 #cargo run --bin debug_aries
-
 cargo run --bin bench -- -c benchmark/bench_config_2.yml

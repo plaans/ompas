@@ -16,11 +16,10 @@ use sompas_core::{eval, parse};
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
-use sompas_structs::lnumber::LNumber;
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
-use std::ops::Deref;
 use tokio::sync::mpsc::UnboundedReceiver;
+use crate::ompas::manager::state::action_status::ProcessStatus;
 
 pub mod error;
 pub mod interface;
@@ -114,25 +113,20 @@ pub async fn rae(
                         killers.push(tx.clone());
                         let log2 = log.clone();
                         let pr2 = pr.clone();
+                        let acting_manager_2 = acting_manager.clone();
                         let future = (Box::pin(async move {
                             let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
                             match &result {
                                 Ok(lv) => log2.info(format!(
                                     "result of task {}: {}",
                                     job_lvalue,
-                                    match lv {
-                                        LValue::Err(e) => {
-                                            match e.deref() {
-                                                LValue::Number(LNumber::Int(i)) => {
-                                                    format!("{:?}", RaeExecError::i64_as_err(*i))
-                                                }
-                                                lv => lv.to_string(),
-                                            }
-                                        }
-                                        lv => lv.to_string(),
-                                    }
+                                    RaeExecError::format_err(lv),
                                 )),
-                                Err(e) => log2.error(format!("Error evaluating task {job_lvalue}({:?}): {e}", pr2)),
+                                Err(e) => {
+                                    log2.error(format!("Error evaluating task {job_lvalue}({:?}): {e}", pr2));
+                                    let id = acting_manager_2.get_id(pr2).await.unwrap();
+                                    acting_manager_2.set_status(&id, ProcessStatus::Failure).await;
+                                }
                             }
 
                             result

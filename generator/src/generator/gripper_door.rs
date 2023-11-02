@@ -202,9 +202,10 @@ impl Problem for GripperDoorProblem {
                 list!(
                     CONNECTS.into(),
                     self.graph.node_weight(start).unwrap().to_string().into(),
+                    door.to_string().into(),
                     self.graph.node_weight(end).unwrap().to_string().into()
                 ),
-                door.to_string().into(),
+                LValue::True
             ));
         }
         facts

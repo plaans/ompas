@@ -30,7 +30,7 @@ pub const ETHER: &str = "ether";
 
 //State functions:
 pub const LEFT_LEG_OF: &str = "left_leg_of";
-pub const RIGHT_LEG_OF: &str = "left_arm_of";
+pub const RIGHT_LEG_OF: &str = "right_leg_of";
 pub const TORSO_OF: &str = "torso_of";
 pub const LEFT_ARM_OF: &str = "left_arm_of";
 pub const RIGHT_ARM_OF: &str = "right_arm_of";
@@ -304,13 +304,20 @@ impl Problem for GripperBuildProblem {
                     OtherObject::Robot(_) => robots.push(label),
                     OtherObject::Ball(_) => balls.push(label),
                 },
-                Object::ToyPart(tp) => match tp {
-                    ToyPart::LeftLeg(_) | ToyPart::RightLeg(_) => legs.push(label),
-                    ToyPart::LeftArm(_) | ToyPart::RightArm(_) => arms.push(label),
-                    ToyPart::Head(_) => heads.push(label),
-                    ToyPart::Torso(_) => torsos.push(label),
+                Object::Toy(t) => {
+                    toys.push(label);
+
+                    for part in t.get_parts() {
+                        let label = part.to_string();
+                        match part {
+                            ToyPart::LeftLeg(_) | ToyPart::RightLeg(_) => legs.push(label),
+                            ToyPart::LeftArm(_) | ToyPart::RightArm(_) => arms.push(label),
+                            ToyPart::Head(_) => heads.push(label),
+                            ToyPart::Torso(_) => torsos.push(label),
+                        }
+                    }
                 },
-                Object::Toy(_) => toys.push(label),
+                _ => {}
             }
         };
 
@@ -435,9 +442,10 @@ impl Problem for GripperBuildProblem {
                 list!(
                     CONNECTS.into(),
                     self.graph.node_weight(start).unwrap().to_string().into(),
+                    door.to_string().into(),
                     self.graph.node_weight(end).unwrap().to_string().into()
                 ),
-                door.to_string().into(),
+                LValue::True
             ));
         }
         facts

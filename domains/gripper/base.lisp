@@ -1,12 +1,12 @@
 (begin
     (def-types
-        (room location)
+        (room robot location)
         gripper
         (ball carriable))
     (def-objects
       (left right gripper)
       (empty carriable)
-      (robby location)
+      (robby robot)
     )
 
     ;state functions

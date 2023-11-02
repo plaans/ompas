@@ -20,17 +20,22 @@
         (:params (?from room) (?to room) (?d door))
         (:pre-conditions
             (= (at-robby) ?from)
-            (connects ?from ?to ?d)
+            (connected ?from ?d ?to)
             (opened ?d))
         (:effects
             ('at-robby ?to)
         ))
 
 
+    (def-lambda connected (lambda (?r1 ?d ?r2)
+        (or (connects ?r1 ?d ?r2) (connects ?r2 ?d ?r1))))
+
 
     (def-lambda is_door_of (lambda (?d ?r)
         (exists (instances room)
-            (lambda (?r2) (or (connects ?r ?d ?r2) (connects ?r2 ?d r))))))
+            (lambda (?r2) 
+                (connected ?r ?d ?r2)
+            ))))
 
     (def-command open (:params (?d door) (?r room) (?g gripper)))
     (def-command-pddl-model open
@@ -38,7 +43,7 @@
         (:pre-conditions
             (= (at-robby) ?r)
             (is_door_of ?d ?r)
-            (= (carry ?g) 'empty))
+            (= (carry ?g) empty))
         (:effects
             ('opened ?d true)))
 
@@ -48,7 +53,7 @@
         (:pre-conditions
             (= (at-robby) ?r)
             (is_door_of ?d ?r)
-            (= (carry ?g) 'empty))
+            (= (carry ?g) empty))
         (:effects
             ('opened ?d false)))
 )

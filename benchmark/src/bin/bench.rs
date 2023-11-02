@@ -26,7 +26,8 @@ pub struct Opt {
 }
 
 pub fn benchmark_working_dir() -> PathBuf {
-    let mut path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    let path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+    let mut path = path.canonicalize().unwrap();
     path.push("benchmark");
     fs::create_dir_all(&path).unwrap();
     path
@@ -83,6 +84,18 @@ fn main() {
         let mut job_dir =  benchmark_working_dir();
         job_dir.push(&domain.label);
 
+        let mut benchmark_log_dir = job_dir.clone();
+        benchmark_log_dir.push("benchmark_log");
+        fs::create_dir_all(&benchmark_log_dir).unwrap();
+        let domain_path = match domain.domain_path.canonicalize() {
+            Ok(p) => p,
+            Err(e) => {
+                bar.println(format!("Error with domain_path of {}: {}",domain.label ,e));
+                bar.println(format!("Skipping job {}", domain.label));
+                continue 'loop_job;
+            }
+        };
+
         bar.println(format!("Benchmarking {} ", domain.label));
         if let Some(binary) = &domain.binary {
             bar.println("Specific ompas binary to install...");
@@ -91,7 +104,15 @@ fn main() {
         }
 
         // Getting all the problem files
-        let problem_dir_path = problem_config.problem_dir_path.clone();
+        let problem_dir_path = match problem_config.problem_dir_path.canonicalize() {
+            Ok(p) => p,
+            Err(e) => {
+                bar.println(format!("Error with problem_dir_path of {}: {}",domain.label ,e));
+                bar.println(format!("Skipping job {}", domain.label));
+                continue 'loop_job;
+            }
+        };
+
         bar.println("Searching for problem files...");
         let mut problems = get_all_problems_files(&problem_dir_path);
         if let Some(specific_problems) = &problem_config.specific_problems {
@@ -122,7 +143,7 @@ fn main() {
         run_config_path.push("run_config");
         fs::create_dir_all(&run_config_path).unwrap();
         for heuristic in heuristics {
-            let (label, code, start) = generate_config(heuristic, &domain.domain_path);
+            let (label, code, start) = generate_config(heuristic, &domain_path);
             //Store in file
             let mut config_path = run_config_path.clone();
             config_path.push(format!("{}.lisp", label));
@@ -161,7 +182,7 @@ fn main() {
                 let config_path = config.path.to_str().unwrap();
 
                 let mut problem_config_path: PathBuf = problems_path.clone();
-                let problem_config_name = format!("{}_{}", problem.label, config.label);
+                let problem_config_name = format!("{}_{}", problem.label.replace(".lisp", ""), config.label);
                 problem_config_path.push(format!("{}.lisp", problem_config_name));
                 let mut file = OpenOptions::new()
                     .write(true)
@@ -170,7 +191,7 @@ fn main() {
                     .open(problem_config_path.clone())
                     .unwrap();
                 let content = format!(
-"(begin\
+"(begin
     (read \"{}\")
     (read \"{}\")
     {}
@@ -185,19 +206,26 @@ fn main() {
                 let config_path = problem_config_path.to_str().unwrap();
 
                 for _ in 0..*n_run {
-                    let start = SystemTime::now();
                     if !first {
-                        std::thread::sleep(Duration::from_secs(5));
+                        std::thread::sleep(Duration::from_secs(2));
                     } else {
                         first = false
                     }
-                    let mut command = Command::new("timeout");
-                    command.arg((*timeout+10).to_string());
-                    command.arg(domain.get_binary());
+                    let start = SystemTime::now();
+                    // let mut command = Command::new("timeout");
+                    // command.arg((*timeout+10).to_string());
+                    // command.arg(domain.get_binary());
+                    let mut command = Command::new(domain.get_binary());
                     command.args(["-d", config_path]);
-                    //command.args(["-t", format!("{}", config.max_time).as_str()]);
-                    let f1 = File::create("benchmark.log").expect("couldn't create file");
-                    let f2 = File::create("benchmark.log").expect("couldn't create file");
+                    command.env("OMPAS_WORKING_DIR", job_dir.to_str().unwrap());
+
+                    bar.println(format!("command: {:?}", command));
+
+                    let mut benchmark_log_file = benchmark_log_dir.clone();
+                    benchmark_log_file.push(format!("benchmark_{}.log", i));
+
+                    let f1 = File::create(&benchmark_log_file).expect("couldn't create file");
+                    let f2 = File::create(&benchmark_log_file).expect("couldn't create file");
                     command
                         .stdout(unsafe { Stdio::from_raw_fd(f1.into_raw_fd()) })
                         .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) });
@@ -227,10 +255,10 @@ fn main() {
 
     bar.finish();
 
-    send_email(
+    /*send_email(
         &config.mail,
         benchmark_data.format_data("ompas-bench".to_string()),
-    )
+    )*/
 }
 
 fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, String, String) {
@@ -274,11 +302,10 @@ fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, Strin
     (
         config_name,
         format!(
-            "(begin\
-    \
-        (read \"{}\") ; loading domain
-        (set-select {})
-    )",
+"(begin
+    (read \"{}\") ; loading domain
+    (set-log-level debug)
+    (set-select {}))",
             domain, select,
         ),
         start.to_string()

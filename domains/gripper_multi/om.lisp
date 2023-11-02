@@ -8,28 +8,30 @@
 
     (def-method move_direct
         (:task go2)
-        (:params (?ro robot) (?r room) (?d door))
+        (:params (?ro robot) (?r room) (?a room) (?n room) (?d door))
         (:pre-conditions
-            (!= (at-rob ?ro) ?r)
-            (is_door_of ?d ?r)
+            (= (at-rob ?ro) ?a)
+            (!= ?a ?r)
+            (connected ?a ?d ?n)
             (opened ?d))
         (:body
             (do
-                (move (at-rob ?ro) ?r ?d)
-                (go2 ?r))))
+                (move ?ro ?a ?n ?d)
+                (go2 ?ro ?r))))
 
     (def-method open_and_move
         (:task go2)
-        (:params (?ro robot) (?r room) (?d door))
+        (:params (?ro robot) (?r room) (?a room) (?n room) (?d door))
         (:pre-conditions
-            (!= (at-rob ?ro) ?r)
-            (is_door_of ?d ?r)
+            (= (at-rob ?ro) ?a)
+            (!= ?a ?r)
+            (connected ?a ?d ?n)
             (! (opened ?d)))
         (:body
             (do
-                (t_open ?r ?d)
-                (move (at-rob ?ro) ?r ?d)
-                (go2 ?r))))
+                (t_open ?ro ?d ?a)
+                (move ?ro ?a ?n ?d)
+                (go2 ?ro ?r))))
 
     ;task with their methods
     (def-task place (:params (?o carriable) (?r room)))
@@ -63,31 +65,37 @@
         (:pre-conditions (!= (pos ?o) ?r) (= (carry ?ro ?g) ?o))
         (:body
             (do
+                (define rh (acquire ?ro))
                 (go2 ?ro ?r)
                 (drop ?ro ?o ?r ?g))))
 
 
 
-    (def-task t_open (:params (?d door) (?r room)))
+    (def-task t_open (:params (?ro robot) (?d door) (?r room)))
     (def-method open_direct
         (:task t_open)
-        (:params (?d door) (?r room) (?ro robot) (?g gripper))
-        (:pre-conditions (= (carry ?ro ?g) empty))
+        (:params  (?ro robot) (?d door) (?r room) (?g gripper))
+        (:pre-conditions 
+            (= (carry ?ro ?g) empty)
+            (is_door_of ?d ?r))
         (:body
             (do
-                (define rh (acquire ?ro))
+                ;(define rh (acquire ?ro))
+                (go2 ?ro ?r)
                 (open ?ro ?d ?r ?g))))
 
     (def-method drop_and_open
         (:task t_open)
-        (:params (?d door) (?r room) (?ro robot))
+        (:params (?ro robot) (?d door) (?r room))
         (:pre-conditions
+            (is_door_of ?d ?r)
             (! (exists
                 (instances gripper)
                 (lambda (?g) (= (carry ?ro ?g) empty)))))
         (:body
             (do
                 (define ?g (arbitrary (instances gripper)))
+                (go2 ?ro ?r)
                 (define ?o (carry ?ro ?g))
                 (drop ?ro ?o ?r ?g)
                 (open ?ro ?d ?r ?g)

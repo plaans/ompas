@@ -44,6 +44,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
+use std::fmt::Write as OtherWrite;
 
 pub struct ModControl {
     pub(crate) options: OMPASManager,
@@ -860,6 +861,28 @@ pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
 
         file_name = Some(arg.replace("(", "").replace(")", "").replace(" ", "."));
     }
+
+    let state = acting_manager.state_manager.get_state(None).await;
+    let mut state_str = "State:\n".to_string();
+    for (k, v) in state.inner {
+        writeln!(state_str, "- {} = {}", k.to_string(), v.value.to_string()).unwrap();
+    }
+
+    let mut state_file_path = run_dir.clone();
+    state_file_path.push(format!(
+        "{}.txt",
+        match &file_name {
+            Some(f) => f.as_str(),
+            None => "state",
+        }
+    ));
+    let mut acting_tree_file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open(state_file_path)
+        .unwrap();
+    acting_tree_file.write_all(state_str.as_bytes()).unwrap();
 
     let acting_tree = acting_manager.acting_tree_as_dot().await;
 

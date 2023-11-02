@@ -2,7 +2,6 @@
     (define gripper-multi-path
         (concatenate (get-env-var "OMPAS_PATH") "/domains/gripper_multi"))
     (set-current-dir gripper-multi-path)
-    (read "../gripper/base.lisp")
     (read "../gripper_door/base.lisp")
 
     (def-types robot)
@@ -17,7 +16,7 @@
         (:params (?r robot) (?from room) (?to room) (?d door))
         (:pre-conditions
             (= (at-rob ?r) ?from)
-            (connects ?from ?to ?d)
+            (connected ?from ?d ?to)
             (opened ?d))
         (:effects
             ('at-rob ?r ?to)))
@@ -28,7 +27,7 @@
       (:pre-conditions
         (= (pos ?o) ?r)
         (= (at-rob ?ro) ?r)
-        (= (carry ?g) empty))
+        (= (carry ?ro ?g) empty))
       (:effects
             ('carry ?ro ?g ?o)
             ('pos ?o ?ro)))
@@ -37,11 +36,11 @@
     (def-command-pddl-model drop
       (:params (?ro robot) (?o carriable) (?r room) (?g gripper))
       (:pre-conditions
-        (= (carry ?g) ?o)
-        (= (at-rob ?ro) ?ro))
+        (= (carry ?ro ?g) ?o)
+        (= (at-rob ?ro) ?r))
      (:effects
         ('carry ?ro ?g empty)
-        ('pos ?o ?ro)))
+        ('pos ?o ?r)))
 
 
     (def-command open (:params (?ro robot) (?d door) (?r room) (?g gripper)))
@@ -49,7 +48,7 @@
         (:params (?ro robot) (?d door) (?r room) (?g gripper))
         (:pre-conditions
             (= (at-rob ?ro) ?r)
-            (connects ?r ?d ?r2)
+            (is_door_of ?d ?r)
             (= (carry ?ro ?g) 'empty))
         (:effects
             ('opened ?d true)))
@@ -59,7 +58,7 @@
         (:params (?ro robot) (?d door) (?r room) (?g gripper))
         (:pre-conditions
             (= (at-rob ?ro) ?r)
-            (connects ?r ?d ?r2)
+            (is_door_of ?d ?r)
             (= (carry ?ro ?g) 'empty))
         (:effects
             ('opened ?d false)))

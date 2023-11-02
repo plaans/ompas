@@ -908,10 +908,10 @@ pub async fn p_expand(
                         }*/
 
                         let expanded = p_expand(&result, top_level, p_env).await?;
-                        p_env
+                        /*p_env
                             .env
                             .log
-                            .trace(format!("In expand: macro expanded: {:?}", expanded));
+                            .trace(format!("In expand: macro expanded: {:?}", expanded));*/
                         return Ok(expanded);
                     }
                 }

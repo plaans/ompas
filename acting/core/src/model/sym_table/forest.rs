@@ -270,7 +270,6 @@ impl<T: Display + Default + Clone, I: Into<NodeId> + From<NodeId>> Forest<T, I> 
         if x_root != y_root {
             self._set_parent(y_root, x_root);
             self._set_rank(x_root, self._get_rank(x_root) + Rank(1));
-            //self.flat_bindings();
         }
     }
 

@@ -112,19 +112,15 @@ pub async fn convert_into_chronicle_instance(
         None => name,
     });
 
-    //Enforce presence of the chronicle
-    /*let presence = *ch.get_presence();
-    ch.replace(&presence, &st.new_bool(true));*/
-
     let lv = lambda.get_body();
 
-    let mut p_env = PLEnv {
+    let p_env = PLEnv {
         env: env.clone(),
         unpure_bindings: Default::default(),
         pc: pc.clone(),
     };
 
-    let om: ActingModel = convert(Some(ch), lv, &mut p_env, st.clone()).await?;
+    let om: ActingModel = convert(Some(ch), lv, p_env, st.clone()).await?;
 
     let mut instantiated_chronicle = om
         .chronicle
@@ -133,7 +129,7 @@ pub async fn convert_into_chronicle_instance(
         .clone()
         .instantiate_and_clean(Default::default());
 
-    try_eval_apply(&mut instantiated_chronicle, &p_env.env).await?;
+    try_eval_apply(&mut instantiated_chronicle, &env).await?;
 
     Ok(ChronicleInstance {
         instantiated_chronicle,

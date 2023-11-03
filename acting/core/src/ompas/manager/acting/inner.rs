@@ -51,6 +51,7 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
+use tokio::runtime::Handle;
 use tokio::sync::{broadcast, watch};
 
 const TASK_NAME: &str = "task_name";
@@ -625,10 +626,13 @@ impl InnerActingManager {
         let rank = root.add_top_level_task(id);
 
         let label = Label::Task(rank);
-        let task_ref = self.models[0].add_new_task(NewTask {
-            start: None,
-            args: args.clone(),
-        }, label);
+        let task_ref = self.models[0].add_new_task(
+            NewTask {
+                start: None,
+                args: args.clone(),
+            },
+            label,
+        );
 
         let start = self.new_acting_var_with_ref(&task_ref.start, &0);
         let end = self.new_acting_var_with_ref(&task_ref.end, &0);
@@ -640,7 +644,6 @@ impl InnerActingManager {
             self.set_execution_val(&arg, val);
             new_args.push(arg)
         }
-
 
         self.processes.push(ActingProcess::new(
             id,
@@ -659,16 +662,18 @@ impl InnerActingManager {
     }
 
     pub fn new_high_level_command(&mut self, debug: String, mut args: Vec<Cst>) -> ProcessRef {
-
         let id = self.processes.len();
         let root: &mut RootProcess = self.processes[0].inner.as_mut_root().unwrap();
         let rank = root.add_top_level_command(id);
 
         let label = Label::Command(rank);
-        let task_ref = self.models[0].add_new_task(NewTask {
-            start: None,
-            args: args.clone(),
-        },label);
+        let task_ref = self.models[0].add_new_task(
+            NewTask {
+                start: None,
+                args: args.clone(),
+            },
+            label,
+        );
 
         let start = self.new_acting_var_with_ref(&task_ref.start, &0);
         let end = self.new_acting_var_with_ref(&task_ref.end, &0);
@@ -680,7 +685,6 @@ impl InnerActingManager {
             self.set_execution_val(&arg, val);
             new_args.push(arg)
         }
-
 
         self.processes.push(ActingProcess::new(
             id,
@@ -1153,6 +1157,7 @@ impl InnerActingManager {
         lv: LValue,
         mut p_env: PLEnv,
     ) -> Result<ActingModel, LRuntimeError> {
+        let handle = Handle::current();
         let debug = lv.to_string();
         let p_eval_lv = p_eval(&lv, &mut p_env).await?;
         let lv_om = annotate(p_eval_lv);
@@ -1184,35 +1189,47 @@ impl InnerActingManager {
                     }
                     let lv = lv.into();
                     let p_eval_lv = p_eval(&lv, &mut p_env).await?;
-                    let lv_om = annotate(p_eval_lv);
-
                     let st = self.st.clone();
-                    let mut ch = Chronicle::new(debug, ChronicleKind::Task, st.clone());
-                    let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
-                    let mut name = vec![];
-                    if let LValue::List(list) = &lv {
-                        let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
-                        for arg in list.as_slice() {
-                            let id = st.new_cst(arg.clone());
-                            ch.add_var(id);
-                            name.push(id);
-                        }
-                    } else {
-                        panic!()
-                    };
-                    ch.set_task(task_name);
-                    ch.set_name(name);
 
-                    let ch = Some(ch);
-                    let pp_lv = pre_processing(&lv_om, &p_env).await?;
+                    let r: Result<_, LRuntimeError> = handle
+                        .spawn_blocking(move || {
+                            let lv_om = annotate(p_eval_lv);
 
-                    let chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
-                        Ok(ch) => Some(ch),
-                        Err(e) => {
-                            println!("convert error: {}", e);
-                            ch
-                        }
-                    };
+                            let mut ch = Chronicle::new(debug, ChronicleKind::Task, st.clone());
+                            let task_name =
+                                task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
+                            let mut name = vec![];
+                            if let LValue::List(list) = &lv {
+                                let list: Vec<_> =
+                                    list.iter().map(|lv| lv.as_cst().unwrap()).collect();
+                                for arg in list.as_slice() {
+                                    let id = st.new_cst(arg.clone());
+                                    ch.add_var(id);
+                                    name.push(id);
+                                }
+                            } else {
+                                panic!()
+                            };
+                            ch.set_task(task_name);
+                            ch.set_name(name);
+
+                            let ch = Some(ch);
+                            let pp_lv = pre_processing(&lv_om, &p_env)?;
+
+                            let chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st) {
+                                Ok(ch) => Some(ch),
+                                Err(e) => {
+                                    println!("convert error: {}", e);
+                                    ch
+                                }
+                            };
+                            Ok((lv, lv_om, chronicle))
+                        })
+                        .await
+                        .unwrap();
+
+                    let (lv, lv_om, chronicle) = r?;
+
                     let lv_expanded = None;
 
                     let model = ActingModel {
@@ -1227,34 +1244,45 @@ impl InnerActingManager {
                 }
                 None => {
                     let st = self.st.clone();
-                    let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
-                    let task_name = task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
-                    let mut name = vec![];
-                    if let LValue::List(list) = &lv {
-                        let list: Vec<_> = list.iter().map(|lv| lv.as_cst().unwrap()).collect();
-                        for arg in list.as_slice() {
-                            let id = st.new_cst(arg.clone());
-                            ch.add_var(id);
-                            name.push(id);
-                        }
-                    } else {
-                        panic!()
-                    };
-                    ch.set_task(task_name);
-                    ch.set_name(name);
+                    let lv_2 = lv.clone();
+                    let lv_om_2 = lv_om.clone();
+                    let r: Result<_, LRuntimeError> = handle
+                        .spawn_blocking(move || {
+                            let mut ch = Chronicle::new(debug, ChronicleKind::Method, st.clone());
+                            let task_name =
+                                task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
+                            let mut name = vec![];
+                            if let LValue::List(list) = &lv_2 {
+                                let list: Vec<_> =
+                                    list.iter().map(|lv| lv.as_cst().unwrap()).collect();
+                                for arg in list.as_slice() {
+                                    let id = st.new_cst(arg.clone());
+                                    ch.add_var(id);
+                                    name.push(id);
+                                }
+                            } else {
+                                panic!()
+                            };
+                            ch.set_task(task_name);
+                            ch.set_name(name);
 
-                    let ch = Some(ch);
-                    let pp_lv = pre_processing(&lv_om, &p_env).await?;
-                    //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
+                            let ch = Some(ch);
+                            let pp_lv = pre_processing(&lv_om_2, &p_env)?;
+                            //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
+                            let chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st) {
+                                Ok(ch) => Some(ch),
+                                Err(e) => {
+                                    println!("convert error: {}", e);
+                                    ch
+                                }
+                            };
+                            Ok((pp_lv, chronicle))
+                        })
+                        .await
+                        .unwrap();
 
-                    chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st).await {
-                        Ok(ch) => Some(ch),
-                        Err(e) => {
-                            println!("convert error: {}", e);
-                            ch
-                        }
-                    };
-
+                    let (pp_lv, new_chronicle) = r?;
+                    chronicle = new_chronicle;
                     lv_expanded = Some(pp_lv);
                 }
             }
@@ -1558,6 +1586,28 @@ impl InnerActingManager {
                                 refinement_label,
                             )
                         }
+                    } else {
+                        continue 'main;
+                    }
+                }
+                ActingProcessInner::Command(c) => {
+                    //Verify if we take the model of the action or the refinement
+                    if let Some(abstract_model) = &c.abstract_model {
+                        //An abstract model is used, meaning that no subtask is present.
+                        id = *abstract_model;
+
+                        let abstract_process = &self.processes[*abstract_model];
+                        let chronicle = self.models[abstract_process.get_am_id()]
+                            .get_clean_instantiated_chronicle()
+                            .unwrap();
+
+                        add_chronicle(
+                            &mut exec_chronicles,
+                            id,
+                            origin,
+                            chronicle,
+                            refinement_label,
+                        );
                     } else {
                         continue 'main;
                     }

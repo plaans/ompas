@@ -11,13 +11,13 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 export OMPAS_RESOURCE_ENCODING=addition
 
 # print the generates chronicles
-export OMPAS_CHRONICLE_DEBUG=full
+export OMPAS_CHRONICLE_DEBUG=off
 
 # Frequency at which continuous planning will be updated
 export OMPAS_DELIBERATION_FREQUENCY=1
 
 # print the plan formatted for the acting tree
-export OMPAS_PLAN_OUTPUT=false
+export OMPAS_PLAN_OUTPUT=true
 
 # print the continuous planning deliberation phases
 export OMPAS_DEBUG_CONTINUOUS_PLANNING=true
@@ -36,7 +36,7 @@ export OMPAS_LOG=false
 # Environment variables for scheme
 export SOMPAS_DEBUG=false
 
-export ARIES_PRINT_PLANNER_OUTPUT=true
+export ARIES_PRINT_PLANNER_OUTPUT=false
 export ARIES_LCP_TIME_SCALE=1000
 #export ARIES_PRINT_INITIAL_PROPAGATION=false
 export ARIES_LCP_RELAXED_TEMPORAL_CONSTRAINT_TASK_METHOD=true;

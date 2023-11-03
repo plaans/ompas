@@ -132,6 +132,10 @@ impl DomainManager {
         self.inner.read().await.tasks.get(label).cloned()
     }
 
+    pub async fn get_state_function(&self, label: &str) -> Option<StateFunction> {
+        self.inner.read().await.state_functions.get(label).cloned()
+    }
+
     pub async fn get_init(&self) -> LValue {
         self.inner.read().await.get_init().clone()
     }
@@ -157,7 +161,11 @@ impl DomainManager {
     pub async fn remove_method(&self, label: &str) {
         let mut inner = self.inner.write().await;
         if let Some(method) = inner.methods.remove(label) {
-            inner.tasks.get_mut(&method.task_label).unwrap().remove_method(label);
+            inner
+                .tasks
+                .get_mut(&method.task_label)
+                .unwrap()
+                .remove_method(label);
         }
     }
 }

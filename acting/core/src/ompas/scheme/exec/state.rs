@@ -1,6 +1,6 @@
 use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::monitor::MonitorManager;
-use crate::ompas::manager::state::partial_state::Fact;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::manager::state::{StateManager, StateType};
 use crate::ompas::scheme::exec::resource::resources;
@@ -27,6 +27,7 @@ use std::time::Duration;
 pub struct ModState {
     pub state: StateManager,
     pub monitors: MonitorManager,
+    pub domain: DomainManager,
 }
 
 impl ModState {
@@ -34,6 +35,7 @@ impl ModState {
         Self {
             state: exec.acting_manager.state_manager.clone(),
             monitors: exec.acting_manager.monitor_manager.clone(),
+            domain: exec.acting_manager.domain_manager.clone(),
         }
     }
 
@@ -41,6 +43,7 @@ impl ModState {
         Self {
             state: state.into(),
             monitors: MonitorManager::from(ClockManager::default()),
+            domain: DomainManager::default(),
         }
     }
 }
@@ -105,7 +108,7 @@ async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let value = args.last().unwrap();
     state
         .state
-        .add_fact(key.try_into()?, Fact::from(&value.try_into()?))
+        .add_value_with_date(key.try_into()?, value.try_into()?)
         .await;
     Ok(())
 }
@@ -128,7 +131,7 @@ async fn effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let value = args.last().unwrap();
     state
         .state
-        .add_fact(key.try_into()?, Fact::from(&value.try_into()?))
+        .add_value_with_date(key.try_into()?, value.try_into()?)
         .await;
     Ok(())
 }
@@ -144,20 +147,29 @@ async fn transitive_effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
     }
     let state = env.get_context::<ModState>(MOD_STATE)?;
     let duration: f64 = args.first().unwrap().try_into()?;
-    let key: LValueS = if args.len() > 3 {
-        LValue::from(&args[1..args.len() - 1])
+
+    let (key, first): (LValueS, _) = if args.len() > 3 {
+        (
+            LValue::from(&args[1..args.len() - 1]).try_into()?,
+            args[1].to_string(),
+        )
     } else {
-        args[1].clone()
-    }
-    .try_into()?;
+        (args[1].clone().try_into()?, args[1].to_string())
+    };
+
+    let intermediate_result = match state.domain.get_state_function(&first).await {
+        Some(sf) => LValueS::from(state.state.get_unk_of_type(sf.result_debug.as_str()).await),
+        None => LValueS::from(UNKNOWN),
+    };
 
     let value: LValueS = args.last().unwrap().try_into()?;
+
     state
         .state
-        .add_fact(key.clone(), Fact::from(&LValueS::from(UNKNOWN)))
+        .add_value_with_date(key.clone(), intermediate_result)
         .await;
     tokio::time::sleep(Duration::from_micros((duration * 1_000_000.0) as u64)).await;
-    state.state.add_fact(key, (&value).into()).await;
+    state.state.add_value_with_date(key, value).await;
     Ok(())
 }
 
@@ -188,18 +200,11 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
     let key: LValueS = key.try_into()?;
 
     let ctx = env.get_context::<ModState>(MOD_STATE)?;
-    let state = ctx
-        .state
-        .get_state(None)
-        .await;
+    let state = ctx.state.get_state(None).await;
 
     let result: LValue = match state.get(&key) {
-        None => {
-            LValue::Nil
-        }
-        Some(f) => {
-            f.value.clone().into()
-        }
+        None => LValue::Nil,
+        Some(f) => f.value.clone().into(),
     };
     Ok(result)
 
@@ -216,7 +221,6 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
         ));
     }
 
-
     let key: LValue = if args.len() > 1 {
         args.into()
     } else {
@@ -227,18 +231,11 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
 
     let ctx = env.get_context::<ModState>(MOD_STATE)?;
 
-    let state = ctx
-        .state
-        .get_state(Some(StateType::Static))
-        .await;
+    let state = ctx.state.get_state(Some(StateType::Static)).await;
 
     let result: LValue = match state.get(&key) {
-        None => {
-            LValue::Nil
-        }
-        Some(f) => {
-            f.value.clone().into()
-        }
+        None => LValue::Nil,
+        Some(f) => f.value.clone().into(),
     };
     Ok(result)
 }

@@ -206,7 +206,7 @@ async fn check_refinement_trace(
 
     let program = acting_manager.get_om_lvalue(&method_id).await;
 
-    log.debug(format!("({method_id}) program: \n{}", program.format(0)));
+    log.trace(format!("({method_id}) program: \n{}", program.format(0)));
 
     Ok(program)
 }
@@ -251,7 +251,10 @@ pub async fn _retry(env: &LEnv, err: LValue) -> LResult {
         .unwrap();
     let debug = acting_manager.get_debug(&task_id).await.unwrap();
     let log = ctx.log.clone();
-    log.error(format!("({task_id}) Failed {debug}: {}", RaeExecError::format_err(&err)));
+    log.error(format!(
+        "({task_id}) Failed {debug}: {}",
+        RaeExecError::format_err(&err)
+    ));
     if let Some(refinement_id) = acting_manager.get_last_executed_refinement(&task_id).await {
         acting_manager.set_failed_method(&refinement_id).await;
         let rt: RefinementTrace = select(task_id, env).await?;

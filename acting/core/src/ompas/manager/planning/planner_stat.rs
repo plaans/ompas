@@ -14,7 +14,7 @@ impl PlannerStat {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanningInstanceStat {
-    pub id: u32,
+    pub id: u64,
     pub duration: Duration,
     pub optimal: bool,
     pub interrupted: bool,

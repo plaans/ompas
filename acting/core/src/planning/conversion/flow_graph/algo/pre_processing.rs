@@ -13,10 +13,8 @@ use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 
 pub const TRANSFORM_LAMBDA_EXPRESSION: &str = "transform-lambda-expression";
 
-pub async fn pre_processing(lv: &LValue, _: &PLEnv) -> LResult {
-    //let lv = lambda_expansion(&lv, p_env).await?;
+pub fn pre_processing(lv: &LValue, _: &PLEnv) -> LResult {
     let lv = do_expansion(lv.clone());
-    //println!("{}", lv.format(0));
 
     Ok(lv)
 }

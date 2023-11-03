@@ -195,8 +195,7 @@ pub async fn __plan(
         }
     }
 
-    let (aries_problem, table): (chronicles::Problem, ActingVarRefTable) =
-        encode(&pp).await.unwrap();
+    let (aries_problem, table): (chronicles::Problem, ActingVarRefTable) = encode(&pp).unwrap();
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
         for instance in &aries_problem.chronicles {
             Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);

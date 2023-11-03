@@ -21,7 +21,6 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::Write;
 use std::ops::Deref;
-use std::time::SystemTime;
 
 const TRY_EVAL_APPLY: &str = "try_eval_apply";
 
@@ -296,18 +295,14 @@ pub fn merge_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
 }
 
 pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
-    let time = SystemTime::now();
-    //println!("({} ms) begin try eval_apply", time.elapsed().unwrap().as_millis());
     let env = env.clone();
     let st = c.st.clone();
 
     let mut c_to_remove: Vec<usize> = Default::default();
 
     'loop_constraint: for (i, constraint) in c.constraints.iter_mut().enumerate() {
-        //println!("({} ms) iteration {}", time.elapsed().unwrap().as_millis(), i);
         if let Constraint::Eq(Lit::Atom(r_c), b) = constraint {
             if let Lit::Apply(args) = b {
-                //println!("({} ms) apply constraint", time.elapsed().unwrap().as_millis());
                 let mut args = args.clone();
                 args.flat_bindings(&st);
                 for arg in &args {
@@ -316,13 +311,11 @@ pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntim
                     }
                 }
                 let expr = args.format(&st, true);
-                //print!("({} ms) apply{expr}", time.elapsed().unwrap().as_millis());
                 let mut env = env.clone();
                 let lv: LValue = {
                     let lv = parse(expr.as_str(), &mut env).await?;
                     eval(&lv, &mut env, None).await
                 }?;
-                //println!("({} ms)=> {lv}", time.elapsed().unwrap().as_millis());
 
                 let lit = lvalue_to_lit(&lv, &st)?;
                 match lit {
@@ -343,14 +336,9 @@ pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntim
                         *b = lit;
                     }
                 }
-                /*println!(
-                    "({} ms) end transformation of apply",
-                    time.elapsed().unwrap().as_millis()
-                );*/
             }
         }
     }
-    //std::process::exit(0);
 
     let mut vec: Vec<usize> = c_to_remove.to_vec();
 

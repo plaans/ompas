@@ -431,10 +431,12 @@ impl ActingManager {
         let mut state = self.state_manager.get_snapshot().await;
         let resource_state = self.resource_manager.get_snapshot(None).await;
         state.absorb(resource_state);
+        let inner = self.inner.read().await;
+        let chronicles = inner.get_current_chronicles();
         ExecutionProblem {
             state,
             st: self.st.clone(),
-            chronicles: self.inner.read().await.get_current_chronicles(),
+            chronicles,
         }
     }
 
@@ -568,6 +570,11 @@ impl ActingManager {
     }
 
     pub async fn get_all_high_level_tasks(&self) -> Vec<ActingProcessId> {
-        self.inner.read().await.processes[0].inner.as_root().unwrap().tasks.clone()
+        self.inner.read().await.processes[0]
+            .inner
+            .as_root()
+            .unwrap()
+            .tasks
+            .clone()
     }
 }

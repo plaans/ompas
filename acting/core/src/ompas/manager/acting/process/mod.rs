@@ -10,7 +10,6 @@ use crate::ompas::manager::acting::process::root_task::RootProcess;
 use crate::ompas::manager::acting::process::task::TaskProcess;
 use crate::ompas::manager::acting::{AMId, ActingProcessId};
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::action_status::ProcessStatus::Pending;
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use tokio::sync::watch;
@@ -72,7 +71,11 @@ impl ActingProcess {
             am_id,
             debug,
             origin,
-            status: Pending,
+            status: if origin == ProcessOrigin::Planner {
+                ProcessStatus::Planned
+            } else {
+                ProcessStatus::Pending
+            },
             start,
             end,
             inner: inner.into(),

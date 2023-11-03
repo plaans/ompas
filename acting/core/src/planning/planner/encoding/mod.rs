@@ -54,43 +54,14 @@ pub async fn encode_chronicles(
     st: &RefSymTable,
     problem: &PlannerProblem,
 ) -> Result<chronicles::Problem> {
-    /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
-    println!("{}", bindings.format(&problem.cc.sym_table, false));
-    println!("initial chronicle: {:?}", init_ch.chronicle);*/
-
-    /*for (i, t) in templates.iter().enumerate() {
-        println!("template {}: {:?}", i, t.chronicle)
-    }*/
-
-    //let instant = Instant::now();
-
     let domain = &problem.domain;
 
     let mut ctx = encode_ctx(st, domain, &problem.state.instance)?;
 
     let templates = domain::generate_templates(table, &mut ctx, &problem.templates)?;
 
-    /*for template in &p.templates {
-        Printer::print_chronicle(&template.chronicle, &p.context.model);
-    }*/
-
-    //let init_ch = create_initial_chronicle(&problem, &mut ctx);
-
-    //Printer::print_chronicle(&init_ch.chronicle, &p.context.model);
-    //exit(0);
-
-    //p.chronicles.push(init_ch);
-
     let chronicles = generate_instances(&mut ctx, table, &problem.instances)?;
 
-    /*for instance in &p.chronicles[1..] {
-        Printer::print_chronicle(&instance.chronicle, &p.context.model);
-    }*/
-
-    /*info!(
-        "Generation of the planning problem: {:.3} ms",
-        instant.elapsed().as_micros() as f64 / 1000.0
-    );*/
     Ok(chronicles::Problem {
         context: ctx,
         templates,

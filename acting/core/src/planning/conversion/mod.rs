@@ -6,7 +6,6 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::conversion::chronicle::convert_graph;
-use crate::planning::conversion::chronicle::post_processing::try_eval_apply;
 use crate::planning::conversion::context::ConversionContext;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::convert_lv;
@@ -35,6 +34,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::SystemTime;
+use tokio::runtime::Handle;
 
 pub mod chronicle;
 pub mod context;
@@ -61,24 +61,32 @@ impl Default for ConvertParameters {
 pub async fn convert(
     ch: Option<Chronicle>,
     lv: &LValue,
-    p_env: &mut PLEnv,
+    mut p_env: PLEnv,
     st: RefSymTable,
 ) -> Result<ActingModel, LRuntimeError> {
-    let p_eval_lv = p_eval(lv, p_env).await?;
+    let handle = Handle::current();
+    let p_eval_lv = p_eval(lv, &mut p_env).await?;
     //debug_println!("{}\np_eval =>\n{}", lv.format(0), p_eval_lv.format(0));
-    let lv_om = annotate(p_eval_lv);
-    //debug_println!("annotate =>\n{}", lv_om.format(0));
+    let r: Result<_, LRuntimeError> = handle
+        .spawn_blocking(move || {
+            let lv_om = annotate(p_eval_lv);
+            //debug_println!("annotate =>\n{}", lv_om.format(0));
 
-    let pp_lv = pre_processing(&lv_om, p_env).await?;
-    //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
+            let pp_lv = pre_processing(&lv_om, &p_env)?;
+            //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
 
-    let chronicle = match _convert(ch.clone(), &pp_lv, p_env, st).await {
-        Ok(ch) => Some(ch),
-        Err(e) => {
-            println!("{}", e);
-            ch
-        }
-    };
+            let chronicle = match _convert(ch.clone(), &pp_lv, &mut p_env, st) {
+                Ok(ch) => Some(ch),
+                Err(e) => {
+                    println!("{}", e);
+                    ch
+                }
+            };
+            Ok((lv_om, pp_lv, chronicle))
+        })
+        .await
+        .unwrap();
+    let (lv_om, pp_lv, chronicle) = r?;
 
     Ok(ActingModel {
         lv: lv.clone(),
@@ -89,7 +97,7 @@ pub async fn convert(
     })
 }
 
-pub async fn _convert(
+pub fn _convert(
     ch: Option<Chronicle>,
     lv: &LValue,
     p_env: &mut PLEnv,
@@ -130,7 +138,7 @@ pub async fn _convert(
     let mut ch = convert_graph(ch, &mut graph, flow, &p_env.env, cv)?;
 
     //println!("({} ms) converted in chronicle", time.elapsed().unwrap().as_millis());
-    try_eval_apply(&mut ch, &p_env.env).await?;
+    //try_eval_apply(&mut ch, &p_env.env).await?;
     //println!("({} ms) try_eval_apply: ok!", time.elapsed().unwrap().as_millis());
     //post_processing(&mut ch, &p_env.env).await?;
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
@@ -413,39 +421,13 @@ pub async fn convert_abstract_task_to_chronicle(
 
     let lv = lambda.get_body();
 
-    let mut p_env = PLEnv {
+    let p_env = PLEnv {
         env: cc.env.clone(),
         unpure_bindings: Default::default(),
         pc: pc.clone(),
     };
 
-    let om = convert(Some(ch), lv, &mut p_env, st).await?;
-
-    /*let lv = p_eval(lv, &mut p_env).await?;
-    //println!("lv: {}", lv.format(4));
-    //panic!();
-    let lv = pre_processing(&lv, &cc.env).await?;
-
-    let mut graph = FlowGraph::new(st);
-
-    let flow = convert_lv(&lv, &mut graph, &mut Default::default())?;
-    graph.flow = flow;
-    if DEBUG_CHRONICLE && task.is_some() {
-        ch.meta_data.flow_graph = graph.clone();
-        debug_with_markdown(label.to_string().as_str(), &ch, "/tmp".into(), true);
-    }
-    flow_graph_post_processing(&mut graph)?;
-    let mut ch = convert_graph(Some(ch), &mut graph, &flow, &cc.env)?;
-    post_processing(&mut ch, cc.env.clone())?;
-
-    graph.flat_bindings();
-    ch.meta_data.flow_graph = graph;
-    ch.meta_data.post_processed_lvalue = lv;
-    ch.meta_data.convert_time = time.elapsed().unwrap();
-
-    if DEBUG_CHRONICLE {
-        debug_with_markdown(label.to_string().as_str(), &ch, "/tmp".into(), true);
-    }*/
+    let om = convert(Some(ch), lv, p_env, st).await?;
 
     Ok(om)
 }

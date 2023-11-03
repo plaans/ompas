@@ -72,6 +72,10 @@ impl StateManager {
         self.instance.write().await.add_type(t, p);
     }
 
+    pub async fn get_unk_of_type(&self, t: &str) -> String {
+        self.instance.read().await.get_unk_of_type(t)
+    }
+
     pub async fn add_instance(&self, instance: &str, r#type: &str) {
         self.instance.write().await.add_instance(instance, r#type);
     }
@@ -253,6 +257,15 @@ impl StateManager {
 
     pub async fn add_fact(&self, key: LValueS, fact: Fact) {
         self.inner_dynamic.write().await.insert(key.clone(), fact);
+        self.trigger_state_update(vec![key]).await;
+    }
+
+    pub async fn add_value_with_date(&self, key: LValueS, value: LValueS) {
+        let date = self.clock_manager.now();
+        self.inner_dynamic
+            .write()
+            .await
+            .insert(key.clone(), Fact::new(value, Some(date)));
         self.trigger_state_update(vec![key]).await;
     }
 

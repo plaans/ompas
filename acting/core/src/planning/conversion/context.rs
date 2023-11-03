@@ -55,7 +55,7 @@ impl ConversionContext {
         }
 
         for (t, instances) in state.instance.inner.iter() {
-            for instance in instances {
+            for instance in instances.get_all_elements() {
                 st.new_constant_symbol(instance, st.get_type_as_domain(t.to_string()).unwrap());
             }
             st.new_constant_symbol(t, st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap());

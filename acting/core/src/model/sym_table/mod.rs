@@ -27,7 +27,6 @@ use sompas_structs::lvalue::LValue;
 use std::collections::VecDeque;
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
-use std::time::SystemTime;
 
 pub mod closure;
 pub mod forest;
@@ -528,13 +527,11 @@ impl SymTable {
     }
 
     pub fn meet_to_domain(&mut self, id: DomainId, domain: impl Into<Domain>) -> EmptyDomains {
-        let time = SystemTime::now();
         let id = self.get_domain_parent(id);
         let mut emptys = EmptyDomains::None;
 
         let var_domain = self.domains[id].clone();
         let domain = domain.into();
-        //if var_domain.constraints.is_empty() {
         let d1 = &self.domains[id].domain;
 
         let d = self.meet(d1, &domain);
@@ -545,10 +542,6 @@ impl SymTable {
         self.domains[id].domain = d;
 
         emptys.append(self.update_domains(var_domain.updates.into()));
-        println!(
-            "t(meet_to_domain) = {} ns",
-            time.elapsed().unwrap().as_nanos()
-        );
         emptys
     }
 

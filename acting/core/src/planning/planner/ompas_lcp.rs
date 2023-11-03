@@ -1,7 +1,7 @@
 use crate::model::acting_domain::OMPASDomain;
-use crate::ompas::manager::planning::populate_problem;
 use crate::ompas::manager::planning::problem_update::ExecutionProblem;
 use crate::ompas::manager::planning::{encode, FinitePlanningProblem};
+use crate::ompas::manager::planning::{populate_problem, DebugDate};
 use crate::ompas::manager::state::state_update_manager::StateRule;
 use crate::ompas::manager::state::StateManager;
 use crate::planning::planner::problem::ChronicleInstance;
@@ -24,7 +24,7 @@ use aries_planning::chronicles::{ChronicleOrigin, FiniteProblem, TaskId};
 use sompas_structs::lenv::LEnv;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::Instant;
+use tokio::runtime::Handle;
 
 const MIN_DEPTH: u32 = 0;
 const MAX_DEPTH: u32 = u32::MAX;
@@ -42,6 +42,7 @@ pub struct OMPASLCPConfig {
     pub state_manager: StateManager,
     pub domain: Arc<OMPASDomain>,
     pub env: LEnv,
+    pub debug_date: DebugDate,
 }
 
 pub fn is_fully_populated(instances: &[ChronicleInstance]) -> bool {
@@ -68,7 +69,7 @@ pub fn is_fully_populated(instances: &[ChronicleInstance]) -> bool {
 pub async fn run_planner(
     execution_problem: &ExecutionProblem,
     config: &OMPASLCPConfig,
-    on_new_sol: impl Fn(&FiniteProblem, Arc<SavedAssignment>) + Clone,
+    on_new_sol: impl Fn(&FiniteProblem, Arc<SavedAssignment>) + Clone + Send + 'static,
     interrupter: Option<PlannerInterrupter>,
 ) -> Result<Option<PlanResult>> {
     let OMPASLCPConfig {
@@ -77,11 +78,11 @@ pub async fn run_planner(
         state_manager,
         domain,
         env,
+        debug_date,
     } = config;
 
+    let handle = Handle::current();
     let mut best_cost = INT_CST_MAX + 1;
-
-    let start = Instant::now();
 
     let mut pp = populate_problem(
         FinitePlanningProblem::ExecutionProblem(execution_problem),
@@ -96,6 +97,11 @@ pub async fn run_planner(
     let max_depth = MAX_DEPTH;
 
     for depth in min_depth..=max_depth {
+        if let Some(interrupter) = &interrupter {
+            if *interrupter.borrow() {
+                return Ok(None);
+            }
+        }
         let depth_string = if depth == u32::MAX {
             "∞".to_string()
         } else {
@@ -104,15 +110,16 @@ pub async fn run_planner(
         if PRINT_PLANNER_OUTPUT.get() {
             println!("{depth_string} Solving with depth {depth_string}");
         }
-        break;
 
-        pp = populate_problem(FinitePlanningProblem::PlannerProblem(&pp), domain, env, 1)
+        debug_date.print_msg("Populating problem");
+        let new_pp = populate_problem(FinitePlanningProblem::PlannerProblem(&pp), domain, env, 1)
             .await
             .unwrap();
-        let fully_populated = is_fully_populated(&pp.instances);
+        debug_date.print_msg("OMPAS Chronicles populated");
+        let fully_populated = is_fully_populated(&new_pp.instances);
 
         if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-            for (origin, chronicle) in pp
+            for (origin, chronicle) in new_pp
                 .instances
                 .iter()
                 .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
@@ -122,7 +129,8 @@ pub async fn run_planner(
         }
 
         let rule = StateRule::Specific(
-            pp.domain
+            new_pp
+                .domain
                 .sf
                 .iter()
                 .map(|sf| sf.get_label().into())
@@ -133,37 +141,44 @@ pub async fn run_planner(
             .update_subscriber_rule(state_subscriber_id, rule)
             .await;
 
-        let (mut problem, table) = encode(&pp).await.unwrap();
+        let r: Result<_> = handle
+            .spawn_blocking(move || {
+                let (mut problem, table) = encode(&new_pp).unwrap();
 
-        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-            for instance in &problem.chronicles {
-                Printer::print_chronicle(&instance.chronicle, &problem.context.model);
-            }
-        }
+                if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                    for instance in &problem.chronicles {
+                        Printer::print_chronicle(&instance.chronicle, &problem.context.model);
+                    }
+                }
 
-        if PRINT_RAW_MODEL.get() {
-            Printer::print_problem(&problem);
-        }
-        if PRINT_PLANNER_OUTPUT.get() {
-            println!("===== Preprocessing ======");
-        }
-        aries_planning::chronicles::preprocessing::preprocess(&mut problem);
-        if PRINT_PLANNER_OUTPUT.get() {
-            println!("==========================");
-        }
+                if PRINT_RAW_MODEL.get() {
+                    Printer::print_problem(&problem);
+                }
+                if PRINT_PLANNER_OUTPUT.get() {
+                    println!("===== Preprocessing ======");
+                }
+                aries_planning::chronicles::preprocessing::preprocess(&mut problem);
+                if PRINT_PLANNER_OUTPUT.get() {
+                    println!("==========================");
+                }
 
-        if PRINT_MODEL.get() {
-            Printer::print_problem(&problem);
-        }
+                if PRINT_MODEL.get() {
+                    Printer::print_problem(&problem);
+                }
 
-        let mut pb = FiniteProblem {
-            model: problem.context.model.clone(),
-            origin: problem.context.origin(),
-            horizon: problem.context.horizon(),
-            chronicles: problem.chronicles.clone(),
-        };
+                let mut pb = FiniteProblem {
+                    model: problem.context.model.clone(),
+                    origin: problem.context.origin(),
+                    horizon: problem.context.horizon(),
+                    chronicles: problem.chronicles.clone(),
+                };
+                aries_planners::encode::populate_with_task_network(&mut pb, &problem, depth)?;
 
-        aries_planners::encode::populate_with_task_network(&mut pb, &problem, depth)?;
+                Ok((new_pp, table, pb))
+            })
+            .await
+            .unwrap();
+        let (new_pp, table, pb) = r?;
         let pb = Arc::new(pb);
 
         let on_new_valid_assignment = {
@@ -172,23 +187,28 @@ pub async fn run_planner(
             move |ass: Arc<SavedAssignment>| on_new_sol(&pb, ass)
         };
         if PRINT_PLANNER_OUTPUT.get() {
-            println!("  [{:.3}s] Populated", start.elapsed().as_secs_f32());
+            debug_date.print_msg(" Populated");
         }
         let result = solve_finite_problem(
+            *debug_date,
             pb.clone(),
             &STRATEGIES,
             *opt,
             on_new_valid_assignment,
             best_cost - 1,
             interrupter.clone(),
-        ).await;
+        )
+        .await;
         if PRINT_PLANNER_OUTPUT.get() {
-            println!("  [{:.3}s] Solved", start.elapsed().as_secs_f32());
+            debug_date.print_msg(" Solved");
         }
 
         let result = result.map(|assignment| (pb, assignment));
         match result {
             SolverResult::Unsat => {
+                if fully_populated {
+                    return Ok(None);
+                }
                 //println!("unsat")
             } // continue (increase depth)
             SolverResult::Sol((_, (_, cost)))
@@ -217,7 +237,7 @@ pub async fn run_planner(
                         Some(PlanResult {
                             ass,
                             fp,
-                            pp: Arc::new(pp),
+                            pp: Arc::new(new_pp),
                             table: Arc::new(table),
                         })
                     }
@@ -242,6 +262,7 @@ pub async fn run_planner(
                 })
             }
         }
+        pp = new_pp;
     }
 
     Ok(None)
@@ -255,21 +276,29 @@ pub async fn run_planner(
 /// If a valid solution of the subproblem is found, the solver will return a satisfying assignment.
 #[allow(clippy::too_many_arguments)]
 async fn solve_finite_problem(
+    debug_date: DebugDate,
     pb: Arc<FiniteProblem>,
     strategies: &[Strat],
     metric: Option<Metric>,
-    on_new_solution: impl Fn(Arc<SavedAssignment>),
+    on_new_solution: impl Fn(Arc<SavedAssignment>) + Send + 'static,
     cost_upper_bound: IntCst,
     interrupter: Option<PlannerInterrupter>,
 ) -> SolverResult<(Solution, Option<IntCst>)> {
+    let handle = Handle::current();
     if PRINT_INITIAL_PROPAGATION.get() {
         propagate_and_print(&pb);
     }
+
+    let (encoded, pb) = handle
+        .spawn_blocking(move || (aries_planners::encode::encode(&pb, metric), pb))
+        .await
+        .unwrap();
+
     let Ok(EncodedProblem {
         mut model,
         objective: metric,
         encoding,
-    }) = aries_planners::encode::encode(&pb, metric)
+    }) = encoded
     else {
         return SolverResult::Unsat;
     };
@@ -293,28 +322,34 @@ async fn solve_finite_problem(
     tokio::spawn(async move {
         if let Some(mut interrupter) = interrupter {
             if interrupter.wait_for(|b| *b == true).await.is_ok() {
-                println!("interrupt received");
+                debug_date.print_msg("Interrupt received");
                 let _ = input_stream.sender.send(InputSignal::Interrupt);
             }
         }
     });
 
-    let result = if let Some(metric) = metric {
-        solver.minimize_with(metric, on_new_solution, None)
-    } else {
-        solver.solve(None)
-    };
+    let join = handle.spawn_blocking(move || {
+        debug_date.print_msg("Starting solver");
 
-    // tag result with cost
-    let result = result.map(|s| {
-        let cost = metric.map(|metric| s.domain_of(metric).0);
-        (s, cost)
-    });
+        let result = if let Some(metric) = metric {
+            solver.minimize_with(metric, on_new_solution, None)
+        } else {
+            solver.solve(None)
+        };
+        debug_date.print_msg("Solver Ended");
 
-    if let SolverResult::Sol(_) = result {
-        if PRINT_PLANNER_OUTPUT.get() {
-            solver.print_stats()
+        // tag result with cost
+        let result = result.map(|s| {
+            let cost = metric.map(|metric| s.domain_of(metric).0);
+            (s, cost)
+        });
+
+        if let SolverResult::Sol(_) = result {
+            if PRINT_PLANNER_OUTPUT.get() {
+                solver.print_stats()
+            }
         }
-    }
-    result
+        result
+    });
+    join.await.unwrap()
 }

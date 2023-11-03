@@ -86,7 +86,7 @@ pub fn encode_ctx(
     let th = TypeHierarchy::new(types).unwrap_or_else(|e| panic!("{e}"));
 
     for (t, instances) in &instance.inner {
-        for sym in instances {
+        for sym in instances.get_all_elements() {
             symbols.push(TypedSymbol::new(sym, t));
         }
     }

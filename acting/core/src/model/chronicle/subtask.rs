@@ -41,7 +41,7 @@ impl GetVariables for SubTask {
 }
 
 impl Replace for SubTask {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.interval.replace(old, new);
         self.name.replace(old, new);
         self.result.replace(old, new);

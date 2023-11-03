@@ -481,7 +481,7 @@ pub fn read_chronicle(
             None => ctx.model.new_bvar(container / VarType::Presence),
         };
         let variable: Variable = prez_var.into();
-        table.add_binding(*ch.get_presence(), variable);
+        table.add_binding(ch.get_presence(), variable);
         params.push(variable);
         let prez: aLit = prez_var.true_lit();
         prez
@@ -490,9 +490,10 @@ pub fn read_chronicle(
     //print!("init params...");
     //TODO: handle case where some parameters are already instantiated.
     for var in &ch.get_variables() {
-        let var_domain = st.get_var_domain(var);
+        let var = st.get_var_parent(*var);
+        let var_domain = st.get_var_domain(st.get_domain_id(var));
         let domain = &var_domain.domain;
-        let label = st.get_label(var, false);
+        let label = st.get_label(var, true);
         let var_type = if label.starts_with(TIMEPOINT_PREFIX)
             || label.starts_with(START_TASK_PREFIX)
             || label.starts_with(END_TASK_PREFIX)
@@ -538,7 +539,7 @@ pub fn read_chronicle(
             }
         };
 
-        let param = if let Some(var) = table.get_var(*var) {
+        let param = if let Some(var) = table.get_var(var) {
             *var
         } else if t == lattice.get_type_id(TYPE_TIMEPOINT).unwrap() {
             let fvar = ctx.model.new_optional_fvar(
@@ -549,10 +550,10 @@ pub fn read_chronicle(
                 container / var_type,
             );
 
-            table.add_binding(*var, fvar.into());
+            table.add_binding(var, fvar.into());
             fvar.into()
         } else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
-            if let Some(var) = table.get_var(*var) {
+            if let Some(var) = table.get_var(var) {
                 *var
             } else {
                 panic!()
@@ -571,7 +572,7 @@ pub fn read_chronicle(
             let ivar = ctx
                 .model
                 .new_optional_ivar(lb, ub, prez, container / var_type);
-            table.add_binding(*var, ivar.into());
+            table.add_binding(var, ivar.into());
             ivar.into()
         } else if *t == TYPE_ID_FLOAT || *t == TYPE_ID_NUMBER {
             let fvar = ctx.model.new_optional_fvar(
@@ -585,7 +586,7 @@ pub fn read_chronicle(
             fvar.into()
         } else if *t == TYPE_ID_BOOLEAN {
             let bvar = ctx.model.new_optional_bvar(prez, container / var_type);
-            table.add_binding(*var, bvar.into());
+            table.add_binding(var, bvar.into());
             bvar.into()
         } else if *t == TYPE_ID_NIL {
             unreachable!()
@@ -610,7 +611,7 @@ pub fn read_chronicle(
             let svar = ctx
                 .model
                 .new_optional_sym_var(t, prez, container / var_type);
-            table.add_binding(*var, svar.into());
+            table.add_binding(var, svar.into());
             svar.into()
         };
         if let Some(var_val) = var_val {

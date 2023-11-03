@@ -174,6 +174,7 @@ impl PlannerManager {
                     stat,
                     update
                 }) = Self::wait_plan(&mut plan_receiver) => {
+                    //println!("planning instance terminated");
                     plan_receiver = None;
                     interrupter = None;
                     _updater = None;
@@ -181,8 +182,10 @@ impl PlannerManager {
                     if let Some(update) =update {
                         acting_manager.write().await.update_acting_tree(update).await;
                     }
+                    planning = false;
                 }
                 _ = process.recv() => {
+                    //println!("killing process planner manager");
                     if let Some(pr) = Self::interrupt(&mut interrupter, &mut plan_receiver).await {
                         stats.write().await.add_stat(pr.stat);
                     };
@@ -192,6 +195,7 @@ impl PlannerManager {
 
                         let now = clock_manager.now();
                         let tick = *clock.borrow();
+                        //println!("tick {}", tick);
                         let mut updates = vec![];
                         while let Ok(update) = rx_update.try_recv() {
                             updates.push(update)
@@ -206,82 +210,93 @@ impl PlannerManager {
                         if !state_update.is_empty() {
                             updates.push(PlannerUpdate::StateUpdate(state_update.drain().collect()));
                         }
-                        if !updates.is_empty() {
-                        //Debug
-                        let explanation = {
-                            let mut explanation = format!("Planning tick n°{tick}\n");
-                            for update in updates {
-                                let update: PlannerUpdate = update;
-                                match update {
-                                    PlannerUpdate::VarUpdate(v) => {
-                                        writeln!(explanation, "- Update of vars {}.", v.format(&st, true)).unwrap();
-                                    }
-                                    PlannerUpdate::ProblemUpdate(a) => {
-                                        writeln!(explanation, "- Planning with new process {a}.").unwrap();
-                                    }
-                                    PlannerUpdate::StateUpdate(s) => {
-                                        writeln!(explanation, "- State Update:").unwrap();
-                                        for u in s {
-                                            writeln!(explanation, "\t - {}", u).unwrap();
-                                        }
-                                    }
-                                    PlannerUpdate::Plan => {
-                                        writeln!(explanation, "- Requested replanning of tree.").unwrap();
-                                    }
-                                }
-                            }
-                            explanation
-                        };
-
-                        if planning {
-                            if let Some(pr) = Self::interrupt(&mut interrupter, &mut plan_receiver).await {
-                                stats.write().await.add_stat(pr.stat)
-                            };
-                        }
-
-                        let mut new_state = state_manager.get_snapshot().await;
-                        let resource_state = resource_manager.get_snapshot(Some(now)).await;
-                        new_state.absorb(resource_state);
-
-                        let mut env = env.clone();
-                        env.update_context(ModState::new_from_snapshot(new_state.clone()));
-
-                        let ep = ExecutionProblem {
-                            state: new_state,
-                            st: st.clone(),
-                            chronicles: acting_manager.read().await.get_current_chronicles(),
-                        };
-
-
-                        let config = PlannerInstanceConfig {
-                            id: next_id,
-                            config: OMPASLCPConfig {
-                                state_subscriber_id: state_update_subscriber.id,
-                                opt,
-                                state_manager:state_manager.clone(),
-                                domain: domain.clone(),
-                                env,
-                            },
-                            clock_manager: clock_manager.clone(),
-                            explanation,
-
-                        };
-
-                        let PlannerInstance {
-                            id: _id,
-                             _updater: u,
-                             interrupter: i,
-                             plan_receiver: p,
-                        } =
-                        PlannerInstance::new(ep, config);
-
-                        next_id+=1;
-                        _updater = Some(u);
-                        interrupter = Some(i);
-                        plan_receiver = Some(p);
-                        planning = true;
-
-                    }
+                        //println!("updates acquired {}", updates.len());
+                    //     if !updates.is_empty() {
+                    //     //Debug
+                    //         let explanation = {
+                    //             let mut explanation = format!("Planning tick n°{tick}\n");
+                    //             for update in updates {
+                    //                 let update: PlannerUpdate = update;
+                    //                 match update {
+                    //                     PlannerUpdate::VarUpdate(v) => {
+                    //                         writeln!(explanation, "- Update of vars {}.", v.format(&st, true)).unwrap();
+                    //                     }
+                    //                     PlannerUpdate::ProblemUpdate(a) => {
+                    //                         writeln!(explanation, "- Planning with new process {a}.").unwrap();
+                    //                     }
+                    //                     PlannerUpdate::StateUpdate(s) => {
+                    //                         writeln!(explanation, "- State Update:").unwrap();
+                    //                         for u in s {
+                    //                             writeln!(explanation, "\t - {}", u).unwrap();
+                    //                         }
+                    //                     }
+                    //                     PlannerUpdate::Plan => {
+                    //                         writeln!(explanation, "- Requested replanning of tree.").unwrap();
+                    //                     }
+                    //                 }
+                    //             }
+                    //             explanation
+                    //         };
+                    //         println!("new planning instance");
+                    //
+                    //         if planning {
+                    //             println!("interrupting previous one");
+                    //             if let Some(pr) = Self::interrupt(&mut interrupter, &mut plan_receiver).await {
+                    //                 stats.write().await.add_stat(pr.stat)
+                    //             };
+                    //         }
+                    //
+                    //         let mut new_state = state_manager.get_snapshot().await;
+                    //         let resource_state = resource_manager.get_snapshot(Some(now)).await;
+                    //         new_state.absorb(resource_state);
+                    //
+                    //         let mut env = env.clone();
+                    //         env.update_context(ModState::new_from_snapshot(new_state.clone()));
+                    //         println!("getting new state");
+                    //
+                    //         let chronicles = acting_manager.read().await.get_current_chronicles();
+                    //         println!("getting current chronicles");
+                    //
+                    //         let ep = ExecutionProblem {
+                    //             state: new_state,
+                    //             st: st.clone(),
+                    //             chronicles: chronicles,
+                    //         };
+                    //
+                    //
+                    //         let config = PlannerInstanceConfig {
+                    //             id: next_id,
+                    //             config: OMPASLCPConfig {
+                    //                 state_subscriber_id: state_update_subscriber.id,
+                    //                 opt,
+                    //                 state_manager:state_manager.clone(),
+                    //                 domain: domain.clone(),
+                    //                 env,
+                    //             },
+                    //             clock_manager: clock_manager.clone(),
+                    //             explanation,
+                    //
+                    //         };
+                    //
+                    //         println!("creating new planning instance");
+                    //         let PlannerInstance {
+                    //             id: _id,
+                    //              _updater: u,
+                    //              interrupter: i,
+                    //              plan_receiver: p,
+                    //         } =
+                    //         PlannerInstance::new(ep, config).await;
+                    //
+                    //         next_id+=1;
+                    //         _updater = Some(u);
+                    //         interrupter = Some(i);
+                    //         plan_receiver = Some(p);
+                    //         planning = true;
+                    //
+                    // }
+                    // else {
+                    //         println!("no update");
+                    // }
                 }
             }
         }
@@ -308,7 +323,7 @@ pub struct PlannerInstance {
 }
 
 impl PlannerInstance {
-    pub fn new(execution_problem: ExecutionProblem, config: PlannerInstanceConfig) -> Self {
+    pub async fn new(execution_problem: ExecutionProblem, config: PlannerInstanceConfig) -> Self {
         let mut stat = PlanningInstanceStat {
             id: config.id,
             duration: Duration::zero(),
@@ -333,72 +348,68 @@ impl PlannerInstance {
         let (plan_sender, plan_receiver) = oneshot::channel();
         let exp = Arc::new(explanation);
 
-        let handle = Handle::current();
 
-        thread::spawn(move || {
-            let _guard = handle.enter();
+        tokio::spawn(async move {
+            let result = ompas_lcp::run_planner(
+                &execution_problem,
+                &config,
+                |_, _| {},
+                Some(interrupted),
+            )
+            .await;
 
-            tokio::spawn(async move {
-                let result = ompas_lcp::run_planner(
-                    &execution_problem,
-                    &config,
-                    |_, _| {},
-                    Some(interrupted),
-                )
-                .await;
+            let update = if let Ok(Some(pr)) = result {
+                let PlanResult { ass, fp, pp, table } = pr;
 
-                let update = if let Ok(Some(pr)) = result {
-                    let PlanResult { ass, fp, pp, table } = pr;
+                let choices = extract_choices(&table, &ass, &fp.model, &pp);
 
-                    let choices = extract_choices(&table, &ass, &fp.model, &pp);
+                if OMPAS_PLAN_OUTPUT.get() {
+                    println!("Successfully planned for:\n{}", exp);
 
-                    if OMPAS_PLAN_OUTPUT.get() {
-                        println!("Successfully planned for:\n{}", exp);
-
-                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-                            for (origin, chronicle) in pp
-                                .instances
-                                .iter()
-                                .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
-                            {
-                                println!("{:?}:\n{}", origin, chronicle)
-                            }
-                        }
-                        for choice in &choices {
-                            println!("{}:{}", choice.process_ref, choice.choice_inner)
+                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                        for (origin, chronicle) in pp
+                            .instances
+                            .iter()
+                            .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                        {
+                            println!("{:?}:\n{}", origin, chronicle)
                         }
                     }
-                    let new_ams = extract_new_acting_models(&table, &ass, &fp.model, &pp);
-
-                    //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
-                    Some(ActingTreeUpdate {
-                        acting_models: new_ams,
-                        choices,
-                    })
-                } else {
-                    if OMPAS_PLAN_OUTPUT.get() {
-                        println!("Successfully planned for:\n{}", exp);
-                        println!("No solution found by planner for");
-                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-                            for (origin, chronicle) in execution_problem
-                                .chronicles
-                                .iter()
-                                .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
-                            {
-                                println!("{:?}:\n{}", origin, chronicle)
-                            }
-                        }
+                    for choice in &choices {
+                        println!("{}:{}", choice.process_ref, choice.choice_inner)
                     }
-                    None
-                };
-                let end = clock_manager.now();
-                stat.duration =
-                    crate::ompas::manager::acting::interval::Interval::new(start, Some(end))
-                        .duration();
-                if plan_sender.send(PlannerResult { stat, update }).is_err() {
-                    panic!("error sending plan update");
                 }
-            })
+                let new_ams = extract_new_acting_models(&table, &ass, &fp.model, &pp);
+
+                //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
+                Some(ActingTreeUpdate {
+                    acting_models: new_ams,
+                    choices,
+                })
+            } else {
+                //println!("No solution");
+                if OMPAS_PLAN_OUTPUT.get() {
+                    println!("No solution found by planner for");
+                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                        for (origin, chronicle) in execution_problem
+                            .chronicles
+                            .iter()
+                            .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                        {
+                            println!("{:?}:\n{}", origin, chronicle)
+                        }
+                    }
+                }
+                None
+            };
+            let end = clock_manager.now();
+            stat.duration =
+                crate::ompas::manager::acting::interval::Interval::new(start, Some(end))
+                    .duration();
+            //println!("sending update");
+            if plan_sender.send(PlannerResult { stat, update }).is_err() {
+                panic!("error sending plan update");
+            }
         });
 
         Self {
@@ -509,11 +520,11 @@ pub async fn populate_problem<'a>(
             if !cis.iter().any(|ci| ci.origin == origin) {
                 let mut value: Vec<ActionParam> = vec![];
                 for e in &subtask.name {
-                    let domain = st.get_domain_of_var(e);
+                    let domain = st.get_domain_of_var(*e);
 
                     let val = match domain.as_cst() {
                         Some(cst) => ActionParam::Instantiated(cst.clone().into()),
-                        None => ActionParam::Uninstantiated(st.format_variable(e).into()),
+                        None => ActionParam::Uninstantiated(st.format_variable(*e).into()),
                     };
                     value.push(val)
                 }
@@ -706,13 +717,13 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
 
     for chronicle in pp.instances.iter().map(|i| &i.instantiated_chronicle) {
         for e in chronicle.get_effects() {
-            let start_domain = st.get_domain_of_var(&e.get_start());
+            let start_domain = st.get_domain_of_var(e.get_start());
             if start_domain.is_constant() {
                 active_effects.push(ActiveEffect {
                     sv: e.sv.format(&st, true),
                     start: start_domain.as_cst().unwrap().as_float().unwrap(),
                     end: st
-                        .get_domain_of_var(&e.get_end())
+                        .get_domain_of_var(e.get_end())
                         .as_cst()
                         .map(|c| c.as_float().unwrap()),
                 })
@@ -762,7 +773,7 @@ fn initialize_root_chronicle(pp: &mut PlannerProblem) {
 
     'loop_effect: for effect in effects {
         let effect_date = st
-            .get_domain_of_var(&effect.get_start())
+            .get_domain_of_var(effect.get_start())
             .as_cst()
             .unwrap_or_else(|| panic!("{}", effect.format(&st, true)))
             .as_float()
@@ -835,7 +846,7 @@ pub fn extract_choices(
     let mut resource_accesses: HashMap<String, Vec<(ProcessRef, ChoiceAcquire)>> =
         Default::default();
 
-    let var_id_as_cst = |st: &RefSymTable, var_id: &VarId| match st.var_as_cst(var_id) {
+    let var_id_as_cst = |st: &RefSymTable, var_id: VarId| match st.var_as_cst(var_id) {
         Some(cst) => cst,
         None => get_var_as_cst(table, ass, model, var_id),
     };
@@ -851,14 +862,14 @@ pub fn extract_choices(
         let chronicle = &instance.instantiated_chronicle;
         let st = &chronicle.st;
 
-        let start = var_id_as_cst(st, &chronicle.interval.get_start());
+        let start = var_id_as_cst(st, chronicle.interval.get_start());
 
-        let end = var_id_as_cst(st, &chronicle.interval.get_end());
+        let end = var_id_as_cst(st, chronicle.interval.get_end());
 
         let name: Vec<Cst> = chronicle
             .get_name()
             .iter()
-            .map(|var_id| var_id_as_cst(st, var_id))
+            .map(|var_id| var_id_as_cst(st, *var_id))
             .collect();
 
         choices.push(Choice::new(
@@ -879,7 +890,7 @@ pub fn extract_choices(
             pr.push(*label);
             let choice: ChoiceInner = match binding {
                 ActingProcessModel::Arbitrary(a) => {
-                    let val = var_id_as_cst(st, &a.var_id);
+                    let val = var_id_as_cst(st, a.var_id);
 
                     ChoiceInner::Arbitrary(ChoiceArbitrary { val })
                 }
@@ -888,21 +899,21 @@ pub fn extract_choices(
                         .task
                         .name
                         .iter()
-                        .map(|var_id| var_id_as_cst(st, var_id))
+                        .map(|var_id| var_id_as_cst(st, *var_id))
                         .collect();
 
-                    let start = var_id_as_cst(st, &action.task.interval.get_start());
+                    let start = var_id_as_cst(st, action.task.interval.get_start());
 
-                    let end = var_id_as_cst(st, &action.task.interval.get_end());
+                    let end = var_id_as_cst(st, action.task.interval.get_end());
 
                     ChoiceInner::SubTask(ChoiceSubTask { name, start, end })
                 }
                 ActingProcessModel::Resource(a) => {
-                    let resource = var_id_as_cst(st, &a.resource);
-                    let quantity = var_id_as_cst(st, &a.quantity);
-                    let request = var_id_as_cst(st, &a.request);
-                    let s_acq = var_id_as_cst(st, &a.acquisition.get_start());
-                    let e_acq = var_id_as_cst(st, &a.acquisition.get_end());
+                    let resource = var_id_as_cst(st, a.resource);
+                    let quantity = var_id_as_cst(st, a.quantity);
+                    let request = var_id_as_cst(st, a.request);
+                    let s_acq = var_id_as_cst(st, a.acquisition.get_start());
+                    let e_acq = var_id_as_cst(st, a.acquisition.get_end());
 
                     let raw_acquire = ChoiceAcquire {
                         resource,
@@ -953,7 +964,7 @@ pub fn get_var_as_cst(
     table: &ActingVarRefTable,
     ass: &Arc<SavedAssignment>,
     model: &Model<VarLabel>,
-    var: &VarId,
+    var: VarId,
 ) -> Cst {
     match table
         .get_var(var)

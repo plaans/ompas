@@ -255,7 +255,7 @@ pub fn equal(a: &Interval, b: &Interval) -> Constraint {
 }
 
 impl Replace for Constraint {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)

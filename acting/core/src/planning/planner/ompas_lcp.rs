@@ -104,6 +104,7 @@ pub async fn run_planner(
         if PRINT_PLANNER_OUTPUT.get() {
             println!("{depth_string} Solving with depth {depth_string}");
         }
+        break;
 
         pp = populate_problem(FinitePlanningProblem::PlannerProblem(&pp), domain, env, 1)
             .await
@@ -180,7 +181,7 @@ pub async fn run_planner(
             on_new_valid_assignment,
             best_cost - 1,
             interrupter.clone(),
-        );
+        ).await;
         if PRINT_PLANNER_OUTPUT.get() {
             println!("  [{:.3}s] Solved", start.elapsed().as_secs_f32());
         }
@@ -253,7 +254,7 @@ pub async fn run_planner(
 ///
 /// If a valid solution of the subproblem is found, the solver will return a satisfying assignment.
 #[allow(clippy::too_many_arguments)]
-fn solve_finite_problem(
+async fn solve_finite_problem(
     pb: Arc<FiniteProblem>,
     strategies: &[Strat],
     metric: Option<Metric>,
@@ -291,7 +292,8 @@ fn solve_finite_problem(
     let input_stream = solver.input_stream();
     tokio::spawn(async move {
         if let Some(mut interrupter) = interrupter {
-            if interrupter.wait_for(|b| *b).await.is_ok() {
+            if interrupter.wait_for(|b| *b == true).await.is_ok() {
+                println!("interrupt received");
                 let _ = input_stream.sender.send(InputSignal::Interrupt);
             }
         }

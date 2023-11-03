@@ -78,7 +78,7 @@ impl FlatBindings for Computation {
 }
 
 impl Replace for Computation {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         match self {
             Self::Add(vec) | Self::Sub(vec) | Self::Mul(vec) | Self::Div(vec) => {
                 for e in vec {

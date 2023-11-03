@@ -1,6 +1,6 @@
 use crate::model::sym_domain::basic_type::BasicType;
 use crate::model::sym_domain::Domain;
-use crate::model::sym_table::{DomainId, EmptyDomains, SymTable, VarId};
+use crate::model::sym_table::{DomainId, EmptyDomains, SymTable};
 use std::sync::Arc;
 
 pub type UpdateClosure = Arc<Box<dyn Fn(&mut SymTable) -> EmptyDomains + Send + 'static + Sync>>;
@@ -8,19 +8,19 @@ pub type UpdateClosure = Arc<Box<dyn Fn(&mut SymTable) -> EmptyDomains + Send + 
 #[derive(Clone)]
 pub struct Update {
     pub closure: UpdateClosure,
-    pub id: VarId,
+    pub id: DomainId,
 }
 
 impl Update {
-    pub fn new(id: VarId, closure: UpdateClosure) -> Self {
+    pub fn new(id: DomainId, closure: UpdateClosure) -> Self {
         Self { closure, id }
     }
 }
 
 pub fn in_union_update(id: DomainId, union_atom: DomainId) -> UpdateClosure {
     Arc::new(Box::new(move |st| {
-        let id = st.get_domain_parent(&id);
-        let union_atom = st.get_domain_parent(&union_atom);
+        let id = st.get_domain_parent(id);
+        let union_atom = st.get_domain_parent(union_atom);
         let union_domain = &st.domains[union_atom].domain;
         let in_union_domain = &st.domains[id].domain;
         let domain = st.meet(union_domain, in_union_domain);
@@ -35,8 +35,8 @@ pub fn in_union_update(id: DomainId, union_atom: DomainId) -> UpdateClosure {
 
 pub fn union_update(id: DomainId, union: Vec<DomainId>) -> UpdateClosure {
     Arc::new(Box::new(move |st| {
-        let id = st.get_domain_parent(&id);
-        let union: Vec<VarId> = union.iter().map(|id| st.get_domain_parent(id)).collect();
+        let id = st.get_domain_parent(id);
+        let union: Vec<DomainId> = union.iter().map(|id| st.get_domain_parent(*id)).collect();
 
         let mut emptys = EmptyDomains::None;
         let mut new_domain = Domain::empty();
@@ -57,8 +57,8 @@ pub fn union_update(id: DomainId, union: Vec<DomainId>) -> UpdateClosure {
 
 pub fn in_composed_update(id: DomainId, composed: DomainId) -> UpdateClosure {
     Arc::new(Box::new(move |st| {
-        let id = st.get_domain_parent(&id);
-        let composed = st.get_domain_parent(&composed);
+        let id = st.get_domain_parent(id);
+        let composed = st.get_domain_parent(composed);
         let composed = st.domains[composed].domain.clone();
 
         if composed.is_empty() {
@@ -85,8 +85,8 @@ pub fn in_composed_update(id: DomainId, composed: DomainId) -> UpdateClosure {
 
 pub fn composed_update(id: DomainId, atom: DomainId) -> UpdateClosure {
     Arc::new(Box::new(move |st| {
-        let id = st.get_domain_parent(&id);
-        let atom = st.get_domain_parent(&atom);
+        let id = st.get_domain_parent(id);
+        let atom = st.get_domain_parent(atom);
         let sub = st.domains[atom].domain.clone();
 
         let ancient_domain = &st.domains[id].domain;
@@ -111,9 +111,9 @@ pub fn composed_update(id: DomainId, atom: DomainId) -> UpdateClosure {
 
 pub fn result_is_err_update(id: DomainId, arg_err: DomainId) -> UpdateClosure {
     Arc::new(Box::new(move |st| {
-        let id = st.get_domain_parent(&id);
-        let arg_err = st.get_domain_parent(&arg_err);
-        let d = st.get_domain(&arg_err).clone();
+        let id = st.get_domain_parent(id);
+        let arg_err = st.get_domain_parent(arg_err);
+        let d = st.get_domain(arg_err).clone();
 
         if d.is_empty() {
             EmptyDomains::Some(vec![id])
@@ -139,9 +139,9 @@ pub fn result_is_err_update(id: DomainId, arg_err: DomainId) -> UpdateClosure {
 
 pub fn arg_is_err_update(id: DomainId, result_err: DomainId) -> UpdateClosure {
     Arc::new(Box::new(move |st| {
-        let id = st.get_domain_parent(&id);
-        let result_err = st.get_domain_parent(&result_err);
-        let d = st.get_domain(&result_err).clone();
+        let id = st.get_domain_parent(id);
+        let result_err = st.get_domain_parent(result_err);
+        let d = st.get_domain(result_err).clone();
         let d = if d.is_true() {
             st.meet(&st.domains[id].domain, &BasicType::Err.into())
         } else if d.is_false() {
@@ -161,10 +161,14 @@ pub fn arg_is_err_update(id: DomainId, result_err: DomainId) -> UpdateClosure {
     }))
 }
 
-pub fn result_branch_cond_update(cond: VarId, result_branch: VarId, branch: bool) -> UpdateClosure {
+pub fn result_branch_cond_update(
+    cond: DomainId,
+    result_branch: DomainId,
+    branch: bool,
+) -> UpdateClosure {
     Arc::new(Box::new(move |st| {
-        let cond = st.get_domain_parent(&cond);
-        let result_branch = st.get_domain_parent(&result_branch);
+        let cond = st.get_domain_parent(cond);
+        let result_branch = st.get_domain_parent(result_branch);
 
         let mut empty = EmptyDomains::None;
 
@@ -191,21 +195,21 @@ pub fn cond_result_branching_update(
     false_result: DomainId,
 ) -> UpdateClosure {
     Arc::new(Box::new(move |st| {
-        let cond = st.get_domain_parent(&cond);
-        let true_result = st.get_domain_parent(&true_result);
-        let false_result = st.get_domain_parent(&false_result);
-        let result_branching = st.get_domain_parent(&result_branching);
+        let cond = st.get_domain_parent(cond);
+        let true_result = st.get_domain_parent(true_result);
+        let false_result = st.get_domain_parent(false_result);
+        let result_branching = st.get_domain_parent(result_branching);
 
         let mut empty = EmptyDomains::None;
 
         if st.domains[cond].domain.is_true() {
-            st.remove_update(&false_result, &result_branching);
-            st.remove_update(&result_branching, &false_result);
-            empty.append(st.union_domain(&true_result, &result_branching));
+            st.remove_update(false_result, result_branching);
+            st.remove_update(result_branching, false_result);
+            empty.append(st.union_domain(true_result, result_branching));
         } else if st.domains[cond].domain.is_false() {
-            st.remove_update(&true_result, &result_branching);
-            st.remove_update(&result_branching, &true_result);
-            empty.append(st.union_domain(&false_result, &result_branching));
+            st.remove_update(true_result, result_branching);
+            st.remove_update(result_branching, true_result);
+            empty.append(st.union_domain(false_result, result_branching));
         }
 
         empty

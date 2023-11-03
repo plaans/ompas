@@ -1600,7 +1600,7 @@ impl InnerActingManager {
                         let mut args: Vec<Option<Cst>> = chronicle
                             .get_task()
                             .iter()
-                            .map(|var_id| st.var_as_cst(var_id))
+                            .map(|var_id| st.var_as_cst(*var_id))
                             .collect();
                         match parent {
                             0 => {
@@ -1627,7 +1627,7 @@ impl InnerActingManager {
                         let args: Vec<Option<Cst>> = chronicle
                             .get_name()
                             .iter()
-                            .map(|var_id| st.var_as_cst(var_id))
+                            .map(|var_id| st.var_as_cst(*var_id))
                             .collect();
                         let Label::Refinement(refinement_label) = label else {
                             todo!()
@@ -1661,7 +1661,7 @@ impl InnerActingManager {
                                     let name = &action.name;
                                     let debug = name.format(&st, true);
                                     let args: Vec<_> =
-                                        name.iter().map(|var_id| st.var_as_cst(var_id)).collect();
+                                        name.iter().map(|var_id| st.var_as_cst(*var_id)).collect();
                                     let _id = self.new_task(
                                         label,
                                         &method,

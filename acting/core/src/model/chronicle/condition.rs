@@ -55,7 +55,7 @@ impl GetVariables for Condition {
 }
 
 impl Replace for Condition {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.sv.replace(old, new);
         self.value.replace(old, new);
         self.interval.replace(old, new);

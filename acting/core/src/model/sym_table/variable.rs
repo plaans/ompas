@@ -11,7 +11,7 @@ pub struct Variable {
 }
 
 impl Variable {
-    pub fn new(label: impl Display, domain: VarId) -> Self {
+    pub fn new(label: impl Display, domain: DomainId) -> Self {
         Self {
             domain,
             parameter: false,
@@ -21,7 +21,7 @@ impl Variable {
         }
     }
 
-    pub fn new_parameter(label: impl Display, domain: VarId) -> Self {
+    pub fn new_parameter(label: impl Display, domain: DomainId) -> Self {
         Self {
             domain,
             parameter: true,

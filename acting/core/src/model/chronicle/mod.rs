@@ -107,16 +107,16 @@ impl Chronicle {
     /*
     GETTERS
      */
-    pub fn get_presence(&self) -> &VarId {
-        &self.presence
+    pub fn get_presence(&self) -> VarId {
+        self.presence
     }
 
-    pub fn get_interval(&self) -> &Interval {
-        &self.interval
+    pub fn get_interval(&self) -> Interval {
+        self.interval
     }
 
-    pub fn get_result(&self) -> &VarId {
-        &self.result
+    pub fn get_result(&self) -> VarId {
+        self.result
     }
 
     pub fn get_result_as_lit(&self) -> Lit {
@@ -179,8 +179,10 @@ impl Chronicle {
         variables
             .iter()
             .filter(|a| {
-                sym_table
-                    .contained_in_domain(&sym_table.get_domain_of_var(a), &BasicType::Symbol.into())
+                sym_table.contained_in_domain(
+                    &sym_table.get_domain_of_var(**a),
+                    &BasicType::Symbol.into(),
+                )
             })
             .cloned()
             .collect()
@@ -263,8 +265,8 @@ impl Chronicle {
     ADDERS
      */
     pub fn add_var(&mut self, var_id: VarId) {
-        let is_variable = !self.st.get_domain_of_var(&var_id).is_constant();
-        let is_param = self.st.get_variable(&var_id).is_parameter();
+        let is_variable = !self.st.get_domain_of_var(var_id).is_constant();
+        let is_param = self.st.get_variable(var_id).is_parameter();
         if is_variable || is_param {
             self.variables.insert(var_id);
         }
@@ -358,7 +360,7 @@ impl Chronicle {
                 format!(
                     "{}({})",
                     id.format(st, sym_version),
-                    st.format_domain_id(&st.get_domain_id(id)),
+                    st.format_domain_id(st.get_domain_id(*id)),
                 )
             })
             .collect::<Vec<String>>();
@@ -440,7 +442,7 @@ impl Chronicle {
 
     pub fn instantiate(mut self, instantiations: Vec<Instantiation>) -> Self {
         for Instantiation { var, value } in instantiations {
-            self.replace(&var, &value);
+            self.replace(var, value);
             self.variables.remove(&var);
             self.variables.remove(&value);
         }
@@ -531,7 +533,7 @@ impl Chronicle {
         let st = self.st.clone();
         let mut free_variables: HashSet<VarId> = Default::default();
         for var in &self.variables {
-            if !st.get_domain_of_var(var).is_constant() {
+            if !st.get_domain_of_var(*var).is_constant() {
                 free_variables.insert(*var);
             }
         }
@@ -651,7 +653,7 @@ impl GetVariables for Chronicle {
 }
 
 impl Replace for Chronicle {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.presence.replace(old, new);
         self.interval.replace(old, new);
         self.name.replace(old, new);
@@ -662,8 +664,8 @@ impl Replace for Chronicle {
                 method.replace(old, new);
             }
         }
-        self.variables.remove(old);
-        self.variables.insert(*new);
+        self.variables.remove(&old);
+        self.variables.insert(new);
         self.conditions.replace(old, new);
         self.constraints.replace(old, new);
         self.subtasks.replace(old, new);

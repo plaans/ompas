@@ -57,16 +57,16 @@ impl FormatWithSymTable for &[VarId] {
 impl FormatWithSymTable for VarId {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
         let id = match sym_version {
-            true => st.get_var_parent(self),
+            true => st.get_var_parent(*self),
             false => *self,
         };
-        st.format_variable(&id)
+        st.format_variable(id)
     }
 }
 
 impl FlatBindings for VarId {
     fn flat_bindings(&mut self, st: &RefSymTable) {
-        *self = st.get_var_parent(self);
+        *self = st.get_var_parent(*self);
     }
 }
 
@@ -84,7 +84,7 @@ pub trait GetVariables {
     ) -> im::HashSet<VarId> {
         self.get_variables()
             .iter()
-            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
+            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(**v), domain))
             .cloned()
             .collect()
     }
@@ -117,22 +117,22 @@ where
 }
 
 pub trait Replace {
-    fn replace(&mut self, old: &VarId, new: &VarId);
+    fn replace(&mut self, old: VarId, new: VarId);
 }
 
 impl<T> Replace for Vec<T>
 where
     T: Replace,
 {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.iter_mut().for_each(|e| e.replace(old, new))
     }
 }
 
 impl Replace for VarId {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
-        if self == old {
-            *self = *new
+    fn replace(&mut self, old: VarId, new: VarId) {
+        if *self == old {
+            *self = new
         }
     }
 }

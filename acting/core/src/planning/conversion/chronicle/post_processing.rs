@@ -21,11 +21,11 @@ use sompas_structs::lvalue::LValue;
 use std::borrow::Borrow;
 use std::fmt::Write;
 use std::ops::Deref;
+use std::time::SystemTime;
 
 const TRY_EVAL_APPLY: &str = "try_eval_apply";
 
 pub fn post_processing(c: &mut Chronicle) -> Result<(), LRuntimeError> {
-    c.st.flat_bindings();
     simplify_constraints(c)?;
     simplify_conditions(c)?;
     simplify_timepoints(c)?;
@@ -38,7 +38,6 @@ pub async fn post_processing_and_try_eval_apply(
     c: &mut Chronicle,
     env: &LEnv,
 ) -> Result<(), LRuntimeError> {
-    c.st.flat_bindings();
     try_eval_apply(c, env).await?;
     post_processing(c)
 }
@@ -50,7 +49,7 @@ pub fn rm_useless_var(c: &mut Chronicle) {
         .get_variables()
         .iter()
         .filter_map(|v| {
-            if c.st.get_variable(v).is_parameter() {
+            if c.st.get_variable(*v).is_parameter() {
                 Some(*v)
             } else {
                 None
@@ -61,7 +60,7 @@ pub fn rm_useless_var(c: &mut Chronicle) {
         .get_all_variables_in_sets()
         .iter()
         .filter_map(|v| {
-            if !c.st.get_domain_of_var(v).is_constant() {
+            if !c.st.get_domain_of_var(*v).is_constant() {
                 Some(*v)
             } else {
                 None
@@ -72,7 +71,7 @@ pub fn rm_useless_var(c: &mut Chronicle) {
 
     let new_vars = used_vars.union(parameters);
     for v in &new_vars {
-        assert_eq!(*v, c.st.get_var_parent(v));
+        assert_eq!(*v, c.st.get_var_parent(*v));
     }
     for v in new_vars {
         c.add_var(v)
@@ -109,8 +108,8 @@ pub fn simplify_timepoints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     let timepoints: HashSet<VarId> = c
         .get_variables()
         .iter()
-        .map(|a| st.get_var_parent(a))
-        .filter(|a| st.contained_in_domain(&st.get_domain_of_var(a), &timepoint_domain))
+        .map(|a| st.get_var_parent(*a))
+        .filter(|a| st.contained_in_domain(&st.get_domain_of_var(*a), &timepoint_domain))
         .collect();
 
     //println!("timepoints: {:?}", format_hash(&timepoints));
@@ -123,8 +122,8 @@ pub fn simplify_timepoints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
             ChronicleSet::SubTask,
         ])
         .iter()
-        .map(|a| st.get_var_parent(a))
-        .filter(|a| st.contained_in_domain(&st.get_domain_of_var(a), &timepoint_domain))
+        .map(|a| st.get_var_parent(*a))
+        .filter(|a| st.contained_in_domain(&st.get_domain_of_var(*a), &timepoint_domain))
         .collect();
 
     //println!("used timepoints: {}", format_hash(&used_timepoints));
@@ -132,10 +131,10 @@ pub fn simplify_timepoints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     let hard_timepoints: HashSet<VarId> = c
         .get_variables()
         .iter()
-        .map(|a| st.get_var_parent(a))
+        .map(|a| st.get_var_parent(*a))
         .filter(|a| {
-            let is_parameter = st.get_variable(a).is_parameter();
-            let is_timepoint = st.contained_in_domain(&st.get_domain_of_var(a), &timepoint_domain);
+            let is_parameter = st.get_variable(*a).is_parameter();
+            let is_timepoint = st.contained_in_domain(&st.get_domain_of_var(*a), &timepoint_domain);
             is_parameter && is_timepoint
         })
         .collect();
@@ -168,8 +167,6 @@ pub fn simplify_timepoints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     for r in problem.get_relations() {
         c.add_constraint(r.into())
     }
-
-    c.st.flat_bindings();
 
     Ok(())
 }
@@ -206,7 +203,7 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
                 match (a, b) {
                     //Simplify equality constraints between atoms
                     (Lit::Atom(a), Lit::Atom(b)) => {
-                        let r = st.union_var(a, b);
+                        let r = st.union_var(*a, *b);
                         if r.is_none() {
                             to_remove.insert(i1);
                         } else {
@@ -214,7 +211,8 @@ pub fn simplify_constraints(c: &mut Chronicle) -> Result<(), LRuntimeError> {
                         }
                     }
                     (Lit::Atom(a), Lit::Constraint(b)) | (Lit::Constraint(b), Lit::Atom(a)) => {
-                        if st.contained_in_domain(&st.get_domain_of_var(a), &BasicType::True.into())
+                        if st
+                            .contained_in_domain(&st.get_domain_of_var(*a), &BasicType::True.into())
                         {
                             vec.push((i1, b.deref().clone()));
                         }
@@ -241,25 +239,25 @@ pub fn simplify_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     let instance_id = st.get_sym_id(INSTANCE).unwrap();
     //println!("instance: {}", instance_id);
     for (i, condition) in c.conditions.iter().enumerate() {
-        let parent = st.get_var_parent(&condition.sv[0]);
+        let parent = st.get_var_parent(condition.sv[0]);
         //println!("condition: {}, {}", condition.format(&st, true), parent,);
         if instance_id == parent && !TEST_CONVERSION.get() {
             //println!("condition is instance");
             assert_eq!(condition.sv.len(), 2);
             let target_domain: String = condition.value.format(&st, true);
-            let domain_id = st.get_domain_id(&condition.sv[1]);
+            let domain_id = st.get_domain_id(condition.sv[1]);
             let t_domain = Domain::Simple(
                 *st.get_lattice()
                     .get_type_id(&target_domain)
                     .unwrap_or_else(|| panic!("{} is not defined as a type", target_domain)),
             );
-            match st.meet_to_domain(&domain_id, t_domain) {
+            match st.meet_to_domain(domain_id, t_domain) {
                 EmptyDomains::None => vec.push(i),
                 EmptyDomains::Some(_) => {
                     panic!(
                         "{} of type {} is not compatible with type {}",
                         condition.sv[1].format(&st, true),
-                        st.format_domain_id(&domain_id),
+                        st.format_domain_id(domain_id),
                         target_domain
                     )
                 }
@@ -281,7 +279,7 @@ pub fn merge_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
         for (j, c2) in c.get_conditions()[next..].iter().enumerate() {
             let index = j + next;
             if c1.interval == c2.interval && c1.sv == c2.sv {
-                st.union_var(&c1.value, &c2.value);
+                st.union_var(c1.value, c2.value);
                 c_to_remove.insert(index);
             }
         }
@@ -293,40 +291,43 @@ pub fn merge_conditions(c: &mut Chronicle) -> Result<(), LRuntimeError> {
     vec.reverse();
     vec.iter().for_each(|i| c.remove_condition(*i));
 
-    c.st.flat_bindings();
     c.flat_bindings();
     Ok(())
 }
 
 pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntimeError> {
+    let time = SystemTime::now();
+    //println!("({} ms) begin try eval_apply", time.elapsed().unwrap().as_millis());
     let env = env.clone();
     let st = c.st.clone();
 
     let mut c_to_remove: Vec<usize> = Default::default();
 
     'loop_constraint: for (i, constraint) in c.constraints.iter_mut().enumerate() {
+        //println!("({} ms) iteration {}", time.elapsed().unwrap().as_millis(), i);
         if let Constraint::Eq(Lit::Atom(r_c), b) = constraint {
             if let Lit::Apply(args) = b {
+                //println!("({} ms) apply constraint", time.elapsed().unwrap().as_millis());
                 let mut args = args.clone();
                 args.flat_bindings(&st);
                 for arg in &args {
-                    if !st.get_domain_of_var(arg).is_constant() {
+                    if !st.get_domain_of_var(*arg).is_constant() {
                         continue 'loop_constraint;
                     }
                 }
                 let expr = args.format(&st, true);
-                //print!("apply{expr}");
+                //print!("({} ms) apply{expr}", time.elapsed().unwrap().as_millis());
                 let mut env = env.clone();
                 let lv: LValue = {
                     let lv = parse(expr.as_str(), &mut env).await?;
                     eval(&lv, &mut env, None).await
                 }?;
-                //println!("=> {lv}");
+                //println!("({} ms)=> {lv}", time.elapsed().unwrap().as_millis());
 
                 let lit = lvalue_to_lit(&lv, &st)?;
                 match lit {
                     Lit::Atom(a) => {
-                        if let EmptyDomains::Some(_) = st.union_var(r_c, &a) {
+                        if let EmptyDomains::Some(_) = st.union_var(*r_c, a) {
                             return Err(LRuntimeError::new(
                                 TRY_EVAL_APPLY,
                                 format!(
@@ -342,16 +343,23 @@ pub async fn try_eval_apply(c: &mut Chronicle, env: &LEnv) -> Result<(), LRuntim
                         *b = lit;
                     }
                 }
+                /*println!(
+                    "({} ms) end transformation of apply",
+                    time.elapsed().unwrap().as_millis()
+                );*/
             }
         }
     }
+    //std::process::exit(0);
 
     let mut vec: Vec<usize> = c_to_remove.to_vec();
 
     vec.reverse();
     vec.iter().for_each(|i| c.remove_constraint(*i));
 
-    c.st.flat_bindings();
-    c.flat_bindings();
+    //c.st.flat_bindings();
+    //c.flat_bindings();
+    //println!("({} ms) end try_eval_apply", time.elapsed().unwrap().as_millis());
+
     Ok(())
 }

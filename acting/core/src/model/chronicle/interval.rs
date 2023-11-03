@@ -108,7 +108,7 @@ impl GetVariables for Interval {
 }
 
 impl Replace for Interval {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.end.replace(old, new);
         self.start.replace(old, new);
         if let Some(d) = &mut self.duration {

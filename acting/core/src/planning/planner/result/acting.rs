@@ -94,14 +94,14 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
         let lv: Vec<LValue> = chronicle
             .get_name()
             .iter()
-            .map(|var_id| st.get_domain_of_var(var_id).as_cst().unwrap().into())
+            .map(|var_id| st.get_domain_of_var(*var_id).as_cst().unwrap().into())
             .collect();
         let lv = lv.into();
 
         let interval = chronicle.interval;
 
         let start = st
-            .get_domain_of_var(&interval.get_start())
+            .get_domain_of_var(interval.get_start())
             .as_cst()
             .unwrap()
             .as_float()
@@ -111,7 +111,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             TIME_SCALE.get() as u64,
         );
         let end = st
-            .get_domain_of_var(&interval.get_end())
+            .get_domain_of_var(interval.get_end())
             .as_cst()
             .unwrap()
             .as_float()
@@ -137,7 +137,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             let choice: RawChoice = match binding {
                 ActingProcessModel::Arbitrary(a) => {
                     let lv: LValue = st
-                        .get_domain_of_var(&a.var_id)
+                        .get_domain_of_var(a.var_id)
                         .as_cst()
                         .unwrap()
                         .clone()
@@ -149,12 +149,12 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         .task
                         .name
                         .iter()
-                        .map(|var_id| st.get_domain_of_var(var_id).as_cst().unwrap().into())
+                        .map(|var_id| st.get_domain_of_var(*var_id).as_cst().unwrap().into())
                         .collect();
                     let lv = lv.into();
 
                     let start = st
-                        .get_domain_of_var(&s.task.interval.get_start())
+                        .get_domain_of_var(s.task.interval.get_start())
                         .as_cst()
                         .unwrap()
                         .as_float()
@@ -164,7 +164,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         TIME_SCALE.get() as u64,
                     );
                     let end = st
-                        .get_domain_of_var(&s.task.interval.get_end())
+                        .get_domain_of_var(s.task.interval.get_end())
                         .as_cst()
                         .unwrap()
                         .as_float()
@@ -181,13 +181,13 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                 ActingProcessModel::Resource(a) => {
                     let resource: String = a.resource.format(st, true);
                     let quantity: usize = st
-                        .get_domain_of_var(&a.quantity)
+                        .get_domain_of_var(a.quantity)
                         .as_cst()
                         .unwrap()
                         .as_int()
                         .unwrap() as usize;
                     let request = st
-                        .get_domain_of_var(&a.request)
+                        .get_domain_of_var(a.request)
                         .as_cst()
                         .unwrap()
                         .as_float()
@@ -198,7 +198,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                     );
 
                     let start_acquisition = st
-                        .get_domain_of_var(&a.acquisition.get_start())
+                        .get_domain_of_var(a.acquisition.get_start())
                         .as_cst()
                         .unwrap()
                         .as_float()
@@ -209,7 +209,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                     );
 
                     let end_acq = st
-                        .get_domain_of_var(&a.acquisition.get_end())
+                        .get_domain_of_var(a.acquisition.get_end())
                         .as_cst()
                         .unwrap()
                         .as_float()

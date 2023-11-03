@@ -110,7 +110,7 @@ impl GetVariables for Effect {
 }
 
 impl Replace for Effect {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.sv.replace(old, new);
         self.operation.get_mut().replace(old, new);
         self.interval.replace(old, new);

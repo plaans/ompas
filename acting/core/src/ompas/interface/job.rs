@@ -4,7 +4,7 @@ use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 use tokio::sync::mpsc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum JobType {
     Task,
     Command,

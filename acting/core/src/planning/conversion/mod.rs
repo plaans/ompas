@@ -29,7 +29,7 @@ use sompas_structs::lvalue::LValue;
 use std::env::set_current_dir;
 use std::fmt::Display;
 use std::fs;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -72,11 +72,11 @@ pub async fn convert(
     let pp_lv = pre_processing(&lv_om, p_env).await?;
     //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
 
-    let chronicle = match _convert(ch, &pp_lv, p_env, st).await {
+    let chronicle = match _convert(ch.clone(), &pp_lv, p_env, st).await {
         Ok(ch) => Some(ch),
         Err(e) => {
             println!("{}", e);
-            None
+            ch
         }
     };
 
@@ -95,19 +95,27 @@ pub async fn _convert(
     p_env: &mut PLEnv,
     st: RefSymTable,
 ) -> Result<Chronicle, LRuntimeError> {
+    let time = SystemTime::now();
     let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
     let mut graph = FlowGraph::new(st);
 
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
-        println!("conversion n°{n_conversion}:\n{}", lv.format(0));
+        println!(
+            "({} ms) conversion n°{n_conversion}:\n{}",
+            time.elapsed().unwrap().as_millis(),
+            lv.format(0)
+        );
     }
     let flow = convert_lv(lv, &mut graph, &mut Default::default())?;
-    let time = SystemTime::now();
+
     graph.flow = flow;
     flow_graph_post_processing(&mut graph)?;
-    /*if OMPAS_CHRONICLE_DEBUG_ON.get() >= ChronicleDebug::Full {
-        println!("flow_graph_post_processing({n_conversion}) = ok!");
-    }*/
+    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
+        println!(
+            "({} ms) flow_graph_post_processing({n_conversion}) = ok!",
+            time.elapsed().unwrap().as_millis()
+        );
+    }
     let max_capacity = match p_env.env.get_context::<ModExec>(MOD_EXEC) {
         Ok(m) => m.acting_manager.resource_manager.get_max_capacity() as i64,
         Err(_) => 1,
@@ -119,12 +127,18 @@ pub async fn _convert(
 
     let cv = &ConvertParameters { max_capacity };
 
-    let mut ch = convert_graph(ch, &mut graph, &flow, &p_env.env, cv)?;
+    let mut ch = convert_graph(ch, &mut graph, flow, &p_env.env, cv)?;
 
+    //println!("({} ms) converted in chronicle", time.elapsed().unwrap().as_millis());
     try_eval_apply(&mut ch, &p_env.env).await?;
+    //println!("({} ms) try_eval_apply: ok!", time.elapsed().unwrap().as_millis());
     //post_processing(&mut ch, &p_env.env).await?;
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
-        println!("chronicle: {}", ch);
+        println!(
+            "({} ms) chronicle: {}",
+            time.elapsed().unwrap().as_millis(),
+            ch
+        );
     }
     graph.flat_bindings();
     ch.meta_data.flow_graph = graph;
@@ -476,7 +490,11 @@ pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: b
     let mut md_path = path.clone();
     let md_file_name = format!("{}-output.md", label);
     md_path.push(&md_file_name);
-    let mut md_file = File::create(&md_path).unwrap();
+    let mut md_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(&md_path)
+        .unwrap();
     let md: String = format!(
         "# Conversion of expression : {}\n
     Time to convert: {}µs\n

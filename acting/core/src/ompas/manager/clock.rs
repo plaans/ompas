@@ -37,9 +37,7 @@ impl ClockManager {
         let mut process =
             ProcessInterface::new("GLOBAL_CLOCK", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
         tokio::spawn(
-            //'main: loop {
             async move {
-                //println!("period = {} µs", period);
                 let mut tick = 0;
                 'main: loop {
                     tokio::select! {

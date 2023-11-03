@@ -86,7 +86,7 @@ impl ActingProcessModelCollection {
 }
 
 impl Replace for ActingProcessModelCollection {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         for e in self.inner.values_mut() {
             match e {
                 ActingProcessModel::Arbitrary(a) => {
@@ -319,7 +319,7 @@ impl FlatBindings for AcquireModel {
 }
 
 impl Replace for AcquireModel {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.constraints.replace(old, new);
         self.conditions.replace(old, new);
         self.effects.replace(old, new);

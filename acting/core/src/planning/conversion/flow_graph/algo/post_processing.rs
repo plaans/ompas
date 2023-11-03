@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 const FLOW_GRAPH_POST_PROCESS: &str = "flow_graph_post_process";
 
 pub fn flow_graph_post_processing(graph: &mut FlowGraph) -> Result<(), LRuntimeError> {
-    let result_graph = graph.get_flow_result(&graph.flow);
+    let result_graph = graph.get_flow_result(graph.flow);
 
     let mut post_process = binding_constraints(graph);
     post_process.push_front(Subtract(result_graph, BasicType::Err.into()));
@@ -33,46 +33,53 @@ pub fn propagate(
     graph: &mut FlowGraph,
     mut queue: VecDeque<PostProcess>,
 ) -> Result<(), LRuntimeError> {
+    let st = graph.st.clone();
     while let Some(post_process) = queue.pop_front() {
         match post_process {
             Subtract(id, d) => {
-                let id = graph.st.get_var_parent(&id);
-                let domain_id = graph.st.get_domain_id(&id);
+                let id = st.get_var_parent(id);
+                let domain_id = st.get_domain_id(id);
                 //println!("Subtract({id}, {})", graph.sym_table.format_domain(&d));
-                let emptys = graph.st.substract_to_domain(&domain_id, d);
+                let emptys = st.substract_to_domain(domain_id, d);
                 if let EmptyDomains::Some(emptys) = emptys {
                     //println!("[Subtract] Domains of {:?} are empty.", emptys);
                     for e in &emptys {
-                        for f in graph.map_atom_id_flow_id.get(e).unwrap() {
-                            queue.push_back(Invalid(*f));
+                        for var in st.get_domain_vars(*e) {
+                            for f in graph.var_id_location.get(&var).unwrap() {
+                                queue.push_back(Invalid(*f));
+                            }
                         }
                     }
                 }
             }
             Meet(id, d) => {
-                let id = graph.st.get_var_parent(&id);
-                let domain_id = graph.st.get_domain_id(&id);
+                let id = st.get_var_parent(id);
+                let domain_id = st.get_domain_id(id);
                 //println!("Meet({id}, {})", graph.sym_table.format_domain(&d));
 
-                let emptys = graph.st.meet_to_domain(&domain_id, d);
+                let emptys = st.meet_to_domain(domain_id, d);
                 if let EmptyDomains::Some(emptys) = emptys {
                     //println!("[Meet] Domains of {:?} are empty.", emptys);
                     for e in &emptys {
-                        for f in graph.map_atom_id_flow_id.get(e).unwrap() {
-                            queue.push_back(Invalid(*f));
+                        for var in st.get_domain_vars(*e) {
+                            for f in graph.var_id_location.get(&var).unwrap() {
+                                queue.push_back(Invalid(*f));
+                            }
                         }
                     }
                 }
             }
             Bind(id1, id2) => {
-                let id1 = graph.st.get_var_parent(&id1);
-                let id2 = graph.st.get_var_parent(&id2);
+                let id1 = st.get_var_parent(id1);
+                let id2 = st.get_var_parent(id2);
                 //println!("Bind({id1}, {id2})");
-                if let EmptyDomains::Some(emptys) = graph.st.union_var(&id1, &id2) {
+                if let EmptyDomains::Some(emptys) = st.union_var(id1, id2) {
                     //println!("[Bind] Domains of {:?} are empty.", emptys);
                     for e in &emptys {
-                        for f in graph.map_atom_id_flow_id.get(e).unwrap() {
-                            queue.push_back(Invalid(*f));
+                        for var in st.get_domain_vars(*e) {
+                            for f in graph.var_id_location.get(&var).unwrap() {
+                                queue.push_back(Invalid(*f));
+                            }
                         }
                     }
                 }
@@ -126,10 +133,10 @@ pub fn binding_constraints(fl: &mut FlowGraph) -> VecDeque<PostProcess> {
 
                 for f in seq {
                     if let Some(prev) = previous_end {
-                        post_process.push_back(Bind(prev, fl.get_flow_start(f)))
+                        post_process.push_back(Bind(prev, fl.get_flow_start(*f)))
                     }
 
-                    previous_end = Some(fl.get_flow_end(f))
+                    previous_end = Some(fl.get_flow_end(*f))
                 }
 
                 for f in seq {

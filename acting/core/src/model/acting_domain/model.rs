@@ -150,9 +150,9 @@ impl Display for Goal {
 impl ActingModel {
     pub fn root(st: &RefSymTable) -> Self {
         let chronicle = Chronicle::new(ROOT, ChronicleKind::Root, st.clone());
-        st.set_domain(&st.get_domain_id(chronicle.get_result()), Domain::nil());
+        st.set_domain(st.get_domain_id(chronicle.get_result()), Domain::nil());
         st.set_domain(
-            &st.get_domain_id(chronicle.get_presence()),
+            st.get_domain_id(chronicle.get_presence()),
             Domain::d_true(),
         );
 
@@ -242,7 +242,7 @@ impl ActingModel {
 
         let start = st.new_timepoint();
         if let Some(t_s) = task.start {
-            let r = st.set_domain(&st.get_domain_id(&start), t_s.as_secs());
+            let r = st.set_domain(st.get_domain_id(start), t_s.as_secs());
             assert!(r.is_none())
         }
 
@@ -252,7 +252,7 @@ impl ActingModel {
         let end = interval.get_end();
 
         let result = st.new_result();
-        st.set_domain(&st.get_domain_id(&result), Domain::nil());
+        st.set_domain(st.get_domain_id(result), Domain::nil());
 
         let name: Vec<VarId> = task.args.drain(..).map(|cst| st.new_cst(cst)).collect();
 

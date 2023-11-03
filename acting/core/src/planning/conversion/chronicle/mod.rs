@@ -76,24 +76,24 @@ impl HandleTable {
         }
     }
 
-    pub fn add_resource_drop(&mut self, var_id: &VarId, drop: VarId) {
-        if let Some(handle) = self.resources.get_mut(var_id) {
+    pub fn add_resource_drop(&mut self, var_id: VarId, drop: VarId) {
+        if let Some(handle) = self.resources.get_mut(&var_id) {
             handle.drops.insert(drop);
         } else {
             panic!("");
         }
     }
 
-    pub fn add_await(&mut self, flow: &FlowId, r#await: VarId) {
-        if let Some(handle) = self.asyncs.get_mut(flow) {
+    pub fn add_await(&mut self, flow: FlowId, r#await: VarId) {
+        if let Some(handle) = self.asyncs.get_mut(&flow) {
             handle.awaits.insert(r#await);
         } else {
             panic!("");
         }
     }
 
-    pub fn add_release(&mut self, var_id: &VarId, release: VarId) {
-        if let Some(handle) = self.resources.get_mut(var_id) {
+    pub fn add_release(&mut self, var_id: VarId, release: VarId) {
+        if let Some(handle) = self.resources.get_mut(&var_id) {
             handle.releases.insert(release);
         } else {
             panic!("");
@@ -104,7 +104,7 @@ impl HandleTable {
 pub fn convert_graph(
     ch: Option<Chronicle>,
     fl: &mut FlowGraph,
-    flow: &FlowId,
+    flow: FlowId,
     env: &LEnv,
     cv: &ConvertParameters,
 ) -> Result<Chronicle, LRuntimeError> {
@@ -116,7 +116,7 @@ pub fn convert_graph(
         let drops: Vec<VarId> = handle
             .drops
             .iter()
-            .map(|v| ch.st.get_var_parent(v))
+            .map(|v| ch.st.get_var_parent(*v))
             .collect();
         let t_drop = match drops.len() {
             0 => panic!(),
@@ -129,7 +129,7 @@ pub fn convert_graph(
         };
         let mut awaits = handle.awaits.clone();
         awaits.insert(t_drop);
-        let awaits: Vec<VarId> = awaits.drain().map(|v| ch.st.get_var_parent(&v)).collect();
+        let awaits: Vec<VarId> = awaits.drain().map(|v| ch.st.get_var_parent(v)).collect();
         let lit: Option<Lit> = match awaits.len() {
             0 => None,
             1 => Some(awaits.first().unwrap().into()),
@@ -137,7 +137,7 @@ pub fn convert_graph(
         };
 
         if let Some(lit) = lit {
-            let end = fl.st.get_var_parent(&fl.get_flow_end(flow));
+            let end = fl.st.get_var_parent(fl.get_flow_end(*flow));
             ch.add_constraint(Constraint::leq(end, lit));
         }
     }
@@ -146,7 +146,7 @@ pub fn convert_graph(
         let drops: Vec<VarId> = handle
             .drops
             .iter()
-            .map(|v| ch.st.get_var_parent(v))
+            .map(|v| ch.st.get_var_parent(*v))
             .collect();
         let t_drop = match drops.len() {
             0 => panic!(),
@@ -159,7 +159,7 @@ pub fn convert_graph(
         };
         let mut releases = handle.releases.clone();
         releases.insert(t_drop);
-        let releases: Vec<VarId> = releases.drain().map(|v| ch.st.get_var_parent(&v)).collect();
+        let releases: Vec<VarId> = releases.drain().map(|v| ch.st.get_var_parent(v)).collect();
         let lit: Option<Lit> = match releases.len() {
             0 => None,
             1 => Some(releases.first().unwrap().into()),
@@ -179,7 +179,7 @@ pub fn convert_into_chronicle(
     ch: Option<Chronicle>,
     ht: &mut HandleTable,
     fl: &mut FlowGraph,
-    flow: &FlowId,
+    flow: FlowId,
     _env: &LEnv,
     cv: &ConvertParameters,
 ) -> Result<Chronicle, LRuntimeError> {
@@ -198,25 +198,25 @@ pub fn convert_into_chronicle(
 
     //Bind the flow start timepoint with the chronicle start timepoint
     st.union_var(
-        &ch.get_interval().get_start(),
-        &fl.get_flow_interval(flow).get_start(),
+        ch.get_interval().get_start(),
+        fl.get_flow_interval(flow).get_start(),
     );
 
     //Bind the flow end timepoint with the chronicle end timepoint
     st.union_var(
-        &ch.get_interval().get_end(),
-        &fl.get_flow_interval(flow).get_end(),
+        ch.get_interval().get_end(),
+        fl.get_flow_interval(flow).get_end(),
     );
 
-    st.union_var(ch.get_result(), &fl.get_flow_result(flow));
+    st.union_var(ch.get_result(), fl.get_flow_result(flow));
 
-    let mut queue = VecDeque::new();
-    queue.push_back(*flow);
+    let mut queue: VecDeque<FlowId> = VecDeque::new();
+    queue.push_back(flow);
 
     while let Some(flow_id) = queue.pop_front() {
         let flow = fl.flows[flow_id].clone();
-        let interval = fl.get_flow_interval(&flow_id);
-        let result = fl.get_flow_result(&flow_id);
+        let interval = fl.get_flow_interval(flow_id);
+        let result = fl.get_flow_result(flow_id);
         let start = interval.get_start();
         let end = interval.get_end();
         let duration = interval.get_duration();
@@ -238,14 +238,14 @@ pub fn convert_into_chronicle(
                     Lit::Exp(_) => {}
                     Lit::Atom(a) => ch.add_constraint(Constraint::eq(result, a)),
                     Lit::Await(a) => {
-                        let handle = fl.get_handle(a).unwrap();
+                        let handle = *fl.get_handle(*a).unwrap();
                         ht.add_await(handle, interval.get_end());
 
                         /*ch.add_constraint(Constraint::leq(
                             fl.get_flow_end(&handle),
                             interval.get_end(),
                         ));*/
-                        st.union_var(&fl.get_flow_result(handle), &result);
+                        st.union_var(fl.get_flow_result(handle), result);
                     }
                     Lit::Acquire(acq) => {
                         let quantity_symbol = st.new_symbol(QUANTITY);
@@ -263,37 +263,34 @@ pub fn convert_into_chronicle(
                         );
 
                         let max_q_result = st.new_result();
-                        st.set_domain(&st.get_domain_id(&max_q_result), quantity_domain.clone());
+                        st.set_domain(st.get_domain_id(max_q_result), quantity_domain.clone());
 
                         //let int_domain: Domain = Domain::Simple(TYPE_ID_INT);
 
                         let new_q_acquire = st.new_result();
-                        st.set_domain(&st.get_domain_id(&new_q_acquire), quantity_domain.clone());
+                        st.set_domain(st.get_domain_id(new_q_acquire), quantity_domain.clone());
                         let new_q_release = st.new_result();
-                        st.set_domain(&st.get_domain_id(&new_q_release), quantity_domain.clone());
+                        st.set_domain(st.get_domain_id(new_q_release), quantity_domain.clone());
                         let current_release_quantity = st.new_result();
                         st.set_domain(
-                            &st.get_domain_id(&current_release_quantity),
+                            st.get_domain_id(current_release_quantity),
                             quantity_domain.clone(),
                         );
                         let current_quantity = st.new_result();
-                        st.set_domain(
-                            &st.get_domain_id(&current_quantity),
-                            quantity_domain.clone(),
-                        );
+                        st.set_domain(st.get_domain_id(current_quantity), quantity_domain.clone());
 
                         ht.add_resource_handle(t_release);
 
-                        let domain_id = st.get_domain_id(&result);
+                        let domain_id = st.get_domain_id(result);
 
                         let drops: Vec<VarId> = st
-                            .get_domain_vars(&domain_id)
+                            .get_domain_vars(domain_id)
                             .drain(..)
-                            .filter_map(|a| st.get_drop(&st.get_var_parent(&a)))
+                            .filter_map(|a| st.get_drop(st.get_var_parent(a)))
                             .collect();
 
                         for drop in drops {
-                            ht.add_resource_drop(&t_release, drop)
+                            ht.add_resource_drop(t_release, drop)
                         }
 
                         let mut acquire = AcquireModel::default();
@@ -493,7 +490,7 @@ pub fn convert_into_chronicle(
                         }
                     }
                     Lit::Release(release) => {
-                        let handle = fl.get_resource_handle(release).unwrap();
+                        let handle = fl.get_resource_handle(*release).unwrap();
                         ht.add_release(handle, interval.get_end());
                     }
                     Lit::Constraint(c) => match c.deref() {
@@ -520,8 +517,8 @@ pub fn convert_into_chronicle(
                                                 format!("{} is not a defined type", r#type),
                                             )
                                         })?;
-                                    st.meet_to_domain(&st.get_domain_id(&result), domain);
-                                    st.union_var(&id, &result);
+                                    st.meet_to_domain(st.get_domain_id(result), domain);
+                                    st.union_var(id, result);
                                     None
                                 }
                             };
@@ -552,17 +549,17 @@ pub fn convert_into_chronicle(
                         let mut args = read[1..].to_vec();
                         args.push(result);
 
-                        let sf = st.get_var_parent(&read[0]);
-                        let d = st.get_domain_of_var(&sf);
+                        let sf = st.get_var_parent(read[0]);
+                        let d = st.get_domain_of_var(sf);
                         if let Domain::Cst(t, _) = d {
                             if let Domain::Application(_, types, r) = t.deref() {
                                 //println!("setting types");
                                 let mut types = types.clone();
                                 types.push(*r.clone());
                                 for (i, (f, t)) in args.iter().zip(types).enumerate() {
-                                    let r = fl.st.get_domain_id(f);
-                                    let domain_debug = st.get_domain(&r);
-                                    if !fl.st.meet_to_domain(&r, t.clone()).is_none() {
+                                    let r = fl.st.get_domain_id(*f);
+                                    let domain_debug = st.get_domain(r);
+                                    if !fl.st.meet_to_domain(r, t.clone()).is_none() {
                                         panic!("Error checking domain of {} which is not compatible with arg {} of sf {}: expected {}, got {}", f.format(&st, true), i, sf.format(&st, true), st.format_domain(&t), st.format_domain(&domain_debug))
                                     };
                                 }
@@ -581,17 +578,17 @@ pub fn convert_into_chronicle(
                         };
 
                         let args = write[1..].to_vec();
-                        let sf = st.get_var_parent(&write[0]);
-                        let d = st.get_domain_of_var(&sf);
+                        let sf = st.get_var_parent(write[0]);
+                        let d = st.get_domain_of_var(sf);
                         if let Domain::Cst(t, _) = d {
                             if let Domain::Application(_, types, r) = t.deref() {
                                 //println!("setting types");
                                 let mut types = types.clone();
                                 types.push(*r.clone());
                                 for (i, (f, t)) in args.iter().zip(types).enumerate() {
-                                    let r = fl.st.get_domain_id(f);
-                                    let domain_debug = st.get_domain(&r);
-                                    if !fl.st.meet_to_domain(&r, t.clone()).is_none() {
+                                    let r = fl.st.get_domain_id(*f);
+                                    let domain_debug = st.get_domain(r);
+                                    if !fl.st.meet_to_domain(r, t.clone()).is_none() {
                                         panic!("Error checking domain of {} which is not compatible with arg {} of sf {}: expected {}, got {}", f.format(&st, true), i, sf.format(&st, true),st.format_domain(&t),st.format_domain(&domain_debug) )
                                     };
                                 }
@@ -608,8 +605,8 @@ pub fn convert_into_chronicle(
                         }
                         ch.add_constraint(Constraint::lt(interval.get_start(), interval.get_end()));
 
-                        let result = ch.st.new_nil();
-                        st.union_var(&result, &result);
+                        let result_2 = ch.st.new_nil();
+                        st.union_var(result, result_2);
                     }
                     Lit::Exec(exec) => {
                         let subtask = SubTask {
@@ -622,16 +619,16 @@ pub fn convert_into_chronicle(
                         let mut args = exec[1..].to_vec();
                         args.push(result);
                         let task = exec[0];
-                        let d = st.get_domain_of_var(&task);
+                        let d = st.get_domain_of_var(task);
                         if let Domain::Cst(t, _) = d {
                             if let Domain::Application(_, types, r) = t.deref() {
                                 //println!("setting types");
                                 let mut types = types.clone();
                                 types.push(*r.clone());
                                 for (f, t) in args.iter().zip(types) {
-                                    let r = fl.st.get_domain_id(f);
+                                    let r = fl.st.get_domain_id(*f);
                                     let t_debug = t.clone();
-                                    if !fl.st.meet_to_domain(&r, t).is_none() {
+                                    if !fl.st.meet_to_domain(r, t).is_none() {
                                         panic!(
                                             "{}: incompatible variable domains: {} not {}",
                                             exec.format(&st, true),
@@ -658,33 +655,33 @@ pub fn convert_into_chronicle(
             FlowKind::Seq(seq) => {
                 let mut precedent = start;
                 for f in &seq {
-                    let start = fl.get_flow_start(f);
+                    let start = fl.get_flow_start(*f);
                     if start != precedent {
                         ch.add_constraint(Constraint::leq(precedent, start));
                     }
-                    precedent = fl.get_flow_end(f);
+                    precedent = fl.get_flow_end(*f);
                 }
 
                 queue.append(&mut VecDeque::from(seq))
             }
             FlowKind::Branching(branching) => {
-                let cond = fl.get_flow_result(&branching.cond_flow);
-                let cond_domain = st.get_domain_of_var(&cond);
+                let cond = fl.get_flow_result(branching.cond_flow);
+                let cond_domain = st.get_domain_of_var(cond);
                 if cond_domain.is_true() {
                     st.union_var(
-                        &fl.get_flow_end(&branching.cond_flow),
-                        &fl.get_flow_start(&branching.true_flow),
+                        fl.get_flow_end(branching.cond_flow),
+                        fl.get_flow_start(branching.true_flow),
                     );
-                    st.union_var(&fl.get_flow_end(&branching.true_flow), &end);
-                    st.union_var(&fl.get_flow_result(&branching.true_flow), &result);
+                    st.union_var(fl.get_flow_end(branching.true_flow), end);
+                    st.union_var(fl.get_flow_result(branching.true_flow), result);
                     queue.push_back(branching.true_flow)
                 } else if cond_domain.is_false() {
                     st.union_var(
-                        &fl.get_flow_end(&branching.cond_flow),
-                        &fl.get_flow_start(&branching.false_flow),
+                        fl.get_flow_end(branching.cond_flow),
+                        fl.get_flow_start(branching.false_flow),
                     );
-                    st.union_var(&fl.get_flow_end(&branching.false_flow), &end);
-                    st.union_var(&fl.get_flow_result(&branching.false_flow), &result);
+                    st.union_var(fl.get_flow_end(branching.false_flow), end);
+                    st.union_var(fl.get_flow_result(branching.false_flow), result);
                     queue.push_back(branching.false_flow)
                 } else {
                     let (t_if, m_true, m_false) = ch.st.new_if();
@@ -693,7 +690,7 @@ pub fn convert_into_chronicle(
                     Partially converts the a branch of 'if', getting by the mean time the variables necessary in computation of the branch that have been defined previously.
                     It also returns the symbol of cond, as it is necessary
                      */
-                    let mut convert_branch = |flow: &FlowId,
+                    let mut convert_branch = |flow: FlowId,
                                               branch: bool,
                                               label: VarId|
                      -> Result<
@@ -703,18 +700,15 @@ pub fn convert_into_chronicle(
                         let mut branch_params: HashMap<VarId, VarId> = Default::default();
                         let mut method = convert_into_chronicle(None, ht, fl, flow, _env, cv)?;
                         for v in &method.get_variables() {
-                            if let Some(declaration) = st.get_declaration(v) {
+                            if let Some(declaration) = st.get_declaration(*v) {
                                 //It means the variable has been created before the method, and shall be transformed into a parameter
-                                if declaration < fl.get_flow_start(&flow_id) {
+                                if declaration < fl.get_flow_start(flow_id) {
                                     let param = st.new_parameter(
-                                        st.get_label(v, false),
-                                        st.get_domain_of_var(v),
+                                        st.get_label(*v, false),
+                                        st.get_domain_of_var(*v),
                                     );
-                                    st.union_domain(
-                                        &st.get_domain_id(&param),
-                                        &st.get_domain_id(v),
-                                    );
-                                    method.replace(v, &param);
+                                    st.union_domain(st.get_domain_id(param), st.get_domain_id(*v));
+                                    method.replace(*v, param);
                                     branch_params.insert(*v, param);
                                 }
                             }
@@ -726,9 +720,9 @@ pub fn convert_into_chronicle(
                     };
 
                     let (method_true, true_params) =
-                        convert_branch(&branching.true_flow, true, m_true)?;
+                        convert_branch(branching.true_flow, true, m_true)?;
                     let (method_false, false_params) =
-                        convert_branch(&branching.false_flow, false, m_false)?;
+                        convert_branch(branching.false_flow, false, m_false)?;
 
                     let true_params_id: HashSet<VarId> = true_params.keys().cloned().collect();
                     let false_params_id: HashSet<VarId> = false_params.keys().cloned().collect();
@@ -740,10 +734,10 @@ pub fn convert_into_chronicle(
 
                     let mut task = vec![t_if, cond_if];
                     for p in &task_params {
-                        let p = st.get_var_parent(p);
+                        let p = st.get_var_parent(*p);
                         let id = ch
                             .st
-                            .new_parameter(ch.st.get_label(&p, false), ch.st.get_domain_of_var(&p));
+                            .new_parameter(ch.st.get_label(p, false), ch.st.get_domain_of_var(p));
                         task.push(id);
                     }
 
@@ -760,15 +754,15 @@ pub fn convert_into_chronicle(
                                 let id = match method_params.get(p) {
                                     None => {
                                         let id = ch.st.new_parameter(
-                                            ch.st.get_label(p, false),
-                                            ch.st.get_domain_of_var(p),
+                                            ch.st.get_label(*p, true),
+                                            ch.st.get_domain_of_var(*p),
                                         );
                                         method.add_var(id);
                                         id
                                     }
                                     Some(id) => *id,
                                 };
-                                st.union_domain(&st.get_domain_id(p), &st.get_domain_id(&id));
+                                st.union_domain(st.get_domain_id(*p), st.get_domain_id(id));
                                 method.add_task_parameter(&id);
                                 method.add_method_parameter(&id);
                             }
@@ -807,14 +801,14 @@ pub fn convert_into_chronicle(
             }
             FlowKind::FlowHandle(h) => {
                 queue.push_back(h);
-                st.union_var(&start, &fl.get_flow_start(&h));
+                st.union_var(start, fl.get_flow_start(h));
                 ht.add_handle(h);
                 //sym_table.union_atom(&ass.get_start(), &fl.get_flow_start(&h));
-                let domain_id = st.get_domain_id(&result);
+                let domain_id = st.get_domain_id(result);
                 let drops: Vec<VarId> = st
-                    .get_domain_vars(&domain_id)
+                    .get_domain_vars(domain_id)
                     .drain(..)
-                    .filter_map(|a| st.get_drop(&st.get_var_parent(&a)))
+                    .filter_map(|a| st.get_drop(st.get_var_parent(a)))
                     .collect();
 
                 for drop in drops {

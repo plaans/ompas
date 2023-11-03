@@ -6,7 +6,9 @@ use crate::ompas::interface::trigger_collection::Response;
 use crate::ompas::interface::trigger_collection::TaskProcess;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingManager;
+use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
+use core::time::Duration;
 use futures::FutureExt;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::logger::LogClient;
@@ -19,7 +21,6 @@ use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
 use tokio::sync::mpsc::UnboundedReceiver;
-use crate::ompas::manager::state::action_status::ProcessStatus;
 
 pub mod error;
 pub mod interface;
@@ -67,8 +68,11 @@ pub async fn rae(
                                 }
                         };
 
+                        let mut is_task = false;
+
                         match job_type {
                             JobType::Task => {
+                                is_task = true;
                                 log.debug(format!("new triggered task: {}", job_expr));
                                 let vec: Vec<LValue> = job_lvalue.clone().try_into().unwrap();
                                 let mut vec_cst = vec![];
@@ -76,14 +80,6 @@ pub async fn rae(
                                     vec_cst.push(e.as_cst().unwrap())
                                 }
                                 let id: ProcessRef = acting_manager.new_high_level_task(job_lvalue.to_string(),vec_cst).await;
-                                if let Some(mut watcher) = acting_manager.subscribe_on_plan_update().await {
-                                    println!("waiting on plan update");
-                                    watcher.recv().await.unwrap_or_else(|_| {
-                                        eprintln!("error on watcher");
-                                        false
-                                    });
-                                    println!("plan available, going to execute now");
-                                }
 
                                 let mod_context: ModActingContext = ModActingContext::new(id.clone());
                                 pr = id;
@@ -118,15 +114,35 @@ pub async fn rae(
                         let pr2 = pr.clone();
                         let acting_manager_2 = acting_manager.clone();
                         let future = (Box::pin(async move {
+                            let id = acting_manager_2.get_id(pr2.clone()).await.unwrap();
+                            let watcher = acting_manager_2.subscribe_on_plan_update().await;
+                            if is_task {
+                                if let Some(mut watcher) = watcher {
+                                    log2.info(format!("({}) Waiting on plan update.", id));
+                                    tokio::select! {
+                                        _ = tokio::time::sleep(Duration::from_secs(1)) => {
+                                            log2.info(format!("({}) Going to execute without a plan", id));
+                                        }
+                                        r = watcher.recv() => {
+                                             let _ = r.unwrap_or_else(|_| {
+                                                 eprintln!("error on watcher");
+                                                 false
+                                            });
+                                            log2.info("plan available, going to execute now");
+                                        }
+                                    }
+                                }
+                            }
+
                             let result = eval(&job_lvalue, &mut new_env, Some(rx)).await;
                             match &result {
                                 Ok(lv) => log2.info(format!(
-                                    "result of task {}: {}",
+                                    "result of job {}: {}",
                                     job_lvalue,
                                     RaeExecError::format_err(lv),
                                 )),
                                 Err(e) => {
-                                    log2.error(format!("Error evaluating task {job_lvalue}({:?}): {e}", pr2));
+                                    log2.error(format!("Error evaluating job {job_lvalue}({:?}): {e}", pr2));
                                     let id = acting_manager_2.get_id(pr2).await.unwrap();
                                     acting_manager_2.set_status(&id, ProcessStatus::Failure).await;
                                 }

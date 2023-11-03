@@ -197,7 +197,7 @@ pub fn var_id_into_atom(
     table: &ActingVarRefTable,
     ctx: &Ctx,
 ) -> aAtom {
-    let ompas_var = st.get_var_domain(a);
+    let ompas_var = st.get_var_domain(st.get_domain_id(*a));
     let domain = &ompas_var.domain;
     if domain.is_true() {
         aLit::TRUE.into()
@@ -231,7 +231,7 @@ pub fn var_id_into_atom(
     } else {
         (*table
             .get_var(*a)
-            .unwrap_or_else(|| panic!("{} undefined in bindings", st.format_variable(a))))
+            .unwrap_or_else(|| panic!("{} undefined in bindings", st.format_variable(*a))))
         .into()
     }
 }

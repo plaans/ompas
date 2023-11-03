@@ -28,24 +28,24 @@ impl RefSymTable {
         self.0.write().unwrap().clear();
     }
 
-    pub fn set_declaration(&self, id: &VarId, timepoint: &VarId) {
+    pub fn set_declaration(&self, id: VarId, timepoint: VarId) {
         self.0.write().unwrap().set_declaration(id, timepoint)
     }
 
-    pub fn set_drop(&self, id: &VarId, timepoint: &VarId) {
+    pub fn set_drop(&self, id: VarId, timepoint: VarId) {
         self.0.write().unwrap().set_drop(id, timepoint)
     }
 
-    pub fn get_declaration(&self, id: &VarId) -> Option<VarId> {
-        self.0.read().unwrap().get_declaration(id)
+    pub fn get_declaration(&self, id: VarId) -> Option<VarId> {
+        self.0.write().unwrap().get_declaration(id)
     }
 
-    pub fn get_drop(&self, id: &VarId) -> Option<VarId> {
-        self.0.read().unwrap().get_drop(id)
+    pub fn get_drop(&self, id: VarId) -> Option<VarId> {
+        self.0.write().unwrap().get_drop(id)
     }
 
-    pub fn get_domain_vars(&self, d: &DomainId) -> Vec<VarId> {
-        self.0.read().unwrap().get_domain_vars(d)
+    pub fn get_domain_vars(&self, d: DomainId) -> Vec<VarId> {
+        self.0.write().unwrap().get_domain_vars(d)
     }
 
     /*
@@ -89,37 +89,37 @@ impl RefSymTable {
     */
 
     //VarDomain
-    pub fn get_var_domain(&self, id: &DomainId) -> VarDomain {
-        self.0.read().unwrap().get_var_domain(id).clone()
+    pub fn get_var_domain(&self, id: DomainId) -> VarDomain {
+        self.0.write().unwrap().get_var_domain(id).clone()
     }
 
-    pub fn get_domain(&self, id: &DomainId) -> Domain {
-        self.0.read().unwrap().get_domain(id).clone()
+    pub fn get_domain(&self, id: DomainId) -> Domain {
+        self.0.write().unwrap().get_domain(id).clone()
     }
 
-    pub fn get_domain_parent(&self, id: &DomainId) -> DomainId {
-        self.0.read().unwrap().get_domain_parent(id)
+    pub fn get_domain_parent(&self, id: DomainId) -> DomainId {
+        self.0.write().unwrap().get_domain_parent(id)
     }
 
     //Variable
-    pub fn get_variable(&self, id: &VarId) -> Variable {
-        self.0.read().unwrap().get_variable(id).clone()
+    pub fn get_variable(&self, id: VarId) -> Variable {
+        self.0.write().unwrap().get_variable(id).clone()
     }
 
-    pub fn get_domain_id(&self, v: &VarId) -> DomainId {
-        self.0.read().unwrap().get_domain_id(v)
+    pub fn get_domain_id(&self, v: VarId) -> DomainId {
+        self.0.write().unwrap().get_domain_id(v)
     }
 
-    pub fn get_label(&self, id: &VarId, parent: bool) -> String {
-        self.0.read().unwrap().get_label(id, parent).to_string()
+    pub fn get_label(&self, id: VarId, parent: bool) -> String {
+        self.0.write().unwrap().get_label(id, parent).to_string()
     }
 
-    pub fn get_var_parent(&self, v: &VarId) -> VarId {
-        self.0.read().unwrap().get_var_parent(v)
+    pub fn get_var_parent(&self, v: VarId) -> VarId {
+        self.0.write().unwrap().get_var_parent(v)
     }
 
-    pub fn get_domain_of_var(&self, v: &VarId) -> Domain {
-        self.0.read().unwrap().get_domain_of_var(v).clone()
+    pub fn get_domain_of_var(&self, v: VarId) -> Domain {
+        self.0.write().unwrap().get_domain_of_var(v).clone()
     }
 
     pub fn get_sym_id(&self, sym: &str) -> Option<VarId> {
@@ -213,44 +213,48 @@ impl RefSymTable {
         self.0.read().unwrap().substract(d1, d2)
     }
 
-    pub fn meet_domains(&self, id_d1: &DomainId, id_d2: &DomainId) -> Domain {
-        self.0.read().unwrap().meet_domains(id_d1, id_d2)
+    pub fn meet_domains(&self, id_d1: DomainId, id_d2: DomainId) -> Domain {
+        self.0.write().unwrap().meet_domains(id_d1, id_d2)
     }
 
-    pub fn union_domains(&self, id_d1: &DomainId, id_d2: &DomainId) -> Domain {
-        self.0.read().unwrap().union_domains(id_d1, id_d2)
+    pub fn union_domains(&self, id_d1: DomainId, id_d2: DomainId) -> Domain {
+        self.0.write().unwrap().union_domains(id_d1, id_d2)
     }
 
-    pub fn substract_domains(&self, id_d1: &DomainId, id_d2: &DomainId) -> Domain {
-        self.0.read().unwrap().substract_domains(id_d1, id_d2)
+    pub fn substract_domains(&self, id_d1: DomainId, id_d2: DomainId) -> Domain {
+        self.0.write().unwrap().substract_domains(id_d1, id_d2)
     }
 
-    pub fn meet_to_domain(&self, id_d1: &DomainId, domain: impl Into<Domain>) -> EmptyDomains {
+    pub fn meet_to_domain(&self, id_d1: DomainId, domain: impl Into<Domain>) -> EmptyDomains {
         self.0.write().unwrap().meet_to_domain(id_d1, domain)
     }
 
-    pub fn substract_to_domain(&self, id_d1: &DomainId, domain: impl Into<Domain>) -> EmptyDomains {
+    pub fn substract_to_domain(&self, id_d1: DomainId, domain: impl Into<Domain>) -> EmptyDomains {
         self.0.write().unwrap().subtract_to_domain(id_d1, domain)
     }
 
-    pub fn set_domain(&self, id: &DomainId, domain: impl Into<Domain>) -> EmptyDomains {
+    pub fn set_domain_of_var(&self, id: VarId, domain: impl Into<Domain>) -> EmptyDomains {
+        self.0.write().unwrap().set_domain_of_var(id, domain)
+    }
+
+    pub fn set_domain(&self, id: DomainId, domain: impl Into<Domain>) -> EmptyDomains {
         self.0.write().unwrap().set_domain(id, domain)
     }
 
-    pub fn add_update(&self, elements: Vec<VarId>, update: Update) {
+    pub fn add_update(&self, elements: Vec<DomainId>, update: Update) {
         self.0.write().unwrap().add_update(elements, update);
     }
 
-    pub fn remove_update(&self, id: &VarId, dependent: &VarId) {
+    pub fn remove_update(&self, id: DomainId, dependent: DomainId) {
         self.0.write().unwrap().remove_update(id, dependent);
     }
 
     pub fn contained_in_domain(&self, d1: &Domain, d2: &Domain) -> bool {
-        self.0.read().unwrap().contained_in_domain(d1, d2)
+        self.0.write().unwrap().contained_in_domain(d1, d2)
     }
 
     pub fn get_type_as_domain(&self, r#type: impl Display) -> Option<Domain> {
-        self.0.read().unwrap().get_type_as_domain(r#type)
+        self.0.write().unwrap().get_type_as_domain(r#type)
     }
 
     /*
@@ -260,11 +264,11 @@ impl RefSymTable {
         self.0.write().unwrap().flat_bindings()
     }
 
-    pub fn union_var(&self, id1: &VarId, id2: &VarId) -> EmptyDomains {
+    pub fn union_var(&self, id1: VarId, id2: VarId) -> EmptyDomains {
         self.0.write().unwrap().union_var(id1, id2)
     }
 
-    pub fn union_domain(&self, id1: &DomainId, id2: &DomainId) -> EmptyDomains {
+    pub fn union_domain(&self, id1: DomainId, id2: DomainId) -> EmptyDomains {
         self.0.write().unwrap().union_domain(id1, id2)
     }
 
@@ -272,28 +276,28 @@ impl RefSymTable {
     OTHER
      */
 
-    pub fn var_as_cst(&self, var_id: &VarId) -> Option<Cst> {
-        self.0.read().unwrap().var_as_cst(var_id)
+    pub fn var_as_cst(&self, var_id: VarId) -> Option<Cst> {
+        self.0.write().unwrap().var_as_cst(var_id)
     }
 
     /*
     FORMAT Function
       */
 
-    pub fn format_variable(&self, id: &VarId) -> String {
-        self.0.read().unwrap().format_variable(id)
+    pub fn format_variable(&self, id: VarId) -> String {
+        self.0.write().unwrap().format_variable(id)
     }
 
-    pub fn format_domain_id(&self, domain: &DomainId) -> String {
-        self.0.read().unwrap().format_domain_id(domain)
+    pub fn format_domain_id(&self, domain: DomainId) -> String {
+        self.0.write().unwrap().format_domain_id(domain)
     }
 
     pub fn format_domain(&self, domain: &Domain) -> String {
-        self.0.read().unwrap().format_domain(domain)
+        self.0.write().unwrap().format_domain(domain)
     }
 
-    pub fn format_var_domain(&self, id: &DomainId) -> String {
-        self.0.read().unwrap().format_var_domain(id)
+    pub fn format_var_domain(&self, id: DomainId) -> String {
+        self.0.write().unwrap().format_var_domain(id)
     }
 
     /*
@@ -305,7 +309,7 @@ impl RefSymTable {
     }
 
     pub fn get_type_id(&self, r#type: impl Display) -> Option<TypeId> {
-        self.0.read().unwrap().lattice.get_type_id(r#type).copied()
+        self.0.write().unwrap().lattice.get_type_id(r#type).copied()
     }
 
     pub fn get_lattice(&self) -> TypeLattice {
@@ -319,19 +323,36 @@ impl RefSymTable {
 
 impl Display for RefSymTable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let st = self.0.read().unwrap();
+        let mut st = self.0.write().unwrap();
 
-        writeln!(f, "## SYM TABLE ").unwrap();
+        writeln!(f, "## SYM TABLE ")?;
 
-        for e in 0..st.domains.len() {
-            writeln!(
-                f,
-                "- ({}){}({})",
-                e,
-                self.get_label(&e, false),
-                self.format_var_domain(&self.get_domain_id(&e)),
-            )?;
+        writeln!(f, "## Variable(s) ##")?;
+
+        for var_id in 0..st.variables.len() {
+            let var_id = VarId(var_id);
+            let parent_id = st.get_var_parent(var_id);
+            if var_id == parent_id {
+                let label = st.get_label(parent_id, false).to_string();
+                let domain_id = st.get_domain_id(parent_id);
+                writeln!(
+                    f,
+                    "- (var_id = {}, domain_id = {}) {}",
+                    domain_id, parent_id, label
+                )?;
+            }
         }
+
+        writeln!(f, "## Domain(s) ##").unwrap();
+        for domain_id in 0..st.domains.len() {
+            let domain_id = DomainId(domain_id);
+            let parent_id = st.get_domain_parent(domain_id);
+            if domain_id == parent_id {
+                let domain = st.format_var_domain(domain_id);
+                writeln!(f, "- (domain_id = {}) {}", domain_id, domain)?;
+            }
+        }
+
         Ok(())
     }
 }

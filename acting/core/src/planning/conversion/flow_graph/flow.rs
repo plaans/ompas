@@ -1,9 +1,18 @@
+use std::fmt::{Display, Formatter};
+use new_type::newtype;
 use crate::model::chronicle::interval::Interval;
 use crate::model::chronicle::lit::Lit;
 use crate::model::process_ref::Label;
 use crate::model::sym_table::VarId;
 
-pub type FlowId = usize;
+newtype!(FlowId: usize);
+
+impl Display for FlowId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+//pub type FlowId = usize;
 
 #[derive(Clone)]
 pub struct Flow {

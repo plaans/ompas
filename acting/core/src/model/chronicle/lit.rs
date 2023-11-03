@@ -374,7 +374,7 @@ impl GetVariables for Lit {
 }
 
 impl Replace for Lit {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         match self {
             Lit::Atom(a) | Lit::Await(a) | Lit::Release(a) => a.replace(old, new),
             Lit::Constraint(c) => c.replace(old, new),
@@ -440,7 +440,7 @@ impl GetVariables for LitSet {
 }
 
 impl Replace for LitSet {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         match self {
             LitSet::Finite(set) => set.replace(old, new),
             LitSet::Domain(d) => d.replace(old, new),

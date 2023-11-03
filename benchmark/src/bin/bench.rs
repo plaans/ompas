@@ -14,7 +14,8 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use tokio::process::{Command};
+use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 use structopt::StructOpt;
 
@@ -45,7 +46,8 @@ pub struct Problem {
     path: PathBuf,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let opt: Opt = Opt::from_args();
     let str =
         fs::read_to_string(&opt.config).expect("Something went wrong reading the config file");
@@ -195,7 +197,6 @@ fn main() {
     (read \"{}\")
     (read \"{}\")
     {}
-    (sleep 1)
     (wait-end-all {})
     (export-report {})
     (exit 0))",
@@ -212,9 +213,8 @@ fn main() {
                         first = false
                     }
                     let start = SystemTime::now();
-                    // let mut command = Command::new("timeout");
-                    // command.arg((*timeout+10).to_string());
-                    // command.arg(domain.get_binary());
+
+
                     let mut command = Command::new(domain.get_binary());
                     command.args(["-d", config_path]);
                     command.env("OMPAS_WORKING_DIR", job_dir.to_str().unwrap());
@@ -223,6 +223,8 @@ fn main() {
 
                     let mut benchmark_log_file = benchmark_log_dir.clone();
                     benchmark_log_file.push(format!("benchmark_{}.log", i));
+
+                    //println!("log file: {}", benchmark_log_file.to_str().unwrap());
 
                     let f1 = File::create(&benchmark_log_file).expect("couldn't create file");
                     let f2 = File::create(&benchmark_log_file).expect("couldn't create file");
@@ -238,6 +240,15 @@ fn main() {
                             problem_path,
                             config_path,
                         ));
+                        tokio::select! {
+                            _ = tokio::time::sleep(Duration::from_secs((timeout+10) as u64)) => {
+                                let _ = c.kill().await;
+                                bar.println("command killed!")
+                            }
+                            _ = c.wait() => {
+                                //bar.println!("command ok!")
+                            }
+                        }
                         let _r = c.wait();
                     } else {
                         panic!("panic");
@@ -304,8 +315,8 @@ fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, Strin
         format!(
 "(begin
     (read \"{}\") ; loading domain
-    (set-log-level debug)
-    (set-select {}))",
+    (set-log-level debug) ;setting log-level
+    (set-select {})) ; define the algorithm of select",
             domain, select,
         ),
         start.to_string()

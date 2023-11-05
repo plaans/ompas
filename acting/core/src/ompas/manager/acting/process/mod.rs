@@ -27,13 +27,11 @@ pub mod task;
 pub enum ProcessOrigin {
     Planner,
     Execution,
-    PlannerDropped,
-    ExecPlanInherited,
 }
 
 impl ProcessOrigin {
     pub fn is_exec(&self) -> bool {
-        matches!(self, Self::ExecPlanInherited | Self::Execution)
+        matches!(self, Self::Execution)
     }
 }
 
@@ -114,14 +112,6 @@ impl ActingProcess {
                 self.status_update = None;
             }
         }
-    }
-
-    pub fn dropped(&mut self) {
-        self.origin = ProcessOrigin::PlannerDropped;
-    }
-
-    pub fn executed(&mut self) {
-        self.origin = ProcessOrigin::ExecPlanInherited;
     }
 
     pub fn get_am_id(&self) -> AMId {

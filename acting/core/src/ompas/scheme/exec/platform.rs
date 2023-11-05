@@ -75,7 +75,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
 
     let f = (Box::pin(async move {
         let command_slice = command_slice.as_slice();
-        let args = command_slice.iter().map(|lv| lv.as_cst()).collect();
+        let mut args = command_slice.iter().map(|lv| lv.as_cst()).collect();
 
         let pr: ProcessRef = env
             .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
@@ -102,7 +102,12 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
             },
 
             ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
-                Some(id) => id,
+                Some(id) => {
+                    acting_manager
+                        .set_process_args(&id, args.drain(..).map(|arg| arg.unwrap()).collect())
+                        .await;
+                    id
+                }
                 None => {
                     acting_manager
                         .new_command(

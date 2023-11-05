@@ -115,7 +115,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
             Some(id) => {
                 acting_manager
-                    .set_action_args(&id, args.drain(..).map(|c| c.unwrap()).collect())
+                    .set_process_args(&id, args.drain(..).map(|c| c.unwrap()).collect())
                     .await;
                 id
             }
@@ -283,7 +283,7 @@ pub async fn select(
     let log = mod_refinement.log.clone();
     let acting_manager = &mod_refinement.acting_manager;
     let task: Vec<LValue> = acting_manager
-        .get_task_args(&task_id)
+        .get_process_args(&task_id)
         .await
         .iter()
         .map(|cst| LValue::from(cst.clone()))
@@ -339,6 +339,13 @@ pub async fn select(
             log.debug(format!(
                 "({task_id}) Valid planned refinement ({refinement}) {lv}"
             ));
+            //let args = acting_manager.get_process_args(&refinement).await;
+            let args: Vec<_> = if let LValue::List(list) = lv {
+                list.iter().map(|v| v.as_cst().unwrap()).collect()
+            } else {
+                panic!()
+            };
+            acting_manager.set_process_args(&refinement, args).await;
             Some(Selected::Anticipated(refinement))
         } else {
             log.warn(format!(

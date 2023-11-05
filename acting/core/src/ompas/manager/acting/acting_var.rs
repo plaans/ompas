@@ -312,6 +312,24 @@ impl ActingVarCollection {
         var.to_string()
     }
 
+    pub fn format_slice_acting_var<
+        T: Any + Sync + Send + Display + Clone + AsCst + PartialEq + std::fmt::Debug,
+    >(
+        &self,
+        slice: &[ActingVarRef<T>],
+    ) -> String {
+        let mut out = "".to_string();
+        for (i, var) in slice.iter().enumerate() {
+            if i != 0 {
+                out.push(' ');
+            }
+            let var = &self.acting_vars[var.id];
+            out.push_str(var.to_string().as_str());
+        }
+
+        out
+    }
+
     pub async fn clear(&mut self) {
         self.acting_vars.clear();
         self.map_ref.clear();

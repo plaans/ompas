@@ -283,13 +283,14 @@ impl InnerActingManager {
         self.acting_vars.get_val(r)
     }
 
-    pub fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
-        self.processes[*id]
-            .inner
-            .as_action()
-            .unwrap()
-            .get_args()
-            .iter()
+    pub fn get_process_args(&self, id: &ActingProcessId) -> Vec<Cst> {
+        let args = match &self.processes[*id].inner {
+            ActingProcessInner::Task(t) => &t.args,
+            ActingProcessInner::Command(c) => &c.args,
+            ActingProcessInner::Method(m) => &m.args,
+            _ => panic!(),
+        };
+        args.iter()
             .map(|r| self.get_acting_var_val(r).unwrap())
             .collect()
     }
@@ -423,7 +424,6 @@ impl InnerActingManager {
                 val: val.as_cst().unwrap(),
             }),
             ProcessOrigin::Execution => self.set_execution_val(acting_var_ref, val),
-            _ => unreachable!(),
         }
     }
 
@@ -456,11 +456,17 @@ impl InnerActingManager {
         self.set_status(id, status)
     }
 
-    pub fn set_action_args(&mut self, id: &ActingProcessId, args: Vec<Cst>) {
+    pub fn set_process_args(&mut self, id: &ActingProcessId, args: Vec<Cst>) {
         let mut debug = "(".to_string();
-
-        let action = self.processes[*id].inner.as_mut_action().unwrap();
-        for (r, arg) in action.get_args().iter().zip(args) {
+        let vec_args = match &self.processes[*id].inner {
+            ActingProcessInner::Task(t) => t.args.clone(),
+            ActingProcessInner::Command(c) => c.args.clone(),
+            ActingProcessInner::Method(m) => m.args.clone(),
+            _ => {
+                panic!()
+            }
+        };
+        for (r, arg) in vec_args.iter().zip(args) {
             write!(debug, "{} ", arg).unwrap();
             self.set_execution_val(r, arg);
         }
@@ -569,24 +575,9 @@ impl InnerActingManager {
         let now = self.clock_manager.now();
         self.set_start(id, Some(now));
         self.set_execution_val(&var_ref, value.clone());
-        self.executed(id);
         self.set_end(id, Some(now), ProcessStatus::Success);
 
         value
-    }
-
-    pub fn executed(&mut self, id: &ActingProcessId) {
-        let origin = &mut self.processes[*id].origin;
-        if ProcessOrigin::Planner == *origin {
-            *origin = ProcessOrigin::ExecPlanInherited
-        }
-    }
-
-    pub fn dropped(&mut self, id: &ActingProcessId) {
-        let origin = &mut self.processes[*id].origin;
-        if ProcessOrigin::Planner == *origin {
-            *origin = ProcessOrigin::PlannerDropped
-        }
     }
 }
 
@@ -1321,8 +1312,6 @@ impl InnerActingManager {
         quantity: Quantity,
         priority: WaiterPriority,
     ) -> Result<WaitAcquire, LRuntimeError> {
-        self.executed(id);
-
         let acquire = self.processes[*id].inner.as_acquire().unwrap();
         let ref_r = acquire.resource.clone();
         let ref_q = acquire.quantity.clone();
@@ -2214,8 +2203,12 @@ fn format_acting_process(
     let mut f = String::new();
     write!(
         f,
-        "{}: ({}) [{},{}]",
+        "{}: ({},{}) [{},{}]",
         acting_process.id(),
+        match acting_process.origin {
+            ProcessOrigin::Planner => "P",
+            ProcessOrigin::Execution => "E",
+        },
         acting_process.status,
         planner_manager.format_acting_var(&acting_process.start),
         planner_manager.format_acting_var(&acting_process.end),
@@ -2230,10 +2223,29 @@ fn format_acting_process(
         ActingProcessInner::RootTask(_) => {
             write!(f, "root").unwrap();
         }
-        ActingProcessInner::Task(_)
-        | ActingProcessInner::Method(_)
-        | ActingProcessInner::Command(_) => {
-            write!(f, "{}", debug).unwrap();
+        ActingProcessInner::Task(t) => {
+            write!(
+                f,
+                "{}",
+                planner_manager.format_slice_acting_var(t.args.as_slice())
+            )
+            .unwrap();
+        }
+        ActingProcessInner::Method(m) | ActingProcessInner::AbstractModel(m) => {
+            write!(
+                f,
+                "{}",
+                planner_manager.format_slice_acting_var(m.args.as_slice())
+            )
+            .unwrap();
+        }
+        ActingProcessInner::Command(c) => {
+            write!(
+                f,
+                "{}",
+                planner_manager.format_slice_acting_var(c.args.as_slice())
+            )
+            .unwrap();
         }
         ActingProcessInner::Arbitrary(arb) => {
             write!(f, "arb({})", planner_manager.format_acting_var(&arb.var)).unwrap();
@@ -2247,9 +2259,6 @@ fn format_acting_process(
                 planner_manager.format_acting_var(&acq.quantity)
             )
             .unwrap();
-        }
-        ActingProcessInner::AbstractModel(_) => {
-            write!(f, "{}", debug).unwrap();
         }
     }
     f

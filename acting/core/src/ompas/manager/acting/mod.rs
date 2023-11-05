@@ -351,10 +351,6 @@ impl ActingManager {
             .count()
     }
 
-    pub async fn executed(&self, id: &ActingProcessId) {
-        self.inner.write().await.executed(id)
-    }
-
     pub async fn set_arbitrary_value(
         &self,
         id_arbitrary: &ActingProcessId,
@@ -385,12 +381,12 @@ impl ActingManager {
         self.inner.write().await.set_s_acq(acquire_id, instant)
     }
 
-    pub async fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
-        self.inner.read().await.get_task_args(id)
+    pub async fn get_process_args(&self, id: &ActingProcessId) -> Vec<Cst> {
+        self.inner.read().await.get_process_args(id)
     }
 
-    pub async fn set_action_args(&self, id: &ActingProcessId, args: Vec<Cst>) {
-        self.inner.write().await.set_action_args(id, args);
+    pub async fn set_process_args(&self, id: &ActingProcessId, args: Vec<Cst>) {
+        self.inner.write().await.set_process_args(id, args);
     }
 
     pub async fn get_lv(&self, id: &ActingProcessId) -> LValue {

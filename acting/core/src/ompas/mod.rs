@@ -8,7 +8,6 @@ use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
-use core::time::Duration;
 use futures::FutureExt;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::logger::LogClient;
@@ -20,6 +19,7 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
+use std::time::Duration;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 pub mod error;
@@ -119,8 +119,11 @@ pub async fn rae(
                             if is_task {
                                 if let Some(mut watcher) = watcher {
                                     log2.info(format!("({}) Waiting on plan update.", id));
+
+                                    let duration = Duration::from_secs_f64(acting_manager_2.get_planner_reactivity());
+
                                     tokio::select! {
-                                        _ = tokio::time::sleep(Duration::from_secs(1)) => {
+                                        _ = tokio::time::sleep(duration) => {
                                             log2.info(format!("({}) Going to execute without a plan", id));
                                         }
                                         r = watcher.recv() => {

@@ -34,7 +34,7 @@ pub struct ChronicleInstance {
     pub refinement_label: RefinementLabel,
 }
 
-pub fn new_problem_chronicle_instance(
+pub async fn new_problem_chronicle_instance(
     st: &RefSymTable,
     mut tasks: Vec<NewTask>,
     goals: Vec<Goal>,

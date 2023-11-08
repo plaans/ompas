@@ -1,7 +1,6 @@
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
-use std::collections::HashSet;
 
 impl FormatWithSymTable for Vec<VarId> {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
@@ -20,9 +19,9 @@ impl FormatWithSymTable for Vec<VarId> {
     }
 }
 
-impl FormatWithSymTable for HashSet<VarId> {
+impl FormatWithSymTable for std::collections::HashSet<VarId> {
     fn format(&self, st: &RefSymTable, sym_version: bool) -> String {
-        let mut str = "(".to_string();
+        let mut str = "{".to_string();
         let mut first = true;
         for e in self {
             if first {
@@ -32,7 +31,7 @@ impl FormatWithSymTable for HashSet<VarId> {
             }
             str.push_str(e.format(st, sym_version).as_str());
         }
-        str.push(')');
+        str.push('}');
         str
     }
 }
@@ -75,13 +74,13 @@ pub trait FormatWithSymTable {
 }
 
 pub trait GetVariables {
-    fn get_variables(&self) -> im::HashSet<VarId>;
+    fn get_variables(&self) -> std::collections::HashSet<VarId>;
 
     fn get_variables_in_domain(
         &self,
         sym_table: &RefSymTable,
         domain: &Domain,
-    ) -> im::HashSet<VarId> {
+    ) -> std::collections::HashSet<VarId> {
         self.get_variables()
             .iter()
             .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(**v), domain))
@@ -94,10 +93,10 @@ impl<T> GetVariables for Vec<T>
 where
     T: GetVariables,
 {
-    fn get_variables(&self) -> im::HashSet<VarId> {
-        let mut set: im::HashSet<VarId> = Default::default();
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
+        let mut set: std::collections::HashSet<VarId> = Default::default();
         for e in self {
-            set = set.union(e.get_variables())
+            set = set.union(&e.get_variables()).cloned().collect();
         }
         set
     }

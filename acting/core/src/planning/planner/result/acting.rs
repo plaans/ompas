@@ -128,7 +128,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             RawChoice::Refinement(RawRefinement { lv, interval }),
         );
 
-        'choice: for (label, binding) in &chronicle.acting_process_models.inner {
+        'choice: for (label, binding) in chronicle.get_all_acting_process_models() {
             let mut pr = pr.clone();
             let ActingProcessModelLabel::Label(label) = label else {
                 todo!()

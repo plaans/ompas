@@ -1,13 +1,11 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::parameters::Parameters;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
-use crate::model::process_ref::{MethodLabel, ProcessRef, RefinementLabel};
+use crate::model::process_ref::ProcessRef;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
-use crate::planning::conversion::chronicle::post_processing::try_eval_apply;
 use crate::planning::conversion::convert;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, PLEnv, PLValue};
-use crate::planning::planner::problem::ChronicleInstance;
 use aries_planning::chronicles::ChronicleOrigin;
 use function_name::named;
 use sompas_structs::lenv::LEnv;
@@ -42,19 +40,15 @@ pub struct PAction {
 }
 
 #[named]
-pub async fn convert_into_chronicle_instance(
-    lambda: &LLambda,
-    p_action: PAction,
+pub fn new_chronicle_for_action(
+    pc: &mut PConfig,
+    action: &[ActionParam],
     task: Option<&[ActionParam]>,
-    parameters: &Parameters,
+    action_params: &Parameters,
+    lambda_params: LambdaArgs,
     st: &RefSymTable,
-    env: &LEnv,
     kind: ChronicleKind,
-) -> Result<ChronicleInstance, LRuntimeError> {
-    let mut pc = PConfig::default();
-
-    let action = &p_action.args;
-
+) -> Result<Chronicle, LRuntimeError> {
     let label = action[0].lvalues().to_string();
     let params = &action[1..];
 
@@ -62,22 +56,23 @@ pub async fn convert_into_chronicle_instance(
 
     let mut ch = Chronicle::new(label.to_string(), kind, st.clone());
     let mut name: Vec<VarId> = vec![symbol_id];
-    if let LambdaArgs::List(l) = lambda.get_params() {
-        if l.len() != parameters.get_number() {
+    if let LambdaArgs::List(ref l) = lambda_params {
+        if l.len() != action_params.get_number() {
             return Err(lruntimeerror!(
                 function_name!(),
                 format!(
                     "for {}: definition of parameters are different({} != {})",
-                    label,
-                    lambda.get_params(),
-                    parameters
+                    label, lambda_params, action_params
                 )
             ));
         }
 
         for (lambda_param, ((_, pt), task_param)) in
-            l.iter().zip(parameters.inner().iter().zip(params))
+            l.iter().zip(action_params.inner().iter().zip(params))
         {
+            let str = lambda_param.to_string();
+            let domain = pt.get_domain().clone();
+            let declaration = ch.interval.get_start();
             let id = match task_param {
                 ActionParam::Instantiated(lv) => {
                     pc.p_table
@@ -91,10 +86,9 @@ pub async fn convert_into_chronicle_instance(
                     }
                 }
                 ActionParam::Uninstantiated(_) => {
-                    let str = lambda_param.to_string();
                     pc.p_table
                         .add(str.to_string(), PLValue::unpure(str.to_string().into()));
-                    let id = st.new_parameter(str, pt.get_domain().clone());
+                    let id = st.new_parameter(str, domain, declaration);
                     ch.add_var(id);
                     id
                 }
@@ -111,6 +105,29 @@ pub async fn convert_into_chronicle_instance(
         }
         None => name,
     });
+    Ok(ch)
+}
+
+pub async fn generate_acting_model(
+    lambda: &LLambda,
+    action: &[ActionParam],
+    task: Option<&[ActionParam]>,
+    parameters: &Parameters,
+    st: &RefSymTable,
+    env: &LEnv,
+    kind: ChronicleKind,
+) -> Result<ActingModel, LRuntimeError> {
+    let mut pc = PConfig::default();
+
+    let ch = new_chronicle_for_action(
+        &mut pc,
+        action,
+        task,
+        parameters,
+        lambda.get_params(),
+        st,
+        kind,
+    )?;
 
     let lv = lambda.get_body();
 
@@ -120,26 +137,30 @@ pub async fn convert_into_chronicle_instance(
         pc: pc.clone(),
     };
 
-    let om: ActingModel = convert(Some(ch), lv, p_env, st.clone()).await?;
+    convert(Some(ch), lv, p_env, st.clone()).await
+}
 
-    let mut instantiated_chronicle = om
-        .chronicle
-        .as_ref()
-        .unwrap()
-        .clone()
-        .instantiate_and_clean(Default::default());
+pub async fn generate_acting_model_or_empty(
+    lambda: &LLambda,
+    args: &[ActionParam],
+    task: Option<&[ActionParam]>,
+    parameters: &Parameters,
+    st: &RefSymTable,
+    env: &LEnv,
+    kind: ChronicleKind,
+) -> Result<ActingModel, LRuntimeError> {
+    let mut am = generate_acting_model(lambda, args, task, parameters, st, env, kind).await?;
+    if am.chronicle.is_none() {
+        am.chronicle = Some(new_chronicle_for_action(
+            &mut PConfig::default(),
+            args,
+            task,
+            parameters,
+            lambda.get_params(),
+            st,
+            kind,
+        )?)
+    }
 
-    try_eval_apply(&mut instantiated_chronicle, &env).await?;
-
-    Ok(ChronicleInstance {
-        instantiated_chronicle,
-        generated: true,
-        origin: p_action.origin,
-        am: om,
-        pr: p_action.pr,
-        refinement_label: RefinementLabel {
-            refinement_id: 0,
-            method_label: MethodLabel::Possibility(0),
-        },
-    })
+    Ok(am)
 }

@@ -1,4 +1,5 @@
 use crate::model::process_ref::Label;
+use crate::model::sym_domain::cst;
 use crate::ompas::manager::acting::acting_var::{ActingVarCollection, ActingVarRef};
 use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
@@ -211,6 +212,23 @@ impl ActingProcessInner {
         }
     }
 
+    pub fn get_abstract_model(&self) -> Option<ActingProcessId> {
+        match self {
+            ActingProcessInner::Task(t) => t.abstract_model,
+            ActingProcessInner::Command(c) => c.abstract_model,
+            _ => None,
+        }
+    }
+
+    pub fn get_args(&self) -> Option<&Vec<ActingVarRef<cst::Cst>>> {
+        match self {
+            ActingProcessInner::Task(t) => Some(&t.args),
+            ActingProcessInner::Command(c) => Some(&c.args),
+            ActingProcessInner::Method(m) => Some(&m.args),
+            _ => None,
+        }
+    }
+
     pub fn as_root(&self) -> Option<&RootProcess> {
         if let Self::RootTask(root) = self {
             Some(root)
@@ -240,6 +258,36 @@ impl ActingProcessInner {
             Some(method)
         } else {
             None
+        }
+    }
+
+    pub fn as_abstract_model(&self) -> Option<&RefinementProcess> {
+        if let Self::AbstractModel(method) = self {
+            Some(method)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_mut_abstract_model(&mut self) -> Option<&mut RefinementProcess> {
+        if let Self::AbstractModel(method) = self {
+            Some(method)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_refinement(&self) -> Option<&RefinementProcess> {
+        match self {
+            Self::AbstractModel(m) | Self::Method(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    pub fn as_mut_refinement(&mut self) -> Option<&mut RefinementProcess> {
+        match self {
+            Self::AbstractModel(m) | Self::Method(m) => Some(m),
+            _ => None,
         }
     }
 
@@ -275,7 +323,7 @@ impl ActingProcessInner {
         }
     }
 
-    pub fn as_action(&self) -> Option<&TaskProcess> {
+    pub fn as_task(&self) -> Option<&TaskProcess> {
         if let Self::Task(action) = self {
             Some(action)
         } else {
@@ -283,8 +331,24 @@ impl ActingProcessInner {
         }
     }
 
-    pub fn as_mut_action(&mut self) -> Option<&mut TaskProcess> {
+    pub fn as_mut_task(&mut self) -> Option<&mut TaskProcess> {
         if let Self::Task(action) = self {
+            Some(action)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_command(&self) -> Option<&CommandProcess> {
+        if let Self::Command(action) = self {
+            Some(action)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_mut_command(&mut self) -> Option<&mut CommandProcess> {
+        if let Self::Command(action) = self {
             Some(action)
         } else {
             None

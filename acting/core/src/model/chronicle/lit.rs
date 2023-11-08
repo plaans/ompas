@@ -3,7 +3,8 @@ use crate::model::chronicle::constraint::Constraint;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::{hashset, HashSet};
+use aries::collections::seq::Seq;
+use map_macro::hash_set;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -346,14 +347,14 @@ impl FlatBindings for Lit {
 }
 
 impl GetVariables for Lit {
-    fn get_variables(&self) -> HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         match self {
-            Lit::Atom(a) | Lit::Await(a) | Lit::Release(a) => hashset!(*a),
+            Lit::Atom(a) | Lit::Await(a) | Lit::Release(a) => hash_set!(*a),
             Lit::Constraint(c) => c.get_variables(),
             Lit::Exp(vec) => {
-                let mut hashset: im::HashSet<VarId> = Default::default();
+                let mut hashset: std::collections::HashSet<VarId> = Default::default();
                 for e in vec {
-                    hashset = hashset.union(e.get_variables())
+                    hashset = hashset.union(&e.get_variables()).cloned().collect();
                 }
                 hashset
             }
@@ -367,7 +368,7 @@ impl GetVariables for Lit {
                 if let Some(capacity) = acq.capacity {
                     vec.push(capacity)
                 }
-                vec.into()
+                vec.to_set()
             }
         }
     }
@@ -429,11 +430,11 @@ impl FlatBindings for LitSet {
 }
 
 impl GetVariables for LitSet {
-    fn get_variables(&self) -> HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         match self {
             LitSet::Finite(set) => set.iter().cloned().collect(),
             LitSet::Domain(d) => {
-                hashset![*d]
+                hash_set![*d]
             }
         }
     }

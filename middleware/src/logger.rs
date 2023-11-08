@@ -296,7 +296,7 @@ impl Logger {
         let path: PathBuf = match &file_descriptor {
             None => {
                 let mut path = self.logs_dir.clone();
-                path.push(name.to_string());
+                path.push(format!("{}.log", name));
                 path
             }
             Some(FileDescriptor::AbsolutePath(ap)) => ap.clone(),

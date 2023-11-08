@@ -172,7 +172,7 @@ pub fn var_id_into_atom(
     let domain = &ompas_var.domain;
     if domain.is_true() {
         aLit::TRUE.into()
-    } else if domain.is_false() {
+    } else if domain.is_false() | domain.is_nil() {
         aLit::FALSE.into()
     } else if let Domain::Cst(_t, cst) = domain {
         match cst {
@@ -200,9 +200,13 @@ pub fn var_id_into_atom(
             },
         }
     } else {
-        (*table
-            .get_var(*a)
-            .unwrap_or_else(|| panic!("{} undefined in bindings", st.format_variable(*a))))
+        (*table.get_var(*a).unwrap_or_else(|| {
+            panic!(
+                "{}(domain = {}) undefined in bindings",
+                st.format_variable(*a),
+                st.format_domain(domain)
+            )
+        }))
         .into()
     }
 }

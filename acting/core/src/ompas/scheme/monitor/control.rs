@@ -37,14 +37,14 @@ use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{lruntimeerror, string, wrong_type};
+use std::fmt::Write as OtherWrite;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tokio::sync::{mpsc, RwLock};
-use std::fmt::Write as OtherWrite;
 
 pub struct ModControl {
     pub(crate) options: OMPASManager,
@@ -146,6 +146,18 @@ impl From<ModControl> for LModule {
             false,
         );
         module.add_async_fn(SET_SELECT, set_select, DOC_SET_SELECT, false);
+        module.add_async_fn(
+            SET_PLANNER_REACTIVITY,
+            set_planner_reactivity,
+            DOC_SET_PLANNER_REACTIVITY,
+            false,
+        );
+        module.add_async_fn(
+            GET_PLANNER_REACTIVITY,
+            get_planner_reactivity,
+            DOC_GET_PLANNER_REACTIVITY,
+            false,
+        );
         module.add_async_fn(GET_DOMAIN, get_domain, DOC_GET_SELECT, false);
         module.add_async_fn(GET_STATE, get_state, DOC_GET_STATE, false);
         module.add_async_fn(
@@ -210,17 +222,13 @@ impl From<ModControl> for LModule {
     }
 }
 
-
 async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let plan_env: LEnv = ctx.get_plan_env().await;
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let acting_manager = ctx.acting_manager.clone();
-    if let Some(opt) = planner {
-        acting_manager
-            .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
-            .await;
-    }
+    acting_manager.set_plan_env(plan_env.clone()).await;
+
     let pendings = ctx.jobs.move_pendings().await;
 
     let (tx, rx) = mpsc::unbounded_channel();
@@ -248,26 +256,48 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
         rae(acting_manager_2, log_2, env, rx).await;
     });
 
-    log.info(format!("Started OMPAS with config {}", match planner {
-        None => "reactive",
-        Some(false) => "planner = satisfactory",
-        Some(true) => "planner = optimality",
-    }));
+    log.info(format!(
+        "Started OMPAS with config {}",
+        match planner {
+            None => "reactive",
+            Some(false) => "planner = satisfactory",
+            Some(true) => "planner = optimality",
+        }
+    ));
     let sender = ctx.get_sender().await.unwrap();
-
 
     {
         let init = acting_manager.domain_manager.get_init().await;
         log.info(format!("Evaluating init: {}", init));
         let (tx, mut rx) = mpsc::unbounded_channel();
-        sender.send(Job::new_init(tx, init).into()).expect("could not send job to rae");
+        sender
+            .send(Job::new_init(tx, init).into())
+            .expect("could not send job to rae");
         if let Response::Handle(handle) = rx.recv().await.unwrap()? {
             let _ = handle.get_future().await;
-        }else {
+        } else {
             unreachable!("OMPAS's response to init should be a future");
         }
     }
 
+    if let Some(opt) = planner {
+        let start = SystemTime::now();
+        acting_manager
+            .domain_manager
+            .init_planning_domain(
+                &plan_env,
+                acting_manager.state_manager.get_snapshot().await,
+                &acting_manager.st,
+            )
+            .await;
+        log.info(format!(
+            "Pre generation of acting models took {:.3} ms",
+            start.elapsed().unwrap().as_secs_f64() * 1000.0
+        ));
+        acting_manager
+            .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
+            .await;
+    }
 
     for PendingJob { id, r#type, lvalue } in pendings {
         log.info(format!("Sending pending job {}", lvalue));
@@ -293,7 +323,6 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
 pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     _start(env, None).await
 }
-
 
 /// Launch main loop of rae in an other asynchronous task.
 #[async_scheme_fn]
@@ -534,6 +563,46 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
 
     ctx.options.set_select_mode(select_mode).await;
     Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn set_planner_reactivity(env: &LEnv, reactivity: LValue) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+
+    let planner_reactivity = match reactivity {
+        LValue::Symbol(s) => {
+            if s.as_str() == "inf" {
+                f64::MAX
+            } else {
+                return Err(LRuntimeError::new(
+                    "",
+                    format!("Expected Symbol(\"inf\") or number, got {}", s),
+                ));
+            }
+        }
+        LValue::Number(n) => f64::from(&n),
+        lv => {
+            return Err(LRuntimeError::new(
+                "",
+                format!("Expected Symbol(\"inf\") or number, got {}", lv),
+            ))
+        }
+    };
+
+    ctx.acting_manager
+        .set_planner_reactivity(planner_reactivity);
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn get_planner_reactivity(env: &LEnv) -> Result<LValue, LRuntimeError> {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    let f = ctx.acting_manager.get_planner_reactivity();
+    if f < f64::MAX {
+        Ok(f.into())
+    } else {
+        Ok("inf".into())
+    }
 }
 
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
@@ -910,20 +979,18 @@ pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
 }
 
 #[async_scheme_fn]
-pub async fn wait_end_all(env: &LEnv, args:&[LValue]) -> Result<(), LRuntimeError> {
+pub async fn wait_end_all(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     let timeout: Option<i64> = if args.len() == 1 {
         Some(args[0].clone().try_into()?)
-    }else {
+    } else {
         None
     };
 
-
-    let acting_manager = &env.get_context::<ModControl>(MOD_CONTROL)?
-        .acting_manager;
+    let acting_manager = &env.get_context::<ModControl>(MOD_CONTROL)?.acting_manager;
 
     let high_level_tasks = acting_manager.get_all_high_level_tasks().await;
 
-    let mut subscriber: Vec<_ > = vec![];
+    let mut subscriber: Vec<_> = vec![];
 
     for task in high_level_tasks {
         subscriber.push(acting_manager.subscribe(&task).await);
@@ -931,12 +998,11 @@ pub async fn wait_end_all(env: &LEnv, args:&[LValue]) -> Result<(), LRuntimeErro
 
     let waiter = tokio::spawn(async move {
         for mut sub in subscriber {
-
             'loop_sub: loop {
                 if sub.borrow().is_terminated() {
                     break 'loop_sub;
                 }
-                let _= sub.changed().await;
+                let _ = sub.changed().await;
             }
         }
     });
@@ -959,5 +1025,3 @@ pub async fn wait_end_all(env: &LEnv, args:&[LValue]) -> Result<(), LRuntimeErro
 
     Ok(())
 }
-
-

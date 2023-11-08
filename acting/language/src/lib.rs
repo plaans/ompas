@@ -597,8 +597,9 @@ pub mod monitor {
         pub const ADD_RESOURCES: &str = "add-resources";
         pub const DOC_ADD_RESOURCES: &str = "Declare a list of new resources";
 
-        pub const ADD_INIT: &str= "add-init";
-        pub const DOC_ADD_INIT: &str= "Defines a program that should be executed at the launch of ompas.";
+        pub const ADD_INIT: &str = "add-init";
+        pub const DOC_ADD_INIT: &str =
+            "Defines a program that should be executed at the launch of ompas.";
 
         pub const REMOVE_COMMAND: &str = "remove-command";
         pub const DOC_REMOVE_COMMAND: &str = "Removes command from the domain definition.";
@@ -727,9 +728,9 @@ pub mod monitor {
         pub const MACRO_DEF_ENV: &str = "(lambda (label value)
             `(add-lambda ',label ',value))";
 
-        pub const DEF_INIT: &str ="def-init";
-        pub const DOC_DEF_INIT: &str= "Wrapper around add-init";
-        pub const DOC_DEF_INIT_VERBOSE: &str= "Example: (def-init (sleep 1))";
+        pub const DEF_INIT: &str = "def-init";
+        pub const DOC_DEF_INIT: &str = "Wrapper around add-init";
+        pub const DOC_DEF_INIT_VERBOSE: &str = "Example: (def-init (sleep 1))";
         pub const MACRO_DEF_INIT: &str = "(lambda (body)
             `(add-init ',body ))";
 
@@ -920,6 +921,12 @@ pub mod monitor {
         pub const DOC_SET_SELECT: &str =
             "Set the select engine: greedy, aries, upom, c_choice, etc.";
 
+        pub const SET_PLANNER_REACTIVITY: &str = "set-planner-reactivity";
+        pub const DOC_SET_PLANNER_REACTIVITY: &str= "Set the time that will define the reactivity of the planner. The value can be the symbol \"inf\", or a number in secs";
+
+        pub const GET_PLANNER_REACTIVITY: &str = "get-planner-reactivity";
+        pub const DOC_GET_PLANNER_REACTIVITY: &str = "Returns the reactivity of the planner.";
+
         pub const GET_SELECT: &str = "get-select";
         pub const DOC_GET_SELECT: &str = "Return the select algorithm used.";
 
@@ -990,8 +997,8 @@ pub mod monitor {
         pub const DOC_EXPORT_REPORT: &str =
             "Exports the acting tree and the state of the current run.";
 
-        pub const WAIT_END_ALL: &str= "wait-end-all";
-        pub const DOC_WAIT_END_ALL: &str= "Wait that all current high-level tasks are terminated.";
+        pub const WAIT_END_ALL: &str = "wait-end-all";
+        pub const DOC_WAIT_END_ALL: &str = "Wait that all current high-level tasks are terminated.";
     }
 }
 

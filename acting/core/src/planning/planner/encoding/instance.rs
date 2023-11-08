@@ -28,7 +28,6 @@ pub fn generate_instances(
             Container::Instance(id),
             Some(scope),
         )?;
-        //Printer::print_chronicle(&template.chronicle, &ctx.model);
 
         new_instances.push(ACI {
             parameters: template

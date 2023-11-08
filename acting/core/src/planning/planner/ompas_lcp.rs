@@ -45,7 +45,7 @@ pub struct OMPASLCPConfig {
     pub debug_date: DebugDate,
 }
 
-pub fn is_fully_populated(instances: &[ChronicleInstance]) -> bool {
+fn is_fully_populated(instances: &[ChronicleInstance]) -> bool {
     let origins: HashSet<ChronicleOrigin> = instances.iter().map(|c| c.origin.clone()).collect();
 
     for (instance_id, c) in instances.iter().enumerate() {
@@ -71,7 +71,7 @@ pub async fn run_planner(
     config: &OMPASLCPConfig,
     on_new_sol: impl Fn(&FiniteProblem, Arc<SavedAssignment>) + Clone + Send + 'static,
     interrupter: Option<PlannerInterrupter>,
-) -> Result<Option<PlanResult>> {
+) -> Result<SolverResult<PlanResult>> {
     let OMPASLCPConfig {
         state_subscriber_id,
         opt,
@@ -99,7 +99,7 @@ pub async fn run_planner(
     for depth in min_depth..=max_depth {
         if let Some(interrupter) = &interrupter {
             if *interrupter.borrow() {
-                return Ok(None);
+                return Ok(SolverResult::Unsat);
             }
         }
         let depth_string = if depth == u32::MAX {
@@ -107,11 +107,8 @@ pub async fn run_planner(
         } else {
             depth.to_string()
         };
-        if PRINT_PLANNER_OUTPUT.get() {
-            println!("{depth_string} Solving with depth {depth_string}");
-        }
+        debug_date.print_msg(format!("{depth_string} Solving with depth {depth_string}"));
 
-        debug_date.print_msg("Populating problem");
         let new_pp = populate_problem(FinitePlanningProblem::PlannerProblem(&pp), domain, env, 1)
             .await
             .unwrap();
@@ -141,11 +138,13 @@ pub async fn run_planner(
             .update_subscriber_rule(state_subscriber_id, rule)
             .await;
 
+        let debug_date = debug_date.clone();
         let r: Result<_> = handle
             .spawn_blocking(move || {
                 let (mut problem, table) = encode(&new_pp).unwrap();
+                debug_date.print_msg("Aries chronicles generated");
 
-                if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
                     for instance in &problem.chronicles {
                         Printer::print_chronicle(&instance.chronicle, &problem.context.model);
                     }
@@ -154,13 +153,9 @@ pub async fn run_planner(
                 if PRINT_RAW_MODEL.get() {
                     Printer::print_problem(&problem);
                 }
-                if PRINT_PLANNER_OUTPUT.get() {
-                    println!("===== Preprocessing ======");
-                }
+                debug_date.print_msg("===== Preprocessing ======");
                 aries_planning::chronicles::preprocessing::preprocess(&mut problem);
-                if PRINT_PLANNER_OUTPUT.get() {
-                    println!("==========================");
-                }
+                debug_date.print_msg("==========================");
 
                 if PRINT_MODEL.get() {
                     Printer::print_problem(&problem);
@@ -190,7 +185,7 @@ pub async fn run_planner(
             debug_date.print_msg(" Populated");
         }
         let result = solve_finite_problem(
-            *debug_date,
+            debug_date,
             pb.clone(),
             &STRATEGIES,
             *opt,
@@ -207,7 +202,7 @@ pub async fn run_planner(
         match result {
             SolverResult::Unsat => {
                 if fully_populated {
-                    return Ok(None);
+                    return Ok(SolverResult::Unsat);
                 }
                 //println!("unsat")
             } // continue (increase depth)
@@ -223,18 +218,18 @@ pub async fn run_planner(
                 return Ok(other.map(|(pb, (ass, _))| (pb, ass))).map(|r| match r {
                     SolverResult::Sol((fp, ass)) => {
                         if OMPAS_PLANNER_OUTPUT.get() {
-                            println!("  Solution found");
-                            println!(
+                            debug_date.print_msg("  Solution found");
+                            debug_date.print_msg(format!(
                                 "\n**** Decomposition ****\n\n\
                     {}\n\n\
                     **** Plan ****\n\n\
                     {}",
                                 format_hddl_plan(&fp, &ass).unwrap(),
-                                format_pddl_plan(&fp, &ass).unwrap()
-                            );
+                                format_pddl_plan(&fp, &ass).unwrap(),
+                            ));
                         }
 
-                        Some(PlanResult {
+                        SolverResult::Sol(PlanResult {
                             ass,
                             fp,
                             pp: Arc::new(new_pp),
@@ -243,21 +238,21 @@ pub async fn run_planner(
                     }
                     SolverResult::Unsat => {
                         if OMPAS_PLANNER_OUTPUT.get() {
-                            println!("No solution");
+                            debug_date.print_msg("No solution");
                         }
-                        None
+                        SolverResult::Unsat
                     }
                     SolverResult::Timeout(_) => {
                         if OMPAS_PLANNER_OUTPUT.get() {
-                            println!("Timeout");
+                            debug_date.print_msg("Timeout");
                         }
-                        None
+                        SolverResult::Timeout(None)
                     }
                     SolverResult::Interrupt(_) => {
                         if OMPAS_PLAN_OUTPUT.get() {
-                            println!("Interrupt")
+                            debug_date.print_msg("Interrupt")
                         }
-                        None
+                        SolverResult::Interrupt(None)
                     }
                 })
             }
@@ -265,7 +260,7 @@ pub async fn run_planner(
         pp = new_pp;
     }
 
-    Ok(None)
+    Ok(SolverResult::Unsat)
 }
 
 /// Instantiates a solver for the given subproblem and attempts to solve it.
@@ -288,12 +283,11 @@ async fn solve_finite_problem(
     if PRINT_INITIAL_PROPAGATION.get() {
         propagate_and_print(&pb);
     }
-
     let (encoded, pb) = handle
         .spawn_blocking(move || (aries_planners::encode::encode(&pb, metric), pb))
         .await
         .unwrap();
-
+    debug_date.print_msg("[Aries] CSP problem encoded");
     let Ok(EncodedProblem {
         mut model,
         objective: metric,
@@ -306,6 +300,8 @@ async fn solve_finite_problem(
         model.enforce(metric.le_lit(cost_upper_bound), []);
     }
     let solver = init_solver(model);
+    debug_date.print_msg("[Aries] Solver initialized");
+
     let encoding = Arc::new(encoding);
 
     // select the set of strategies, based on user-input or hard-coded defaults.
@@ -317,9 +313,10 @@ async fn solve_finite_problem(
     let mut solver = aries::solver::parallel::ParSolver::new(solver, strats.len(), |id, s| {
         strats[id].adapt_solver(s, pb.clone(), encoding.clone())
     });
+    debug_date.print_msg("[Aries] ParSolver initialized");
 
     let input_stream = solver.input_stream();
-    tokio::spawn(async move {
+    let interrupt_handle = tokio::spawn(async move {
         if let Some(mut interrupter) = interrupter {
             if interrupter.wait_for(|b| *b == true).await.is_ok() {
                 debug_date.print_msg("Interrupt received");
@@ -329,7 +326,7 @@ async fn solve_finite_problem(
     });
 
     let join = handle.spawn_blocking(move || {
-        debug_date.print_msg("Starting solver");
+        debug_date.print_msg("[Aries] Starting solver");
 
         let result = if let Some(metric) = metric {
             solver.minimize_with(metric, on_new_solution, None)
@@ -351,5 +348,7 @@ async fn solve_finite_problem(
         }
         result
     });
-    join.await.unwrap()
+    let r = join.await.unwrap();
+    interrupt_handle.abort();
+    r
 }

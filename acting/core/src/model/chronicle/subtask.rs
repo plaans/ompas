@@ -3,7 +3,6 @@ use crate::model::process_ref::Label;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::HashSet;
 
 #[derive(Clone, Debug)]
 pub struct SubTask {
@@ -33,10 +32,13 @@ impl FlatBindings for SubTask {
 }
 
 impl GetVariables for SubTask {
-    fn get_variables(&self) -> HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         let mut hashet = self.interval.get_variables();
         hashet.insert(self.result);
-        hashet.union(self.name.iter().cloned().collect())
+        hashet
+            .union(&self.name.iter().cloned().collect())
+            .cloned()
+            .collect()
     }
 }
 

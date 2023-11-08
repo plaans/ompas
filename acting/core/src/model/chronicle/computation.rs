@@ -2,7 +2,6 @@ use crate::model::chronicle::lit::Lit;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::HashSet;
 use std::fmt::Write;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -52,12 +51,12 @@ impl FormatWithSymTable for Computation {
 }
 
 impl GetVariables for Computation {
-    fn get_variables(&self) -> HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         match self {
             Self::Add(vec) | Self::Sub(vec) | Self::Mul(vec) | Self::Div(vec) => {
-                let mut set: HashSet<VarId> = Default::default();
+                let mut set: std::collections::HashSet<VarId> = Default::default();
                 for e in vec {
-                    set = set.union(e.get_variables())
+                    set = set.union(&e.get_variables()).cloned().collect()
                 }
                 set
             }

@@ -16,8 +16,8 @@ use crate::model::sym_table::r#trait::{FlatBindings, GetVariables, Replace};
 use crate::model::sym_table::VarId;
 use crate::planning::conversion::chronicle::post_processing::post_processing;
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
-use im::HashSet;
 use std::borrow::Borrow;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
@@ -32,20 +32,36 @@ pub mod lit;
 pub mod subtask;
 pub mod task_template;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum ChronicleKind {
     Root,
     Command,
+    #[default]
     Method,
     Task,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
+pub struct ChronicleDebugData {
+    pub flow_graph: FlowGraph,
+    pub convert_time: Duration,
+}
+
+#[derive(Default)]
 pub struct ChronicleMetaData {
     pub kind: ChronicleKind,
     label: String,
-    pub flow_graph: FlowGraph,
-    pub convert_time: Duration,
+    pub debug: Option<ChronicleDebugData>,
+}
+
+impl Clone for ChronicleMetaData {
+    fn clone(&self) -> Self {
+        Self {
+            kind: self.kind,
+            label: self.label.to_string(),
+            debug: None,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -61,18 +77,21 @@ pub struct Chronicle {
     pub conditions: Vec<Condition>,
     effects: Vec<Effect>,
     subtasks: Vec<SubTask>,
-    pub acting_process_models: ActingProcessModelCollection,
+    acting_process_models: ActingProcessModelCollection,
     pub sub_chronicles: Vec<TaskTemplate>,
     pub st: RefSymTable,
 }
 
 impl Chronicle {
     pub fn new(label: impl Display, kind: ChronicleKind, st: RefSymTable) -> Self {
-        let interval = Interval::new(st.new_start(), st.new_end());
+        let start = st.new_start();
+        let interval = Interval::new(start, st.new_end(start));
+        let start = interval.get_start();
+        let presence = st.new_presence(start);
+        st.set_declaration(presence, start);
 
-        let presence = st.new_presence();
-
-        let result = st.new_chronicle_result();
+        let result = st.new_chronicle_result(start);
+        st.set_declaration(result, start);
 
         let init_var = vec![presence, result, interval.get_start(), interval.get_end()];
 
@@ -81,8 +100,7 @@ impl Chronicle {
             meta_data: ChronicleMetaData {
                 kind,
                 label: label.to_string(),
-                flow_graph: Default::default(),
-                convert_time: Duration::from_secs(0),
+                debug: None,
             },
             name: Default::default(),
             task: Default::default(),
@@ -139,16 +157,29 @@ impl Chronicle {
         &self.subtasks
     }
 
-    fn build_hashset<T: GetVariables>(vec: &[T]) -> im::HashSet<VarId> {
+    pub fn get_acting_process_model(
+        &self,
+        label: impl Into<ActingProcessModelLabel>,
+    ) -> Option<&ActingProcessModel> {
+        self.acting_process_models.get_process_model(label)
+    }
+
+    pub fn get_all_acting_process_models(
+        &self,
+    ) -> &HashMap<ActingProcessModelLabel, ActingProcessModel> {
+        &self.acting_process_models.inner
+    }
+
+    fn build_hashset<T: GetVariables>(vec: &[T]) -> HashSet<VarId> {
         let mut hashset: HashSet<VarId> = Default::default();
         for e in vec {
-            hashset = hashset.union(e.get_variables());
+            hashset = hashset.union(&e.get_variables()).cloned().collect();
         }
 
         hashset
     }
 
-    pub fn get_variables_in_set(&self, set: ChronicleSet) -> im::HashSet<VarId> {
+    pub fn get_variables_in_set(&self, set: ChronicleSet) -> HashSet<VarId> {
         match set {
             ChronicleSet::Effect => Self::build_hashset(&self.effects),
             ChronicleSet::Constraint => Self::build_hashset(&self.constraints),
@@ -157,15 +188,21 @@ impl Chronicle {
         }
     }
 
-    pub fn get_variables_in_sets(&self, sets: Vec<ChronicleSet>) -> im::HashSet<VarId> {
+    pub fn get_variables_in_sets(
+        &self,
+        sets: Vec<ChronicleSet>,
+    ) -> std::collections::HashSet<VarId> {
         let mut hashset = HashSet::default();
         for set in sets {
-            hashset = hashset.union(self.get_variables_in_set(set))
+            hashset = hashset
+                .union(&self.get_variables_in_set(set))
+                .cloned()
+                .collect();
         }
         hashset
     }
 
-    pub fn get_all_variables_in_sets(&self) -> im::HashSet<VarId> {
+    pub fn get_all_variables_in_sets(&self) -> std::collections::HashSet<VarId> {
         self.get_variables_in_sets(vec![
             ChronicleSet::Effect,
             ChronicleSet::Constraint,
@@ -194,6 +231,10 @@ impl Chronicle {
 
     pub fn get_name(&self) -> &Vec<VarId> {
         &self.name
+    }
+
+    pub fn get_label(&self) -> Option<String> {
+        self.name.get(0).map(|var_id| var_id.format(&self.st, true))
     }
 
     pub fn get_task(&self) -> &Vec<VarId> {
@@ -306,8 +347,21 @@ impl Chronicle {
         self.subtasks.push(sub_task);
     }
 
-    pub fn add_task_template(&mut self, task: TaskTemplate) {
-        self.sub_chronicles.push(task)
+    pub fn add_acting_process_model(
+        &mut self,
+        label: Label,
+        acting_process_model: impl Into<ActingProcessModel>,
+    ) {
+        let model = acting_process_model.into();
+        for var in model.get_variables() {
+            self.add_var(var);
+        }
+        self.acting_process_models.add_binding(label, model);
+    }
+
+    pub fn add_task_template(&mut self, task: TaskTemplate) -> usize {
+        self.sub_chronicles.push(task);
+        self.sub_chronicles.len() - 1
     }
 
     pub fn add_task_parameter(&mut self, param: &VarId) {
@@ -359,7 +413,7 @@ impl Chronicle {
             .map(|id| {
                 format!(
                     "{}({})",
-                    id.format(st, sym_version),
+                    st.get_label(*id, sym_version),
                     st.format_domain_id(st.get_domain_id(*id)),
                 )
             })
@@ -441,10 +495,23 @@ impl Chronicle {
     }
 
     pub fn instantiate(mut self, instantiations: Vec<Instantiation>) -> Self {
+        //let st = self.st.clone();
         for Instantiation { var, value } in instantiations {
             self.replace(var, value);
             self.variables.remove(&var);
-            self.variables.remove(&value);
+            self.variables.insert(value);
+            /*println!(
+                "value({}) = {}",
+                var.format(&st, true),
+                value.format(&st, true)
+            );*/
+            /*if !st.get_domain_of_var(var).is_constant() {
+                let duplicate = st.duplicate(var);
+                st.union_var(duplicate, value);
+                self.replace(var, duplicate);
+                self.variables.remove(&var);
+                self.variables.insert(duplicate);
+            }*/
         }
         self
     }
@@ -559,12 +626,13 @@ impl Chronicle {
             let mut to_remove = vec![];
 
             'loop_condition: for (i, condition) in self.conditions.iter().enumerate() {
-                let variables = condition.get_variables();
+                let variables = condition.interval.get_variables();
                 for var in &variables {
                     if free_variables.contains(var) {
                         continue 'loop_condition;
                     }
                 }
+
                 to_remove.push(i)
             }
             self.remove_conditions(to_remove)
@@ -575,7 +643,7 @@ impl Chronicle {
             let mut to_remove = vec![];
 
             'loop_condition: for (i, effect) in self.effects.iter().enumerate() {
-                let variables = effect.get_variables();
+                let variables = effect.interval.get_variables();
                 for var in &variables {
                     if free_variables.contains(var) {
                         continue 'loop_condition;
@@ -602,6 +670,43 @@ impl Chronicle {
             self.remove_subtasks(to_remove)
         }
         self
+    }
+
+    pub fn duplicate(&self) -> Self {
+        let st = self.st.clone();
+        let mut new_chronicle = Self {
+            meta_data: self.meta_data.clone(),
+            name: self.name.clone(),
+            task: self.task.clone(),
+            presence: self.presence,
+            interval: self.interval,
+            result: self.result,
+            variables: self.variables.clone(),
+            constraints: self.constraints.clone(),
+            conditions: self.conditions.clone(),
+            effects: self.effects.clone(),
+            subtasks: self.subtasks.clone(),
+            acting_process_models: self.acting_process_models.clone(),
+            sub_chronicles: vec![],
+            st: self.st.clone(),
+        };
+        let vars: Vec<(_, _)> = self
+            .variables
+            .iter()
+            .map(|var| (*var, st.duplicate(*var)))
+            .collect();
+
+        for (old, new) in vars {
+            new_chronicle.replace(old, new)
+        }
+        for TaskTemplate { name, methods } in &self.sub_chronicles {
+            let methods = methods.iter().map(|m| m.duplicate()).collect();
+            new_chronicle.sub_chronicles.push(TaskTemplate {
+                name: name.clone(),
+                methods,
+            })
+        }
+        new_chronicle
     }
 }
 
@@ -655,22 +760,17 @@ impl GetVariables for Chronicle {
 impl Replace for Chronicle {
     fn replace(&mut self, old: VarId, new: VarId) {
         self.presence.replace(old, new);
+        self.result.replace(old, new);
         self.interval.replace(old, new);
         self.name.replace(old, new);
         self.task.replace(old, new);
-        for sub in &mut self.sub_chronicles {
-            sub.name.replace(old, new);
-            for method in &mut sub.methods {
-                method.replace(old, new);
-            }
-        }
+        self.constraints.replace(old, new);
+        self.conditions.replace(old, new);
+        self.effects.replace(old, new);
+        self.subtasks.replace(old, new);
+        self.acting_process_models.replace(old, new);
         self.variables.remove(&old);
         self.variables.insert(new);
-        self.conditions.replace(old, new);
-        self.constraints.replace(old, new);
-        self.subtasks.replace(old, new);
-        self.effects.replace(old, new);
-        self.acting_process_models.replace(old, new);
     }
 }
 

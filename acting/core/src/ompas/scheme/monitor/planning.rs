@@ -7,25 +7,21 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::interval::Interval;
 use crate::ompas::manager::domain::DomainManager;
-use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::problem_update::ExecutionProblem;
-use crate::ompas::manager::planning::{
-    encode, extract_choices, populate_problem, FinitePlanningProblem,
-};
+use crate::ompas::manager::planning::{extract_choices, DebugDate};
+use crate::ompas::manager::state::state_update_manager::StateRule;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::ompas::scheme::monitor::ModMonitor;
-use crate::planning::planner::encoding::PlannerProblem;
+use crate::planning::planner::ompas_lcp;
+use crate::planning::planner::ompas_lcp::OMPASLCPConfig;
 use crate::planning::planner::problem::new_problem_chronicle_instance;
 use crate::planning::planner::result::instance::instantiate_chronicles;
-use crate::planning::planner::result::PlanResult;
-use crate::planning::planner::solver::{run_planner, PMetric};
+use crate::planning::planner::solver::PMetric;
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG, OMPAS_PLAN_OUTPUT};
-use aries::core::INT_CST_MAX;
-use aries_planning::chronicles;
-use aries_planning::chronicles::printer::Printer;
+use aries_planners::solver::SolverResult;
 use ompas_language::monitor::control::MOD_CONTROL;
 use ompas_language::monitor::model::MOD_MODEL;
 use ompas_language::monitor::planning::*;
@@ -145,39 +141,31 @@ pub async fn __plan(
     let mut env: LEnv = ctx.get_plan_env().await;
     let state: WorldStateSnapshot = ctx.get_plan_state().await;
 
-    env.update_context(ModState::new_from_snapshot(state));
+    env.update_context(ModState::new_from_snapshot(state.clone()));
     let opt = if opt { Some(PMetric::Makespan) } else { None };
     let st = acting_manager.st.clone();
+    acting_manager
+        .domain_manager
+        .init_planning_domain(&env, state, &st)
+        .await;
+
     let domain: OMPASDomain = acting_manager.domain_manager.get_inner().await;
     add_domain_symbols(&st, &domain);
 
     let mut state = acting_manager.state_manager.get_snapshot().await;
+    let state_manager = acting_manager.state_manager.clone();
     let resource_state = acting_manager.resource_manager.get_snapshot(None).await;
     state.absorb(resource_state);
-    let ep: ExecutionProblem = ExecutionProblem {
+    let mut ep: ExecutionProblem = ExecutionProblem {
         state,
         st: st.clone(),
-        chronicles: vec![new_problem_chronicle_instance(
-            &st,
-            tasks.clone(),
-            goals,
-            events,
-        )],
+        chronicles: vec![new_problem_chronicle_instance(&st, tasks.clone(), goals, events).await],
     };
-
-    let mut pp: PlannerProblem = populate_problem(
-        FinitePlanningProblem::ExecutionProblem(&ep),
-        &domain,
-        &env,
-        INT_CST_MAX as u32,
-    )
-    .await
-    .unwrap();
 
     //hack
     for (i, task) in tasks.iter().enumerate() {
         if let Some(start) = task.start {
-            let ch = &mut pp.instances[i + 1].instantiated_chronicle;
+            let ch = &mut ep.chronicles[i + 1].instantiated_chronicle;
             *ch = ch.clone().instantiate(vec![Instantiation::new(
                 ch.interval.get_start(),
                 st.new_cst(start.as_cst().unwrap()),
@@ -186,8 +174,8 @@ pub async fn __plan(
     }
 
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-        for (origin, chronicle) in pp
-            .instances
+        for (origin, chronicle) in ep
+            .chronicles
             .iter()
             .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
         {
@@ -195,36 +183,46 @@ pub async fn __plan(
         }
     }
 
-    let (aries_problem, table): (chronicles::Problem, ActingVarRefTable) = encode(&pp).unwrap();
-    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-        for instance in &aries_problem.chronicles {
-            Printer::print_chronicle(&instance.chronicle, &aries_problem.context.model);
-        }
-    }
+    let subscriber = state_manager.new_subscriber(StateRule::All).await;
 
-    let result = run_planner(aries_problem, opt, None);
+    let result = ompas_lcp::run_planner(
+        &ep,
+        &OMPASLCPConfig {
+            state_subscriber_id: subscriber.id,
+            opt,
+            state_manager,
+            domain: Arc::new(domain),
+            env,
+            debug_date: DebugDate::new(0),
+        },
+        |_, _| {},
+        None,
+    )
+    .await;
 
     //println!("{}", format_partial_plan(&pb, &x)?);
 
-    if let Ok(Some(pr)) = result {
-        let instances = instantiate_chronicles(&pp, &pr, &table);
-        let PlanResult { ass, fp, pp, table } = pr;
-        // for v in ass.variables() {
-        //     let prez = format!("[{:?}]", ass.presence_literal(v));
-        //     let v_str = format!("{v:?}");
-        //     print!("{prez:<6}  {v_str:<6} <- {:?}", ass.domain(v));
-        //     if let Some(lbl) = fp.model.get_label(v) {
-        //         println!("    {lbl:?}");
-        //     } else {
-        //         println!()
-        //     }
-        // }
-
-        let choices = extract_choices(&table, &ass, &fp.model, &pp);
+    if let Ok(SolverResult::Sol(pr)) = result {
+        let choices = extract_choices(&pr);
 
         if OMPAS_PLAN_OUTPUT.get() {
             println!("Plan found");
             if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                //let PlanResult { ass, fp, .. } = &pr;
+
+                // for v in ass.variables() {
+                //     let prez = format!("[{:?}]", ass.presence_literal(v));
+                //     let v_str = format!("{v:?}");
+                //     print!("{prez:<6}  {v_str:<6} <- {:?}", ass.domain(v));
+                //     if let Some(lbl) = fp.model.get_label(v) {
+                //         println!("    {lbl:?}");
+                //     } else {
+                //         println!()
+                //     }
+                // }
+
+                let instances = instantiate_chronicles(&pr);
+
                 for i in instances {
                     println!("{}", i)
                 }

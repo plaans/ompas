@@ -7,11 +7,11 @@
 
     (def-method move_direct
         (:task go2)
-        (:params (?ro robot) (?r room) (?a room) (?n room) (?d door))
+        (:params (?r room) (?a room) (?n room) (?d door))
         (:pre-conditions
             (= (at-robby) ?a)
             (!= ?a ?r)
-            (connected ?a ?d ?n)
+            (connects ?a ?d ?n)
             (opened ?d))
         (:body
             (do
@@ -20,11 +20,11 @@
 
     (def-method open_and_move
         (:task go2)
-        (:params (?ro robot) (?r room) (?a room) (?n room) (?d door))
+        (:params (?r room) (?a room) (?n room) (?d door))
         (:pre-conditions
-            (= (at-rob ?ro) ?a)
+            (= (at-robby) ?a)
             (!= ?a ?r)
-            (connected ?a ?d ?n)
+            (connects ?a ?d ?n)
             (! (opened ?d)))
         (:body
             (do
@@ -35,7 +35,7 @@
     (def-task t_open (:params (?r room) (?d door)))
     (def-method open_direct
         (:task t_open)
-        (:params (?ro robot) (?r room) (?d door) (?g gripper))
+        (:params (?r room) (?d door) (?g gripper))
         (:pre-conditions (= (carry ?g) empty))
         (:body
             (open ?d ?r ?g)))
@@ -44,9 +44,9 @@
         (:task t_open)
         (:params (?r room) (?d door))
         (:pre-conditions
-            (! (exists
+            (forall
                 (instances gripper)
-                (lambda (?g) (= (carry ?g) empty)))))
+                (lambda (?g) (= (carry ?g) empty))))
         (:body
             (do
                 (define ?g (arbitrary (instances gripper)))

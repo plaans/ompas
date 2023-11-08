@@ -29,6 +29,13 @@ impl ProcessRef {
         }
     }
 
+    pub fn last(&self) -> Option<&Label> {
+        match self {
+            ProcessRef::Id(_) => None,
+            ProcessRef::Relative(_, vec) => vec.last(),
+        }
+    }
+
     pub fn as_id(&self) -> Option<ActingProcessId> {
         if let Self::Id(id) = self {
             Some(*id)
@@ -105,6 +112,7 @@ pub enum Label {
     Command(usize),
     ResourceAcquisition(usize),
     Arbitrary(usize),
+    SyntheticTask(usize),
 }
 
 impl Display for Label {
@@ -127,6 +135,9 @@ impl Display for Label {
             }
             Label::AbstractModel => {
                 write!(f, "abstract_model")
+            }
+            Label::SyntheticTask(id) => {
+                write!(f, "synthetic_task({})", id)
             }
         }
     }

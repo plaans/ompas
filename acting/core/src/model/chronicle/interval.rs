@@ -1,8 +1,7 @@
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::{hashset, HashSet};
-
+use map_macro::hash_set;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Interval {
     start: VarId,
@@ -98,8 +97,8 @@ impl FlatBindings for Interval {
 }
 
 impl GetVariables for Interval {
-    fn get_variables(&self) -> HashSet<VarId> {
-        let mut set = hashset![self.start, self.end];
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
+        let mut set = hash_set![self.start, self.end];
         if let Some(d) = self.duration {
             set.insert(d);
         }

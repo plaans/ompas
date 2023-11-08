@@ -68,6 +68,26 @@ pub struct ActingModel {
 }
 
 impl ActingModel {
+    pub fn duplicate_with_args(&self, args: &[Option<Cst>], st: &RefSymTable) -> Self {
+        let chronicle = self.chronicle.as_ref().unwrap().duplicate();
+
+        let name = chronicle.get_name().clone();
+        let mut runtime_info = self.runtime_info.clone();
+        for (arg, var) in args[1..].iter().zip(&name[1..]) {
+            if let Some(cst) = arg {
+                let value = st.new_cst(cst.clone());
+                runtime_info.add_instantiation(Instantiation::new(*var, value));
+            }
+        }
+        ActingModel {
+            lv: self.lv.clone(),
+            lv_om: self.lv_om.clone(),
+            lv_expanded: self.lv_expanded.clone(),
+            runtime_info,
+            chronicle: Some(chronicle),
+        }
+    }
+
     pub fn get_clean_instantiated_chronicle(&self) -> Option<Chronicle> {
         self.chronicle
             .as_ref()
@@ -150,23 +170,15 @@ impl Display for Goal {
 impl ActingModel {
     pub fn root(st: &RefSymTable) -> Self {
         let chronicle = Chronicle::new(ROOT, ChronicleKind::Root, st.clone());
-        st.set_domain(st.get_domain_id(chronicle.get_result()), Domain::nil());
-        st.set_domain(
-            st.get_domain_id(chronicle.get_presence()),
-            Domain::d_true(),
-        );
-
-        let mut runtime_info: RuntimeInfo = Default::default();
-        runtime_info.add_instantiation(Instantiation::new(
-            chronicle.get_interval().get_start(),
-            st.new_cst(Cst::Float(0.0)),
-        ));
+        st.meet_to_domain(st.get_domain_id(chronicle.get_result()), Domain::nil());
+        st.meet_to_domain(st.get_domain_id(chronicle.get_presence()), Domain::d_true());
+        st.meet_to_domain(st.get_domain_id(chronicle.interval.get_start()), 0.0);
 
         Self {
             lv: LValue::Nil,
             lv_om: LValue::Nil,
             lv_expanded: Some(LValue::Nil),
-            runtime_info,
+            runtime_info: RuntimeInfo::default(),
             chronicle: Some(chronicle),
         }
     }
@@ -270,7 +282,7 @@ impl ActingModel {
 
         let binding = ActionModel::new(subtask, constraints);
 
-        chronicle.acting_process_models.add_binding(label, binding);
+        chronicle.add_acting_process_model(label, binding);
 
         TaskRef { start, end, name }
     }

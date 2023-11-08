@@ -1,9 +1,10 @@
 use crate::model::sym_domain::basic_type::{
-    BasicType, TYPE_ID_ANY, TYPE_ID_FALSE, TYPE_ID_NIL, TYPE_ID_TRUE,
+    BasicType, TYPE_ID_ANY, TYPE_ID_EMPTY, TYPE_ID_FALSE, TYPE_ID_NIL, TYPE_ID_TRUE,
 };
 use crate::model::sym_domain::type_lattice::TypeLattice;
 use crate::model::sym_domain::Domain::*;
 use crate::ompas::manager::acting::acting_var::AsCst;
+use std::collections::HashSet;
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -23,6 +24,12 @@ pub enum Bound {
     Exc(cst::Cst),
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct DomainSubstitution {
+    alias: TypeId,
+    base: TypeId,
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Domain {
     Simple(TypeId),
@@ -36,6 +43,51 @@ pub enum Domain {
 }
 
 impl Domain {
+    pub fn substitute(mut self, subs: HashSet<DomainSubstitution>) -> Self {
+        for sub in subs {
+            self.replace(sub.base, sub.alias);
+        }
+        self
+    }
+
+    pub fn replace(&mut self, old: TypeId, new: TypeId) {
+        match self {
+            Simple(t) => {
+                if *t == old {
+                    *t = new;
+                }
+            }
+            Composed(c, u) => {
+                if *c == old {
+                    *c = new;
+                }
+                for d in u {
+                    d.replace(old, new)
+                }
+            }
+            Union(u) => {
+                for d in u {
+                    d.replace(old, new)
+                }
+            }
+            Substract(d, s) => {
+                d.replace(old, new);
+                s.replace(old, new);
+            }
+            Cst(c, _) => {
+                c.replace(old, new);
+            }
+            IntRange(_, _) => {}
+            Application(f, args, r) => {
+                f.replace(old, new);
+                r.replace(old, new);
+                for arg in args {
+                    arg.replace(old, new)
+                }
+            }
+        }
+    }
+
     pub fn format(&self, dc: &TypeLattice) -> String {
         match self {
             Simple(id) => dc.types[*id].to_string(),
@@ -80,19 +132,6 @@ impl Domain {
                 format!("{}:{str} -> {}", t.format(dc), r.format(dc))
             }
             IntRange(l, u) => {
-                /*let mut str = "".to_string();
-                match l {
-                    Bound::Inc(d) => write!(str, "[{}", d),
-                    Bound::Exc(d) => write!(str, "]{}", d),
-                }
-                .unwrap();
-                match u {
-                    Bound::Inc(d) => write!(str, "{}]", d),
-                    Bound::Exc(d) => write!(str, "{}[", d),
-                }
-                .unwrap();
-                str*/
-
                 format!("[{l},{u}]")
             }
         }
@@ -149,7 +188,7 @@ impl Domain {
     }
 
     pub fn is_empty(&self) -> bool {
-        self == &Simple(0)
+        self == &Simple(TYPE_ID_EMPTY)
     }
 
     pub fn is_application(&self) -> bool {
@@ -157,7 +196,7 @@ impl Domain {
     }
 
     pub fn is_any(&self) -> bool {
-        self == &Simple(1)
+        self == &Simple(TYPE_ID_ANY)
     }
 
     pub fn any() -> Self {
@@ -171,6 +210,9 @@ impl Domain {
     pub fn is_false(&self) -> bool {
         self == &Simple(TYPE_ID_FALSE)
     }
+    pub fn is_nil(&self) -> bool {
+        self == &Simple(TYPE_ID_NIL)
+    }
 
     pub fn empty() -> Self {
         Simple(0)
@@ -181,7 +223,7 @@ impl Domain {
     }
 
     pub fn nil() -> Domain {
-        Union(vec![BasicType::False.into(), BasicType::EmptyList.into()])
+        Simple(TYPE_ID_NIL)
     }
 
     pub fn d_true() -> Domain {
@@ -312,8 +354,8 @@ impl From<&str> for Domain {
 impl From<bool> for Domain {
     fn from(b: bool) -> Self {
         match b {
-            true => Simple(TYPE_ID_TRUE),
-            false => Domain::nil(),
+            true => Cst(Box::new(BasicType::True.into()), cst::Cst::Bool(true)),
+            false => Cst(Box::new(Domain::nil()), cst::Cst::Bool(false)),
         }
     }
 }

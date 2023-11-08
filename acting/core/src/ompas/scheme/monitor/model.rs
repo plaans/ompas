@@ -173,7 +173,11 @@ impl From<ModModel> for LModule {
         );
 
         module.add_macro(DEF_ENV, MACRO_DEF_ENV, (DOC_DEF_ENV, DOC_DEF_ENV_VERBOSE));
-        module.add_macro(DEF_INIT, MACRO_DEF_INIT, (DOC_DEF_INIT, DOC_DEF_INIT_VERBOSE));
+        module.add_macro(
+            DEF_INIT,
+            MACRO_DEF_INIT,
+            (DOC_DEF_INIT, DOC_DEF_INIT_VERBOSE),
+        );
 
         module.add_macro(OM_MODEL, MACRO_OM_MODEL, DOC_OM_MODEL);
         module.add_macro(
@@ -501,7 +505,8 @@ pub async fn add_command(
     let mut command = Command::default();
     command.set_label(map.get(&NAME.into()).unwrap().to_string());
     command.set_parameters(
-        Parameters::try_from_lvalue(map.get(&PARAMETERS.into()).unwrap(), &st).await?,
+        Parameters::try_from_lvalue(map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil), &st)
+            .await?,
     );
     let params = command.get_parameters().get_params_as_lvalue();
     let params_list = command.get_parameters().get_labels();

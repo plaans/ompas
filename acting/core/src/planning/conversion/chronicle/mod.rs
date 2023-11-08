@@ -10,6 +10,8 @@ use crate::model::chronicle::lit::{Lit, LitSet};
 use crate::model::chronicle::subtask::SubTask;
 use crate::model::chronicle::task_template::TaskTemplate;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
+use crate::model::process_ref::Label;
+use crate::model::sym_domain::basic_type::BasicType;
 use crate::model::sym_domain::basic_type::BasicType::Boolean;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
@@ -472,7 +474,7 @@ pub fn convert_into_chronicle(
                         }
 
                         if let Some(label) = flow.label {
-                            ch.acting_process_models.add_binding(
+                            ch.add_acting_process_model(
                                 label,
                                 ResourceModel::new(
                                     resource,
@@ -508,7 +510,7 @@ pub fn convert_into_chronicle(
                                     }
                                 }
                                 LitSet::Domain(d) => {
-                                    let id = st.new_parameter("_arbitrary_", Domain::any());
+                                    let id = st.new_parameter("_arbitrary_", Domain::any(), start);
                                     let r#type: String = d.format(&st, true);
                                     let domain =
                                         st.get_type_as_domain(&r#type).ok_or_else(|| {
@@ -523,7 +525,7 @@ pub fn convert_into_chronicle(
                                 }
                             };
                             if let Some(label) = flow.label {
-                                ch.acting_process_models.add_binding(
+                                ch.add_acting_process_model(
                                     label,
                                     ArbitraryModel::new(
                                         flow.interval.get_start(),
@@ -626,12 +628,14 @@ pub fn convert_into_chronicle(
                                 let mut types = types.clone();
                                 types.push(*r.clone());
                                 for (f, t) in args.iter().zip(types) {
-                                    let r = fl.st.get_domain_id(*f);
+                                    let r = st.get_domain_id(*f);
+                                    let r_debug = st.get_domain_of_var(*f);
                                     let t_debug = t.clone();
-                                    if !fl.st.meet_to_domain(r, t).is_none() {
+                                    if !st.meet_to_domain(r, t).is_none() {
                                         panic!(
-                                            "{}: incompatible variable domains: {} not {}",
+                                            "{}: incompatible variable domains: domain {} of {} not {}",
                                             exec.format(&st, true),
+                                            st.format_domain(&r_debug),
                                             (*f).format(&st, true),
                                             st.format_domain(&t_debug),
                                         )
@@ -640,8 +644,7 @@ pub fn convert_into_chronicle(
                             }
                         }
                         if let Some(label) = flow.label {
-                            ch.acting_process_models
-                                .add_binding(label, ActionModel::new(subtask, vec![]));
+                            ch.add_acting_process_model(label, ActionModel::new(subtask, vec![]));
                         } else {
                             ch.add_subtask(subtask);
                         }
@@ -699,21 +702,34 @@ pub fn convert_into_chronicle(
                     > {
                         let mut branch_params: HashMap<VarId, VarId> = Default::default();
                         let mut method = convert_into_chronicle(None, ht, fl, flow, _env, cv)?;
-                        for v in &method.get_variables() {
-                            if let Some(declaration) = st.get_declaration(*v) {
-                                //It means the variable has been created before the method, and shall be transformed into a parameter
-                                if declaration < fl.get_flow_start(flow_id) {
-                                    let param = st.new_parameter(
-                                        st.get_label(*v, false),
-                                        st.get_domain_of_var(*v),
-                                    );
-                                    st.union_domain(st.get_domain_id(param), st.get_domain_id(*v));
-                                    method.replace(*v, param);
-                                    branch_params.insert(*v, param);
-                                }
+                        let variables = method.get_variables();
+                        /*println!(
+                            "method({}).variable = {}",
+                            branch,
+                            variables.format(&st, true)
+                        );*/
+                        for v in variables {
+                            //It means the variable has been created before the method, and shall be transformed into a parameter
+                            if ch.variables.contains(&v) {
+                                let param = st.new_parameter(
+                                    st.get_label(v, false),
+                                    st.get_domain_of_var(v),
+                                    start,
+                                );
+                                st.union_domain(st.get_domain_id(param), st.get_domain_id(v));
+                                method.replace(v, param);
+                                branch_params.insert(v, param);
                             }
                         }
-                        let cond = ch.st.new_parameter(COND, branch);
+                        let cond = ch.st.new_parameter(
+                            COND,
+                            match branch {
+                                true => BasicType::True,
+                                false => BasicType::False,
+                            },
+                            start,
+                        );
+                        method.add_var(cond);
                         method.set_task(vec![t_if, cond]);
                         method.set_name(vec![label, cond]);
                         Ok((method, branch_params))
@@ -730,14 +746,16 @@ pub fn convert_into_chronicle(
                         true_params_id.union(&false_params_id).cloned().collect();
 
                     let mut task_params: Vec<VarId> = task_params.drain().collect();
-                    let cond_if = ch.st.new_parameter(COND, Boolean);
+                    let cond_if = ch.st.new_parameter(COND, Boolean, start);
 
                     let mut task = vec![t_if, cond_if];
                     for p in &task_params {
                         let p = st.get_var_parent(*p);
-                        let id = ch
-                            .st
-                            .new_parameter(ch.st.get_label(p, false), ch.st.get_domain_of_var(p));
+                        let id = ch.st.new_parameter(
+                            ch.st.get_label(p, false),
+                            ch.st.get_domain_of_var(p),
+                            start,
+                        );
                         task.push(id);
                     }
 
@@ -756,6 +774,7 @@ pub fn convert_into_chronicle(
                                         let id = ch.st.new_parameter(
                                             ch.st.get_label(*p, true),
                                             ch.st.get_domain_of_var(*p),
+                                            start,
                                         );
                                         method.add_var(id);
                                         id
@@ -766,17 +785,6 @@ pub fn convert_into_chronicle(
                                 method.add_task_parameter(&id);
                                 method.add_method_parameter(&id);
                             }
-                            //We enforce that the return types are the same
-                            /*let m_result = *method.get_result();
-                            st.union_domain(
-                                &st.get_domain_id(&m_result),
-                                &st.get_domain_id(&vertice.result),
-                            );*/
-                            /*println!(
-                                "union type(id)s {} and {}",
-                                ch.sym_table.get_type_id_of(&m_result),
-                                ch.sym_table.get_type_id_of(&vertice.result)
-                            );*/
                             Ok(method)
                         };
 
@@ -787,16 +795,19 @@ pub fn convert_into_chronicle(
                         name: task,
                         methods: vec![method_true, method_false],
                     };
-                    ch.add_task_template(task);
+                    let id = ch.add_task_template(task);
 
                     let mut task = vec![t_if, cond];
                     task.append(&mut task_params);
-                    ch.add_subtask(SubTask {
+                    let label = Label::SyntheticTask(id);
+                    let subtask = SubTask {
                         interval,
                         name: task,
                         result,
-                        label: None,
-                    })
+                        label: Some(label),
+                    };
+                    ch.add_acting_process_model(label, ActionModel::new(subtask, vec![]));
+                    //ch.add_subtask(subtask)
                 }
             }
             FlowKind::FlowHandle(h) => {

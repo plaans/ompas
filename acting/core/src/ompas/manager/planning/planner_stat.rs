@@ -16,6 +16,14 @@ impl PlannerStat {
 pub struct PlanningInstanceStat {
     pub id: u64,
     pub duration: Duration,
-    pub optimal: bool,
-    pub interrupted: bool,
+    pub status: PlanningStatus,
+    pub seeking_optimal: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PlanningStatus {
+    Timeout,
+    Interrupted,
+    Unsat,
+    Sat(bool),
 }

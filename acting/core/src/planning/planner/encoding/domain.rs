@@ -191,7 +191,7 @@ fn convert_constraint(
                 let mut cs =
                     convert_constraint(c.deref(), prez, container, table, st, ctx, Some(value))?;
                 constraints.append(&mut cs);
-                aConstraint::neq(get_atom(a, ctx), value)
+                aConstraint::eq(get_atom(a, ctx), value)
             }
             (Lit::Atom(value), Lit::Computation(c)) => {
                 let value = get_atom(value, ctx);
@@ -552,13 +552,11 @@ pub fn read_chronicle(
 
             table.add_binding(var, fvar.into());
             fvar.into()
-        } else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
-            if let Some(var) = table.get_var(var) {
-                *var
-            } else {
-                panic!()
-            }
-        } else if *t == TYPE_ID_INT {
+        }
+        /*else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
+            panic!("{} should not exist", var.format(&st, true))
+        }*/
+        else if *t == TYPE_ID_INT {
             let (lb, ub): (IntCst, IntCst) = if OMPAS_PLAN_ENCODING_OPTIMIZATION.get() {
                 if let Some(VarVal::Range(l, u)) = var_val {
                     (*l as IntCst, *u as IntCst)
@@ -741,29 +739,30 @@ pub fn read_chronicle(
         let end: FAtom = get_atom(&s.interval.get_end(), ctx)
             .try_into()
             .unwrap_or_else(|t| panic!("{:?}", t));
-        let e: Vec<aAtom> = s.name.iter().map(|a| get_atom(a, ctx)).collect();
+        let mut task_name = vec![get_atom(&s.result, ctx)];
+        s.name.iter().for_each(|a| task_name.push(get_atom(a, ctx)));
         let st = SubTask {
             id: None,
             start,
             end,
-            task_name: e,
+            task_name,
         };
 
         subtasks.push(st);
     }
-    //println!("ok!");
 
     let start: FAtom = get_atom(&ch.get_interval().get_start(), ctx).try_into()?;
     let end: FAtom = get_atom(&ch.get_interval().get_end(), ctx).try_into()?;
 
-    //print!("init name...");
-    let name: Vec<aAtom> = ch.get_name().iter().map(|a| get_atom(a, ctx)).collect();
-    //println!("ok!");
+    let mut name: Vec<aAtom> = vec![get_atom(&ch.get_result(), ctx)];
+    ch.get_name()
+        .iter()
+        .for_each(|a| name.push(get_atom(a, ctx)));
 
-    //print!("init task...");
-    let task: Vec<aAtom> = ch.get_task().iter().map(|a| get_atom(a, ctx)).collect();
-    //println!("ok!");
-    //print!("\n\n");
+    let mut task: Vec<aAtom> = vec![get_atom(&ch.get_result(), ctx)];
+    ch.get_task()
+        .iter()
+        .for_each(|a| task.push(get_atom(a, ctx)));
 
     let template = aChronicle {
         kind: match ch.meta_data.kind {

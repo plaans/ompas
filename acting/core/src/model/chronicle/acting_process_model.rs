@@ -7,8 +7,8 @@ use crate::model::process_ref::Label;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::HashSet;
-use std::collections::HashMap;
+use map_macro::hash_set;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter, Write};
 
 #[derive(Default, Clone)]
@@ -162,31 +162,38 @@ pub enum ActingProcessModel {
 }
 
 impl GetVariables for ActingProcessModel {
-    fn get_variables(&self) -> HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         match self {
             ActingProcessModel::Arbitrary(a) => {
-                let set = im::hashset! {a.var_id, a.timepoint};
+                let set = hash_set! {a.var_id, a.timepoint};
                 if let Some(c) = &a.constraints {
-                    set.union(c.get_variables())
+                    set.union(&c.get_variables()).cloned().collect()
                 } else {
                     set
                 }
             }
             ActingProcessModel::Action(a) => {
                 let set = a.task.get_variables();
-                set.union(a.constraints.get_variables())
+                set.union(&a.constraints.get_variables()).cloned().collect()
             }
             ActingProcessModel::Resource(acq) => {
                 let mut set = acq.acquisition.get_variables();
                 set.insert(acq.request);
                 set.insert(acq.resource);
                 set.insert(acq.quantity);
-                let set = set.union(acq.condition_max_q.get_variables());
+                let set: HashSet<_> = set
+                    .union(&acq.condition_max_q.get_variables())
+                    .cloned()
+                    .collect();
                 set.union(
-                    acq.acquire
+                    &acq.acquire
                         .get_variables()
-                        .union(acq.release.get_variables()),
+                        .union(&acq.release.get_variables())
+                        .cloned()
+                        .collect(),
                 )
+                .cloned()
+                .collect()
             }
         }
     }
@@ -327,12 +334,19 @@ impl Replace for AcquireModel {
 }
 
 impl GetVariables for AcquireModel {
-    fn get_variables(&self) -> HashSet<VarId> {
-        self.constraints.get_variables().union(
-            self.conditions
-                .get_variables()
-                .union(self.effects.get_variables()),
-        )
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
+        self.constraints
+            .get_variables()
+            .union(
+                &self
+                    .conditions
+                    .get_variables()
+                    .union(&self.effects.get_variables())
+                    .cloned()
+                    .collect(),
+            )
+            .cloned()
+            .collect()
     }
 }
 

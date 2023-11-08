@@ -1,7 +1,6 @@
 pub mod aries;
 pub mod c_choice;
 pub mod rae_plan;
-use crate::model::acting_domain::OMPASDomain;
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::error::RaeExecError;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
@@ -22,7 +21,6 @@ use crate::ompas::scheme::exec::refinement::c_choice::c_choice_select;
 use crate::ompas::scheme::exec::refinement::rae_plan::rae_plan_select;
 use crate::ompas::scheme::exec::state::{instances, ModState};
 use crate::ompas::scheme::exec::ModExec;
-use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
 use ::aries::collections::seq::Seq;
 use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::refinement::*;
@@ -140,13 +138,12 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         .await
         .map_err(|e: LRuntimeError| e.chain("select"))?;
 
-    check_refinement_trace(env, ctx, &task_id, rt)
+    check_refinement_trace(ctx, &task_id, rt)
         .await
         .map_err(|e| e.chain("check_refinement_trace"))
 }
 
 async fn check_refinement_trace(
-    env: &LEnv,
     ctx: &ModRefinement,
     task_id: &ActingProcessId,
     mut rt: RefinementTrace,
@@ -173,11 +170,6 @@ async fn check_refinement_trace(
                 return Ok(RaeExecError::NoApplicableMethod.into());
             } else {
                 let debug = method.to_string();
-                let p_env = PLEnv {
-                    env: env.clone(),
-                    pc: Default::default(),
-                    unpure_bindings: Default::default(),
-                };
 
                 let args = if let LValue::List(list) = &method {
                     list.iter().map(|lv| lv.as_cst()).collect()
@@ -186,13 +178,7 @@ async fn check_refinement_trace(
                 };
 
                 acting_manager
-                    .new_executed_method(
-                        task_id,
-                        debug,
-                        args,
-                        MethodModel::Raw(method.clone(), p_env),
-                        ProcessOrigin::Execution,
-                    )
+                    .new_executed_method(task_id, debug, args, MethodModel::Raw(method.clone()))
                     .await
             }
         }
@@ -258,7 +244,7 @@ pub async fn _retry(env: &LEnv, err: LValue) -> LResult {
     if let Some(refinement_id) = acting_manager.get_last_executed_refinement(&task_id).await {
         acting_manager.set_failed_method(&refinement_id).await;
         let rt: RefinementTrace = select(task_id, env).await?;
-        check_refinement_trace(env, ctx, &task_id, rt).await
+        check_refinement_trace(ctx, &task_id, rt).await
     } else {
         println!(
             "Attempt retry when there were no previous refinement for {}",
@@ -451,13 +437,17 @@ pub async fn applicable(
     env.update_context(ModState::new_from_snapshot(state.clone()));
     let env = &env;
 
-    let domain: OMPASDomain = ctx.domain.get_inner().await;
+    let domain = &ctx.domain;
 
-    let method_templates: Vec<String> =
-        domain.tasks.get(&task_label).unwrap().get_methods().clone();
+    let method_templates: Vec<String> = domain
+        .get_task(&task_label)
+        .await
+        .unwrap()
+        .get_methods()
+        .clone();
 
     for template in &method_templates {
-        let method_template = domain.methods.get(template).unwrap();
+        let method_template = domain.get_method(template).await.unwrap();
         let types: Vec<LValue> = method_template
             .parameters
             .get_types_as_lvalue()

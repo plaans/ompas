@@ -86,19 +86,23 @@ impl Constraint {
 }
 
 impl GetVariables for Constraint {
-    fn get_variables(&self) -> im::HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
             | Constraint::Neq(l1, l2)
-            | Constraint::Lt(l1, l2) => l1.get_variables().union(l2.get_variables()),
+            | Constraint::Lt(l1, l2) => l1
+                .get_variables()
+                .union(&l2.get_variables())
+                .cloned()
+                .collect(),
             Constraint::Min(vec)
             | Constraint::Max(vec)
             | Constraint::And(vec)
             | Constraint::Or(vec) => {
-                let mut vars: im::HashSet<VarId> = Default::default();
+                let mut vars: std::collections::HashSet<VarId> = Default::default();
                 for lit in vec {
-                    vars = vars.union(lit.get_variables())
+                    vars = vars.union(&lit.get_variables()).cloned().collect();
                 }
                 vars
             }

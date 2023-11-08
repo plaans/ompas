@@ -9,7 +9,7 @@ use crate::model::sym_table::r#trait::{FlatBindings, GetVariables};
 use crate::model::sym_table::VarId;
 use crate::planning::conversion::flow_graph::flow::{BranchingFlow, Flow, FlowId, FlowKind};
 use new_type::newtype;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::ops::{Index, IndexMut};
 
@@ -172,22 +172,28 @@ impl FlowGraph {
         }
     }
 
-    pub fn get_atom_of_flow(&self, flow: FlowId) -> im::HashSet<VarId> {
+    pub fn get_atom_of_flow(&self, flow: FlowId) -> std::collections::HashSet<VarId> {
         let flow = &self.flows[flow];
 
         let mut set = match &flow.kind {
             FlowKind::Lit(lit) => lit.get_variables(),
             FlowKind::Seq(seq) => {
-                let mut set = im::HashSet::default();
+                let mut set = std::collections::HashSet::default();
                 for f in seq {
-                    set = set.union(self.get_atom_of_flow(*f));
+                    set = set.union(&self.get_atom_of_flow(*f)).cloned().collect();
                 }
                 set
             }
             FlowKind::Branching(branching) => {
                 let set = self.get_atom_of_flow(branching.true_flow);
-                let set = set.union(self.get_atom_of_flow(branching.false_flow));
-                let set = set.union(self.get_atom_of_flow(branching.cond_flow));
+                let set: HashSet<VarId> = set
+                    .union(&self.get_atom_of_flow(branching.false_flow))
+                    .cloned()
+                    .collect();
+                let set: HashSet<VarId> = set
+                    .union(&self.get_atom_of_flow(branching.cond_flow))
+                    .cloned()
+                    .collect();
                 set
             }
             FlowKind::FlowHandle(f) => self.get_atom_of_flow(*f),
@@ -220,7 +226,12 @@ impl FlowGraph {
         let vertice = value.into();
         let result = self.st.new_result();
         let (start, end) = if vertice.is_exec() {
-            (self.st.new_start_task(), self.st.new_end_task())
+            let start = self.st.new_timepoint();
+            let start_task = self.st.new_start_task(start);
+            if !self.st.union_var(start, start_task).is_none() {
+                panic!();
+            }
+            (start_task, self.st.new_end_task(start_task))
         } else {
             (self.st.new_timepoint(), self.st.new_timepoint())
         };

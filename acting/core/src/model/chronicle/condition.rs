@@ -2,7 +2,6 @@ use crate::model::chronicle::interval::Interval;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::HashSet;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Condition {
@@ -44,7 +43,7 @@ impl FlatBindings for Condition {
 }
 
 impl GetVariables for Condition {
-    fn get_variables(&self) -> HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         let mut hashset = self.interval.get_variables();
         hashset.insert(self.value);
         self.sv.iter().for_each(|a| {

@@ -1,4 +1,3 @@
-use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::planning::conversion::context::ConversionContext;
@@ -52,19 +51,19 @@ impl From<ModDebugConversion> for LModule {
 #[async_scheme_fn]
 pub async fn translate(env: &LEnv, obj: String) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
-    let context: ConversionContext = ctx.get_conversion_context().await;
+    let mut context: ConversionContext = ctx.get_conversion_context().await;
+    context
+        .domain
+        .methods
+        .retain(|k, _| k.as_str() == obj.as_str());
+    context
+        .domain
+        .commands
+        .retain(|k, _| k.as_str() == obj.as_str());
+
     let pd: PlanningDomain = convert_acting_domain(&context).await?;
 
-    let ch = pd
-        .templates
-        .iter()
-        .find(|&ch| {
-            let ch = ch.chronicle.as_ref().unwrap();
-            let st = &ch.st;
-            ch.get_name().format(st, true).contains(&obj)
-        })
-        .unwrap();
-    debug_with_markdown(&obj, ch, "/tmp/".into(), true);
+    debug_with_markdown(&obj, &pd.templates[0], "/tmp/".into(), true);
 
     Ok(())
 }

@@ -60,6 +60,10 @@ impl RefSymTable {
         self.0.write().unwrap().new_nil()
     }
 
+    pub fn new_err(&self) -> VarId {
+        self.0.write().unwrap().new_err()
+    }
+
     pub fn new_int(&self, i: i64) -> VarId {
         self.0.write().unwrap().new_int(i)
     }
@@ -82,6 +86,10 @@ impl RefSymTable {
 
     pub fn new_constant_symbol(&self, symbol: impl Display, domain: impl Into<Domain>) -> VarId {
         self.0.write().unwrap().new_constant_symbol(symbol, domain)
+    }
+
+    pub fn duplicate(&self, id: VarId) -> VarId {
+        self.0.write().unwrap().duplicate(id)
     }
 
     /*
@@ -165,36 +173,44 @@ impl RefSymTable {
         self.0.write().unwrap().new_start()
     }
 
-    pub fn new_end(&self) -> VarId {
-        self.0.write().unwrap().new_end()
+    pub fn new_end(&self, start: VarId) -> VarId {
+        self.0.write().unwrap().new_end(start)
     }
 
-    pub fn new_start_task(&self) -> VarId {
-        self.0.write().unwrap().new_start_task()
+    pub fn new_start_task(&self, start: VarId) -> VarId {
+        self.0.write().unwrap().new_start_task(start)
     }
 
-    pub fn new_end_task(&self) -> VarId {
-        self.0.write().unwrap().new_end_task()
+    pub fn new_end_task(&self, start: VarId) -> VarId {
+        self.0.write().unwrap().new_end_task(start)
     }
 
     pub fn new_arbitrary(&self) -> VarId {
         self.0.write().unwrap().new_arbitrary()
     }
 
-    pub fn new_presence(&self) -> VarId {
-        self.0.write().unwrap().new_presence()
+    pub fn new_presence(&self, start: VarId) -> VarId {
+        self.0.write().unwrap().new_presence(start)
     }
 
-    pub fn new_chronicle_result(&self) -> VarId {
-        self.0.write().unwrap().new_chronicle_result()
+    pub fn new_chronicle_result(&self, start: VarId) -> VarId {
+        self.0.write().unwrap().new_chronicle_result(start)
     }
 
     pub fn new_symbol(&self, sym: impl Display) -> VarId {
         self.0.write().unwrap().new_symbol(sym)
     }
 
-    pub fn new_parameter(&self, symbol: impl ToString, domain: impl Into<Domain>) -> VarId {
-        self.0.write().unwrap().new_parameter(symbol, domain)
+    pub fn new_parameter(
+        &self,
+        symbol: impl ToString,
+        domain: impl Into<Domain>,
+        declaration: VarId,
+    ) -> VarId {
+        self.0
+            .write()
+            .unwrap()
+            .new_parameter(symbol, domain, declaration)
     }
 
     /*

@@ -18,23 +18,26 @@ use crate::ompas::manager::planning::PlannerManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::StateManager;
-use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
+use crate::planning::conversion::flow_graph::algo::pre_processing::expand_lambda;
 use crate::planning::conversion::flow_graph::graph::Dot;
 use crate::planning::planner::solver::PMetric;
+use atomic_float::AtomicF64;
 use inner::InnerActingManager;
 use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::{Master, ProcessInterface};
 use ompas_utils::task_handler::EndSignal;
-use sompas_structs::lenv::LEnv;
+use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::list;
+use sompas_structs::llambda::LLambda;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
-use sompas_structs::lvalue::{LValue, Sym};
+use sompas_structs::lvalue::LValue;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::{fs, thread};
 use tokio::runtime::Handle;
@@ -60,6 +63,25 @@ pub struct ActingTreeDisplayer {
 
 pub type RefInnerActingManager = Arc<RwLock<InnerActingManager>>;
 #[derive(Clone)]
+pub struct PlannerReactivity {
+    inner: Arc<AtomicF64>,
+}
+
+impl Default for PlannerReactivity {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(AtomicF64::new(f64::MAX)),
+        }
+    }
+}
+
+impl PlannerReactivity {
+    pub fn get_planner_reactivity(&self) -> f64 {
+        self.inner.load(Ordering::Relaxed)
+    }
+}
+
+#[derive(Clone)]
 pub struct ActingManager {
     pub st: RefSymTable,
     pub resource_manager: ResourceManager,
@@ -69,31 +91,7 @@ pub struct ActingManager {
     pub inner: RefInnerActingManager,
     pub clock_manager: ClockManager,
     acting_tree_displayer: Arc<RwLock<Option<ActingTreeDisplayer>>>,
-}
-
-impl ActingManager {
-    pub fn new(st: RefSymTable) -> Self {
-        let clock_manager = ClockManager::default();
-        let resource_manager = ResourceManager::default();
-        let mut ompas_domain = OMPASDomain::default();
-        ompas_domain.init(&st);
-        let domain: DomainManager = ompas_domain.into();
-        Self {
-            st: st.clone(),
-            resource_manager: resource_manager.clone(),
-            monitor_manager: MonitorManager::from(clock_manager.clone()),
-            domain_manager: domain.clone(),
-            state_manager: StateManager::new(clock_manager.clone(), st.clone()),
-            inner: Arc::new(RwLock::new(InnerActingManager::new(
-                resource_manager,
-                clock_manager.clone(),
-                domain,
-                st,
-            ))),
-            clock_manager,
-            acting_tree_displayer: Arc::new(Default::default()),
-        }
-    }
+    planner_reactivity: PlannerReactivity,
 }
 
 impl Default for ActingManager {
@@ -102,8 +100,51 @@ impl Default for ActingManager {
     }
 }
 
+impl ActingManager {
+    pub fn new(st: RefSymTable) -> Self {
+        let clock_manager = ClockManager::default();
+        let resource_manager = ResourceManager::default();
+        let mut ompas_domain = OMPASDomain::default();
+        ompas_domain.init(&st);
+        let domain_manager: DomainManager = ompas_domain.into();
+        Self {
+            st: st.clone(),
+            resource_manager: resource_manager.clone(),
+            monitor_manager: MonitorManager::from(clock_manager.clone()),
+            domain_manager: domain_manager.clone(),
+            state_manager: StateManager::new(clock_manager.clone(), st.clone()),
+            inner: Arc::new(RwLock::new(InnerActingManager::new(
+                resource_manager,
+                clock_manager.clone(),
+                domain_manager,
+                st,
+            ))),
+            clock_manager,
+            acting_tree_displayer: Arc::new(Default::default()),
+            planner_reactivity: PlannerReactivity::default(),
+        }
+    }
+
+    pub fn get_planner_reactivity(&self) -> f64 {
+        self.planner_reactivity.inner.load(Ordering::Relaxed)
+    }
+
+    pub fn set_planner_reactivity(&self, planner_reactivity: f64) {
+        let old = self.planner_reactivity.inner.load(Ordering::Relaxed);
+        self.planner_reactivity
+            .inner
+            .compare_exchange(
+                old,
+                planner_reactivity,
+                Ordering::Acquire,
+                Ordering::Release,
+            )
+            .unwrap();
+    }
+}
+
 pub enum MethodModel {
-    Raw(LValue, PLEnv),
+    Raw(LValue),
     ActingModel(ActingModel),
 }
 
@@ -199,10 +240,17 @@ impl ActingManager {
         debug: String,
         origin: ProcessOrigin,
     ) -> ActingProcessId {
-        self.inner
-            .write()
-            .await
-            .new_command(label, parent, args, debug, origin)
+        let mut locked_inner = self.inner.write().await;
+        let id = locked_inner.new_command(label, parent, args, debug, origin);
+        if locked_inner.is_planner_activated() {
+            let model = locked_inner
+                .generate_acting_model_for_command(&id)
+                .await
+                .unwrap();
+            locked_inner.new_abstract_model(&id, model);
+        }
+
+        id
     }
 
     pub async fn new_refinement(&self, parent: &ActingProcessId) -> usize {
@@ -219,12 +267,11 @@ impl ActingManager {
         debug: String,
         args: Vec<Option<Cst>>,
         model: MethodModel,
-        origin: ProcessOrigin,
     ) -> ActingProcessId {
         self.inner
             .write()
             .await
-            .new_executed_method(parent, debug, args, model, origin)
+            .new_executed_method(parent, debug, args, model)
             .await
     }
 
@@ -405,13 +452,18 @@ impl ActingManager {
         self.inner.read().await.get_debug(id).clone()
     }
 
+    pub async fn set_plan_env(&self, env: LEnv) {
+        self.inner.write().await.env = Some(env)
+    }
+
     pub async fn start_planner_manager(&self, env: LEnv, opt: Option<PMetric>) {
         let pmi = PlannerManager::run(
             self.inner.clone(),
             self.state_manager.clone(),
-            self.domain_manager.get_inner().await,
+            self.domain_manager.clone(),
             self.st.clone(),
             env,
+            self.planner_reactivity.clone(),
             opt,
         )
         .await;
@@ -462,25 +514,27 @@ impl ActingManager {
             panic!("action_id: {action_id}, lv: {}, lv_om: {}", lv, lv_om)
         };
 
-        let mut body = vec![
+        let body = vec![
             LPrimitive::Begin.into(),
             list!(DEF_PROCESS_ID.into(), (*id).into()),
+            lv_om,
         ];
 
-        let labels: Vec<Arc<Sym>> = self
+        let lambda: LLambda = self
             .domain_manager
             .get_method(&label)
             .await
             .unwrap()
-            .parameters
-            .get_labels();
+            .lambda_body
+            .clone()
+            .try_into()
+            .unwrap();
 
-        for (param, value) in labels.iter().zip(params_values) {
-            body.push(list![LPrimitive::Define.into(), param.into(), value]);
-        }
+        let lambda = LLambda::new(lambda.get_params(), body.into(), LEnvSymbols::default());
 
-        body.push(lv_om);
-        list!(body.into(), (action_id).into())
+        let body = expand_lambda(&lambda, &params_values).unwrap();
+
+        list!(body, (action_id).into())
     }
 
     pub async fn update_acting_tree(&self, update: ActingTreeUpdate) {

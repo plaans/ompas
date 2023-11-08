@@ -1,24 +1,30 @@
+use crate::model::acting_domain::acting_model_collection::ActingModelCollection;
 use crate::model::acting_domain::command::Command;
 use crate::model::acting_domain::method::Method;
 use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::parameters::{ParameterType, Parameters};
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
+use crate::model::add_domain_symbols;
 use crate::model::sym_domain::basic_type::{TYPE_ID_INT, TYPE_INT};
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
+use crate::OMPAS_PRE_COMPUTE_MODELS;
+use aries::core::INT_CST_MAX;
 use im::HashMap;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE};
 use ompas_language::*;
-use sompas_structs::lenv::LEnvSymbols;
+use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
+pub mod acting_model_collection;
 pub mod command;
 pub mod method;
 pub mod model;
@@ -36,9 +42,25 @@ pub struct OMPASDomain {
     pub map_symbol_type: HashMap<String, String>,
     pub env: LEnvSymbols,
     pub init: LValue,
+    pub acting_model_collection: Option<ActingModelCollection>,
 }
 
 impl OMPASDomain {
+    pub async fn init_acting_model_collection(
+        &mut self,
+        env: &LEnv,
+        state: WorldStateSnapshot,
+        st: &RefSymTable,
+    ) {
+        add_domain_symbols(&st, &self);
+        let mut amc = ActingModelCollection::default();
+        if OMPAS_PRE_COMPUTE_MODELS.get() {
+            amc.pre_compute_acting_models(&self, env, state, st).await;
+            println!("Models pre computed");
+        }
+        self.acting_model_collection = Some(amc)
+    }
+
     pub fn init(&mut self, st: &RefSymTable) {
         self.add_state_function(
             QUANTITY.to_string(),
@@ -51,7 +73,7 @@ impl OMPASDomain {
                         st.get_type_as_domain(TYPE_OBJECT).unwrap(),
                     ),
                 )]),
-                Domain::IntRange(0, 1),
+                Domain::IntRange(0, INT_CST_MAX as i64),
                 TYPE_INT.to_string(),
                 None,
             ),

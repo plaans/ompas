@@ -268,14 +268,6 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                                 p_temp_env.env = temp_env;
                                 scopes.new_defined_scope(p_temp_env);
                             } else {
-                                /*if all_unpure {
-                                    results.push(PLValue::unpure(
-                                        exps.drain(..)
-                                            .map(|plv| plv.lvalue)
-                                            .collect::<Vec<LValue>>()
-                                            .into(),
-                                    ));
-                                } else {*/
                                 let mut new_exps = vec![];
                                 for (i, exp) in exps.drain(..).enumerate() {
                                     if i != 0 {
@@ -289,7 +281,6 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                                     transform_lambda_expression(&new_exps.into(), p_env).await?,
                                 );
                                 scopes.new_scope();
-                                //}
                             }
                         }
                         LValue::Fn(fun) => {
@@ -416,12 +407,17 @@ pub async fn p_eval(lv: &LValue, root_env: &mut PLEnv) -> LResult {
                             }
                         };
                     } else {
+                        scopes.new_scope();
+                        let p_env = scopes.get_last_mut();
+                        let conseq = p_eval(&i.conseq, p_env).await?;
+                        let alt = p_eval(&i.alt, p_env).await?;
                         results.push(PLValue::unpure(list![
                             LPrimitive::If.into(),
                             result.lvalue_as_quote(),
-                            i.conseq.clone(),
-                            i.alt.clone()
-                        ]))
+                            conseq,
+                            alt
+                        ]));
+                        scopes.revert_scope()
                     }
 
                     scopes.revert_scope()
@@ -909,9 +905,9 @@ pub async fn p_expand(
 
                         let expanded = p_expand(&result, top_level, p_env).await?;
                         /*p_env
-                            .env
-                            .log
-                            .trace(format!("In expand: macro expanded: {:?}", expanded));*/
+                        .env
+                        .log
+                        .trace(format!("In expand: macro expanded: {:?}", expanded));*/
                         return Ok(expanded);
                     }
                 }

@@ -40,6 +40,7 @@ pub fn convert_lv(
         LValue::List(l) => convert_list(l, fl, define_table)?,
         LValue::True => convert_bool(true, fl),
         LValue::Nil => convert_nil(fl),
+        LValue::Err(_) => convert_err(fl),
         lv => {
             return Err(LRuntimeError::new(
                 "convert",
@@ -77,6 +78,11 @@ fn convert_bool(bool: bool, fl: &mut FlowGraph) -> FlowId {
 
 fn convert_nil(fl: &mut FlowGraph) -> FlowId {
     let id = fl.st.new_nil();
+    fl.new_instantaneous_assignment(Lit::Atom(id))
+}
+
+fn convert_err(fl: &mut FlowGraph) -> FlowId {
+    let id = fl.st.new_err();
     fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 

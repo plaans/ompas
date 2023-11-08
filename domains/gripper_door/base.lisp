@@ -11,7 +11,7 @@
         (:result boolean))
 
     (def-function connects
-        (:params (?r1 room) (?d2 door) (?r2 room))
+        (:params (?r1 room) (?d door) (?r2 room))
         (:result boolean))
 
     ; New commands
@@ -20,21 +20,16 @@
         (:params (?from room) (?to room) (?d door))
         (:pre-conditions
             (= (at-robby) ?from)
-            (connected ?from ?d ?to)
+            (connects ?from ?d ?to)
             (opened ?d))
         (:effects
             ('at-robby ?to)
         ))
 
-
-    (def-lambda connected (lambda (?r1 ?d ?r2)
-        (or (connects ?r1 ?d ?r2) (connects ?r2 ?d ?r1))))
-
-
     (def-lambda is_door_of (lambda (?d ?r)
         (exists (instances room)
             (lambda (?r2) 
-                (connected ?r ?d ?r2)
+                (connects ?r ?d ?r2)
             ))))
 
     (def-command open (:params (?d door) (?r room) (?g gripper)))
@@ -42,8 +37,8 @@
         (:params (?d door) (?r room) (?g gripper))
         (:pre-conditions
             (= (at-robby) ?r)
-            (is_door_of ?d ?r)
-            (= (carry ?g) empty))
+            (= (carry ?g) empty)
+            (is_door_of ?d ?r))
         (:effects
             ('opened ?d true)))
 
@@ -52,8 +47,8 @@
         (:params (?d door) (?r room) (?g gripper))
         (:pre-conditions
             (= (at-robby) ?r)
-            (is_door_of ?d ?r)
-            (= (carry ?g) empty))
+            (= (carry ?g) empty)
+            (is_door_of ?d ?r))
         (:effects
             ('opened ?d false)))
 )

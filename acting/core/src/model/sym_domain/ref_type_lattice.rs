@@ -51,15 +51,15 @@ impl RefTypeLattice {
     }
 
     pub async fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
-        self.0.read().await.__meet(t1, t2)
+        self.0.read().await.meet(t1, t2)
     }
 
     pub async fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
-        self.0.read().await.__union(t1, t2)
+        self.0.read().await.union(t1, t2)
     }
 
     pub async fn __substract(&self, t1: &Domain, t2: &Domain) -> Domain {
-        self.0.read().await.__substract(t1, t2)
+        self.0.read().await.substract(t1, t2)
     }
 
     #[allow(dead_code)]

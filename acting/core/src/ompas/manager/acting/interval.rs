@@ -149,9 +149,13 @@ impl Interval {
         self.end = Some(end)
     }
 }
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum Duration {
-    Finite { num: u128, denom: u64 },
+    Finite {
+        num: u128,
+        denom: u64,
+    },
+    #[default]
     Inf,
 }
 

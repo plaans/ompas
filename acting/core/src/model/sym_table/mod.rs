@@ -19,7 +19,7 @@ use new_type::newtype;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::*;
-use sompas_language::kind::NIL;
+use sompas_language::kind::{ERR, NIL};
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -200,10 +200,8 @@ impl SymTable {
     }
 
     pub fn get_declaration(&mut self, id: VarId) -> Option<VarId> {
-        let id = self.get_var_parent(id);
-        self.variables[id]
-            .declaration
-            .map(|t| self.get_var_parent(t))
+        //let id = self.get_var_parent(id);
+        self.variables[id].declaration
     }
 
     pub fn get_drop(&mut self, id: VarId) -> Option<VarId> {
@@ -238,6 +236,10 @@ impl SymTable {
 
     pub fn new_nil(&mut self) -> VarId {
         self.new_variable(NIL, BasicType::Nil)
+    }
+
+    pub fn new_err(&mut self) -> VarId {
+        self.new_variable(ERR, BasicType::Err)
     }
 
     pub fn new_int(&mut self, i: i64) -> VarId {
@@ -289,31 +291,36 @@ impl SymTable {
     pub fn new_start(&mut self) -> VarId {
         let index = self.meta_data.new_start_index();
         let sym = &format!("{START_PREFIX}{index}");
-        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        let id = self.new_parameter(
+            sym,
+            self.get_type_as_domain(TYPE_TIMEPOINT).unwrap(),
+            VarId(0),
+        );
+        self.set_declaration(id, id);
         self.ids.insert(sym, &id);
         id
     }
 
-    pub fn new_end(&mut self) -> VarId {
+    pub fn new_end(&mut self, start: VarId) -> VarId {
         let index = self.meta_data.new_end_index();
         let sym = &format!("{END_PREFIX}{index}");
-        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap(), start);
         self.ids.insert(sym, &id);
         id
     }
 
-    pub fn new_start_task(&mut self) -> VarId {
+    pub fn new_start_task(&mut self, start: VarId) -> VarId {
         let index = self.meta_data.new_start_task_index();
         let sym = &format!("{START_TASK_PREFIX}{index}");
-        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap(), start);
         self.ids.insert(sym, &id);
         id
     }
 
-    pub fn new_end_task(&mut self) -> VarId {
+    pub fn new_end_task(&mut self, start: VarId) -> VarId {
         let index = self.meta_data.new_end_task_index();
         let sym = &format!("{END_TASK_PREFIX}{index}");
-        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        let id = self.new_parameter(sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap(), start);
         self.ids.insert(sym, &id);
         id
     }
@@ -322,17 +329,33 @@ impl SymTable {
         let index = self.meta_data.new_if_index();
 
         let sym_if = &format!("{IF_PREFIX}{index}");
-        let id_if = self.new_variable(sym_if, self.get_type_as_domain(TYPE_TASK).unwrap());
+        let id_if = self.new_variable(
+            sym_if,
+            Domain::Cst(
+                Box::new(self.get_type_as_domain(TYPE_TASK).unwrap()),
+                cst::Cst::Symbol(sym_if.to_string()),
+            ),
+        );
         self.ids.insert(sym_if, &id_if);
 
         let sym_m_true = &format!("m_{}_true", sym_if);
-        let id_m_true =
-            self.new_variable(sym_m_true, self.get_type_as_domain(TYPE_METHOD).unwrap());
+        let id_m_true = self.new_variable(
+            sym_m_true,
+            Domain::Cst(
+                Box::new(self.get_type_as_domain(TYPE_METHOD).unwrap()),
+                cst::Cst::Symbol(sym_m_true.to_string()),
+            ),
+        );
         self.ids.insert(sym_m_true, &id_m_true);
 
         let sym_m_false = &format!("m_{}_false", sym_if);
-        let id_m_false =
-            self.new_variable(sym_m_true, self.get_type_as_domain(TYPE_METHOD).unwrap());
+        let id_m_false = self.new_variable(
+            sym_m_false,
+            Domain::Cst(
+                Box::new(self.get_type_as_domain(TYPE_METHOD).unwrap()),
+                Cst::Symbol(sym_m_false.to_string()),
+            ),
+        );
         self.ids.insert(sym_m_false, &id_m_false);
 
         (id_if, id_m_true, id_m_false)
@@ -346,18 +369,19 @@ impl SymTable {
         id
     }
 
-    pub fn new_presence(&mut self) -> VarId {
+    pub fn new_presence(&mut self, start: VarId) -> VarId {
         let index = self.meta_data.new_presence_index();
         let sym = &format!("{PRESENCE_PREFIX}{index}");
-        let id = self.new_parameter(sym, Boolean);
+        //self.get_type_as_domain(TYPE_PRESENCE).unwrap()
+        let id = self.new_parameter(sym, Boolean, start);
         self.ids.insert(sym, &id);
         id
     }
 
-    pub fn new_chronicle_result(&mut self) -> VarId {
+    pub fn new_chronicle_result(&mut self, start: VarId) -> VarId {
         let index = self.meta_data.new_chronicle_result_index();
         let sym = &format!("{CHRONICLE_RESULT_PREFIX}{index}");
-        let id = self.new_parameter(sym, Domain::any());
+        let id = self.new_parameter(sym, Domain::any(), start);
         self.ids.insert(sym, &id);
         id
     }
@@ -397,7 +421,12 @@ impl SymTable {
         }
     }
 
-    pub fn new_parameter(&mut self, symbol: impl ToString, domain: impl Into<Domain>) -> VarId {
+    pub fn new_parameter(
+        &mut self,
+        symbol: impl ToString,
+        domain: impl Into<Domain>,
+        declaration: VarId,
+    ) -> VarId {
         let symbol = symbol.to_string();
         let version = self.ids.version(&symbol);
         let sym = format!("{symbol}_{version}");
@@ -407,7 +436,39 @@ impl SymTable {
             .new_node(Variable::new_parameter(sym, domain_id));
         self.add_var_to_domain(domain_id, id);
         self.ids.insert(&symbol, &id);
+        self.set_declaration(id, declaration);
         id
+    }
+
+    pub fn duplicate(&mut self, id: VarId) -> VarId {
+        let id = self.get_var_parent(id);
+        let domain_id = self.get_domain_id(id);
+        let domain = &self.domains[domain_id].clone();
+        let var_domain = VarDomain {
+            domain: domain.domain.clone(),
+            updates: vec![],
+            vars: vec![],
+        };
+
+        let domain_id = self.domains.new_node(var_domain);
+        let variable = &self.variables[id];
+
+        let symbol = variable.label.to_string();
+        let version = self.ids.version(&symbol);
+        let sym = format!("{symbol}_{version}");
+        //println!("dup");
+
+        let variable = Variable {
+            domain: domain_id,
+            parameter: variable.parameter,
+            label: sym,
+            declaration: None,
+            drop: None,
+        };
+        let var_id = self.variables.new_node(variable);
+        self.add_var_to_domain(domain_id, var_id);
+        self.ids.insert(&symbol, &id);
+        var_id
     }
 }
 /*
@@ -472,15 +533,15 @@ impl SymTable {
      */
 
     pub fn meet(&self, d1: &Domain, d2: &Domain) -> Domain {
-        self.lattice.__meet(d1, d2)
+        self.lattice.meet(d1, d2)
     }
 
     pub fn union(&self, d1: &Domain, d2: &Domain) -> Domain {
-        self.lattice.__union(d1, d2)
+        self.lattice.union(d1, d2)
     }
 
     pub fn substract(&self, d1: &Domain, d2: &Domain) -> Domain {
-        self.lattice.__substract(d1, d2)
+        self.lattice.substract(d1, d2)
     }
 
     pub fn meet_domains(&mut self, id_d1: DomainId, id_d2: DomainId) -> Domain {

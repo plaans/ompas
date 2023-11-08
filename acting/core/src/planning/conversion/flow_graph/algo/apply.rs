@@ -2,6 +2,7 @@ use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::lit::{AcquireLit, Lit, LitSet};
 use crate::model::process_ref::Label;
+use crate::model::sym_domain::basic_type::BasicType;
 use crate::model::sym_domain::basic_type::BasicType::{Boolean, Float, True};
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::closure::Update;
@@ -229,6 +230,8 @@ fn convert_eq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunti
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::eq(left, right))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -242,7 +245,8 @@ fn convert_leq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::leq(left, right))));
-
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -255,6 +259,8 @@ fn convert_lt(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunti
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::lt(left, right))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -268,6 +274,8 @@ fn convert_gt(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunti
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::lt(right, left))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -281,6 +289,8 @@ fn convert_geq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::leq(right, left))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -294,6 +304,9 @@ fn convert_not(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::not(val))));
 
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
+
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -306,6 +319,8 @@ fn convert_neq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::neq(a, b))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -318,6 +333,8 @@ fn convert_and(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::and(args))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -330,6 +347,8 @@ fn convert_or(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunti
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::or(args))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, BasicType::Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))

@@ -1,20 +1,23 @@
 use crate::model::chronicle::{Chronicle, Instantiation};
-use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
+use crate::model::sym_domain::cst::Cst;
 use crate::ompas::manager::planning::get_var_as_cst;
-use crate::planning::planner::encoding::PlannerProblem;
 use crate::planning::planner::result::PlanResult;
 
-pub fn instantiate_chronicles(
-    pp: &PlannerProblem,
-    pr: &PlanResult,
-    table: &ActingVarRefTable,
-) -> Vec<Chronicle> {
+pub fn instantiate_chronicles(pr: &PlanResult) -> Vec<Chronicle> {
     let mut instances = vec![];
-    let ass = &pr.ass;
-    let model = &pr.fp.model;
+    let PlanResult { ass, fp, pp, table } = pr;
+
+    let model = &fp.model;
     let st = pp.st.clone();
-    for instance in &pp.instances {
-        let chronicle = &instance.instantiated_chronicle;
+    for chronicle in pp.instances.iter().filter_map(|c| {
+        if get_var_as_cst(table, ass, model, c.instantiated_chronicle.get_presence())
+            == Cst::Bool(true)
+        {
+            Some(&c.instantiated_chronicle)
+        } else {
+            None
+        }
+    }) {
         let mut instantiations = vec![];
         for var in &chronicle.variables {
             let cst = get_var_as_cst(table, ass, model, *var);

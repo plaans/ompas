@@ -207,7 +207,7 @@ impl DomainTest {
             Substract(s, t) => {
                 let s = s.into_domain(dc);
                 let t = t.into_domain(dc);
-                dc.__substract(&s, &t)
+                dc.substract(&s, &t)
             }
             Cst(d1, c1) => Domain::Cst(Box::new(d1.into_domain(dc)), c1.clone()),
             New(s) => Domain::Simple(*dc.get_type_id(s.as_str()).unwrap()),
@@ -294,20 +294,20 @@ impl DomainTest {
         let ta = ta.into_domain(tl);
         let tb = tb.into_domain(tl);
 
-        DomainTest::from_domain(tl, &tl.__meet(&ta, &tb))
+        DomainTest::from_domain(tl, &tl.meet(&ta, &tb))
     }
 
     pub fn union(tl: &TypeLattice, ta: &DomainTest, tb: &DomainTest) -> DomainTest {
         let ta = ta.into_domain(tl);
         let tb = tb.into_domain(tl);
 
-        DomainTest::from_domain(tl, &tl.__union(&ta, &tb))
+        DomainTest::from_domain(tl, &tl.union(&ta, &tb))
     }
 
     pub fn substract(tl: &TypeLattice, ta: &DomainTest, tb: &DomainTest) -> DomainTest {
         let ta = ta.into_domain(tl);
         let tb = tb.into_domain(tl);
 
-        DomainTest::from_domain(tl, &tl.__substract(&ta, &tb))
+        DomainTest::from_domain(tl, &tl.substract(&ta, &tb))
     }
 }

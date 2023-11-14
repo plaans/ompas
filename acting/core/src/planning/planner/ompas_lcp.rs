@@ -99,7 +99,7 @@ pub async fn run_planner(
     for depth in min_depth..=max_depth {
         if let Some(interrupter) = &interrupter {
             if *interrupter.borrow() {
-                return Ok(SolverResult::Unsat);
+                return Ok(SolverResult::Interrupt(None));
             }
         }
         let depth_string = if depth == u32::MAX {
@@ -112,6 +112,11 @@ pub async fn run_planner(
         let new_pp = populate_problem(FinitePlanningProblem::PlannerProblem(&pp), domain, env, 1)
             .await
             .unwrap();
+        if let Some(interrupter) = &interrupter {
+            if *interrupter.borrow() {
+                return Ok(SolverResult::Interrupt(None));
+            }
+        }
         debug_date.print_msg("OMPAS Chronicles populated");
         let fully_populated = is_fully_populated(&new_pp.instances);
 
@@ -139,10 +144,16 @@ pub async fn run_planner(
             .await;
 
         let debug_date = debug_date.clone();
+        let interrupter_2 = interrupter.clone();
         let r: Result<_> = handle
             .spawn_blocking(move || {
                 let (mut problem, table) = encode(&new_pp).unwrap();
                 debug_date.print_msg("Aries chronicles generated");
+                if let Some(interrupter) = &interrupter_2 {
+                    if *interrupter.borrow() {
+                        return Ok(SolverResult::Interrupt(None));
+                    }
+                }
 
                 if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
                     for instance in &problem.chronicles {
@@ -156,6 +167,11 @@ pub async fn run_planner(
                 debug_date.print_msg("===== Preprocessing ======");
                 aries_planning::chronicles::preprocessing::preprocess(&mut problem);
                 debug_date.print_msg("==========================");
+                if let Some(interrupter) = &interrupter_2 {
+                    if *interrupter.borrow() {
+                        return Ok(SolverResult::Interrupt(None));
+                    }
+                }
 
                 if PRINT_MODEL.get() {
                     println!("OMPAS model at depth {}", depth);
@@ -177,12 +193,21 @@ pub async fn run_planner(
                     chronicles: problem.chronicles.clone(),
                 };
                 aries_planners::encode::populate_with_task_network(&mut pb, &problem, depth)?;
+                if let Some(interrupter) = &interrupter_2 {
+                    if *interrupter.borrow() {
+                        return Ok(SolverResult::Interrupt(None));
+                    }
+                }
 
-                Ok((new_pp, table, pb))
+                Ok(SolverResult::Sol((new_pp, table, pb)))
             })
             .await
             .unwrap();
-        let (new_pp, table, pb) = r?;
+        let (new_pp, table, pb) = match r? {
+            SolverResult::Sol((new_pp, table, pb)) => (new_pp, table, pb),
+            SolverResult::Interrupt(None) => return Ok(SolverResult::Interrupt(None)),
+            _ => unreachable!(),
+        };
         let pb = Arc::new(pb);
 
         let on_new_valid_assignment = {
@@ -211,7 +236,7 @@ pub async fn run_planner(
         match result {
             SolverResult::Unsat => {
                 if fully_populated {
-                    return Ok(SolverResult::Unsat);
+                    return Ok(SolverResult::Interrupt(None));
                 }
                 //println!("unsat")
             } // continue (increase depth)
@@ -289,6 +314,11 @@ async fn solve_finite_problem(
     interrupter: Option<PlannerInterrupter>,
 ) -> SolverResult<(Solution, Option<IntCst>)> {
     let handle = Handle::current();
+    if let Some(interrupter) = &interrupter {
+        if *interrupter.borrow() {
+            return SolverResult::Interrupt(None);
+        }
+    }
     if PRINT_INITIAL_PROPAGATION.get() {
         propagate_and_print(&pb);
     }
@@ -296,6 +326,11 @@ async fn solve_finite_problem(
         .spawn_blocking(move || (aries_planners::encode::encode(&pb, metric), pb))
         .await
         .unwrap();
+    if let Some(interrupter) = &interrupter {
+        if *interrupter.borrow() {
+            return SolverResult::Interrupt(None);
+        }
+    }
     debug_date.print_msg("[Aries] CSP problem encoded");
     let Ok(EncodedProblem {
         mut model,
@@ -303,7 +338,7 @@ async fn solve_finite_problem(
         encoding,
     }) = encoded
     else {
-        return SolverResult::Unsat;
+        return SolverResult::Interrupt(None);
     };
     if let Some(metric) = metric {
         model.enforce(metric.le_lit(cost_upper_bound), []);
@@ -322,6 +357,11 @@ async fn solve_finite_problem(
     let mut solver = aries::solver::parallel::ParSolver::new(solver, strats.len(), |id, s| {
         strats[id].adapt_solver(s, pb.clone(), encoding.clone())
     });
+    if let Some(interrupter) = &interrupter {
+        if *interrupter.borrow() {
+            return SolverResult::Interrupt(None);
+        }
+    }
     debug_date.print_msg("[Aries] ParSolver initialized");
 
     let input_stream = solver.input_stream();

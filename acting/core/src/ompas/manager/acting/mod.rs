@@ -42,7 +42,7 @@ use std::sync::Arc;
 use std::time::Duration as OtherDuration;
 use std::{fs, thread};
 use tokio::runtime::Handle;
-use tokio::sync::{broadcast, mpsc, watch, RwLock};
+use tokio::sync::{mpsc, watch, RwLock};
 
 pub mod acting_stat;
 pub mod acting_var;
@@ -74,7 +74,7 @@ pub struct PlannerReactivity {
 impl Default for PlannerReactivity {
     fn default() -> Self {
         Self {
-            inner: Arc::new(AtomicF64::new(f64::MAX)),
+            inner: Arc::new(AtomicF64::new(MAX_REACTIVITY)),
         }
     }
 }
@@ -147,14 +147,14 @@ impl ActingManager {
     }
 
     pub fn set_planner_reactivity(&self, planner_reactivity: f64) {
-        let old = self.planner_reactivity.inner.load(Ordering::Relaxed);
+        let old = self.planner_reactivity.inner.load(Ordering::Acquire);
         self.planner_reactivity
             .inner
             .compare_exchange(
                 old,
                 planner_reactivity,
                 Ordering::Acquire,
-                Ordering::Release,
+                Ordering::Relaxed,
             )
             .unwrap();
     }
@@ -505,11 +505,14 @@ impl ActingManager {
         }
     }
 
-    pub async fn subscribe_on_plan_update(&self) -> Option<broadcast::Receiver<bool>> {
+    pub async fn subscribe_on_plan_update(
+        &self,
+        watched_processes: Vec<ActingProcessId>,
+    ) -> Option<mpsc::UnboundedReceiver<Vec<ActingProcessId>>> {
         self.inner
-            .read()
+            .write()
             .await
-            .subscribe_on_planner_tree_update()
+            .subscriber_on_plan_update(watched_processes)
             .await
     }
 

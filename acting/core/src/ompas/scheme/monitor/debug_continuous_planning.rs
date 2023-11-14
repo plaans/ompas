@@ -17,7 +17,6 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
-use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub struct ModContinuousPlanning {
@@ -82,8 +81,11 @@ async fn wait_on_planner(env: &LEnv) -> LResult {
         .get_context::<ModControl>(MOD_CONTROL)?
         .acting_manager
         .clone();
-    let mut recv: broadcast::Receiver<bool> =
-        acting_manager.subscribe_on_plan_update().await.unwrap();
+    let high_level_tasks = acting_manager.get_all_high_level_tasks().await;
+    let mut recv = acting_manager
+        .subscribe_on_plan_update(high_level_tasks)
+        .await
+        .unwrap();
     recv.recv()
         .await
         .expect("Error while waiting on plan update.");

@@ -158,6 +158,15 @@ pub async fn run_planner(
                 debug_date.print_msg("==========================");
 
                 if PRINT_MODEL.get() {
+                    println!("OMPAS model at depth {}", depth);
+                    for (origin, chronicle) in new_pp
+                        .instances
+                        .iter()
+                        .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                    {
+                        println!("{:?}:\n{}", origin, chronicle)
+                    }
+                    println!("ARIES model at depth {}", depth);
                     Printer::print_problem(&problem);
                 }
 

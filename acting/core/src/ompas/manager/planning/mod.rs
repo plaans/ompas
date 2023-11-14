@@ -3,7 +3,7 @@ use crate::model::acting_domain::OMPASDomain;
 use crate::model::chronicle::acting_process_model::{ActingProcessModel, ActingProcessModelLabel};
 use crate::model::chronicle::effect::{Effect, EffectOperation};
 use crate::model::chronicle::interval::Interval;
-use crate::model::chronicle::{Chronicle, ChronicleKind};
+use crate::model::chronicle::ChronicleKind;
 use crate::model::process_ref::{Label, MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
@@ -56,7 +56,6 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Display, Write};
-use std::mem;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -1039,10 +1038,10 @@ pub fn extract_new_acting_models(pr: &PlanResult) -> Vec<ChronicleInstance> {
         .iter()
         .filter(|c| c.generated)
         .cloned()
-        .map(|mut ci| {
-            let empty = Chronicle::new("", ChronicleKind::Method, RefSymTable::default());
-            let ch = mem::replace(&mut ci.instantiated_chronicle, empty);
-            ci.am.chronicle = Some(ch);
+        .map(|ci| {
+            // let empty = Chronicle::new("", ChronicleKind::Method, RefSymTable::default());
+            // let ch = mem::replace(&mut ci.instantiated_chronicle, empty);
+            // ci.am.chronicle = Some(ch);
             ci
         })
         .collect()

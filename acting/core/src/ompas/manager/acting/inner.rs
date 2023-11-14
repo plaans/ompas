@@ -1,6 +1,7 @@
 use crate::model::acting_domain::model::ModelKind::PlanModel;
 use crate::model::acting_domain::model::{ActingModel, NewTask, ROOT};
 use crate::model::chronicle::acting_process_model::{ActingProcessModel, ActingProcessModelLabel};
+use crate::model::chronicle::task_template::TaskTemplate;
 use crate::model::chronicle::{Chronicle, ChronicleKind, Instantiation};
 use crate::model::process_ref::{Label, MethodLabel, ProcessRef, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
@@ -47,13 +48,14 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::any::Any;
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Write};
-use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write as ioWrite;
 use std::path::PathBuf;
+use std::{fs, mem};
 use tokio::runtime::Handle;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::{mpsc, watch};
 
 const TASK_NAME: &str = "task_name";
 const TASK_STATUS: &str = "task_status";
@@ -940,6 +942,8 @@ impl InnerActingManager {
             )),
         ));
 
+        self.add_sub_processes_from_model(&id, ProcessOrigin::Execution);
+
         id
     }
 
@@ -1048,7 +1052,7 @@ impl InnerActingManager {
             RefinementProcess::new(label, args),
         ));
 
-        self.add_sub_processes_from_model(&id);
+        self.add_sub_processes_from_model(&id, origin);
 
         id
     }
@@ -1628,9 +1632,9 @@ impl InnerActingManager {
         self.planner_manager_interface.is_some()
     }
 
-    pub fn notify_planner_tree_update(&mut self) {
-        if let Some(planner) = &self.planner_manager_interface {
-            planner.notify_update_tree();
+    pub fn notify_plan_update(&mut self, updated: Vec<ActingProcessId>) {
+        if let Some(planner) = &mut self.planner_manager_interface {
+            planner.notify_update_tree(updated);
         }
     }
 
@@ -1646,10 +1650,13 @@ impl InnerActingManager {
         }
     }
 
-    pub async fn subscribe_on_planner_tree_update(&self) -> Option<broadcast::Receiver<bool>> {
+    pub async fn subscriber_on_plan_update(
+        &mut self,
+        watched_processes: Vec<ActingProcessId>,
+    ) -> Option<mpsc::UnboundedReceiver<Vec<ActingProcessId>>> {
         self.planner_manager_interface
-            .as_ref()
-            .map(|pmi| pmi.subscribe_on_update())
+            .as_mut()
+            .map(|pmi| pmi.subscribe_on_update(watched_processes))
     }
 
     pub fn get_current_chronicles(&self) -> Vec<ChronicleInstance> {
@@ -1810,17 +1817,24 @@ impl InnerActingManager {
             choices,
         } = update;
         self.add_processes_from_chronicles(acting_models);
-        self.absorb_choices(choices).await;
-        self.notify_planner_tree_update();
+        let updated = self.absorb_choices(choices).await;
+        self.notify_plan_update(updated);
     }
 
-    fn add_sub_processes_from_model(&mut self, parent: &ActingProcessId) {
-        let chronicle =
-            if let Some(chronicle) = self.models[self.get_am_id(parent)].chronicle.as_ref() {
-                chronicle
+    fn add_sub_processes_from_model(&mut self, parent: &ActingProcessId, origin: ProcessOrigin) {
+        let am_id = self.get_am_id(parent);
+        let (chronicle, mut templates) =
+            if let Some(chronicle) = self.models[am_id].chronicle.as_mut() {
+                let templates = mem::take(&mut chronicle.sub_chronicles);
+                (&*chronicle, templates)
             } else {
                 return;
             };
+        let mut templates: HashMap<usize, TaskTemplate> = templates
+            .drain(..)
+            .enumerate()
+            .map(|(id, task_template)| (id, task_template))
+            .collect();
         let st = self.st.clone();
         let bindings = chronicle.get_all_acting_process_models().clone();
 
@@ -1831,7 +1845,7 @@ impl InnerActingManager {
             //println!("creating {}", ProcessRef::Relative(*parent, vec![label]));
             match binding {
                 ActingProcessModel::Arbitrary(_arbitrary) => {
-                    let _id = self.new_arbitrary(label, parent, ProcessOrigin::Execution);
+                    let _id = self.new_arbitrary(label, parent, origin);
                 }
                 ActingProcessModel::Action(action_binding) => {
                     let action = &action_binding.task;
@@ -1840,23 +1854,46 @@ impl InnerActingManager {
                     let args: Vec<_> = name.iter().map(|var_id| st.var_as_cst(*var_id)).collect();
                     match label {
                         Label::Command(_) => {
-                            let _ = self.new_command(
-                                label,
-                                parent,
-                                args,
-                                debug,
-                                ProcessOrigin::Execution,
-                            );
+                            let _ = self.new_command(label, parent, args, debug, origin);
                         }
-                        Label::Task(_) | Label::SyntheticTask(_) => {
-                            let _id =
-                                self.new_task(label, parent, args, debug, ProcessOrigin::Execution);
+                        Label::Task(_) => {
+                            let _id = self.new_task(label, parent, args, debug, origin);
+                        }
+                        Label::SyntheticTask(id) => {
+                            let mut template = templates.remove(&id).unwrap();
+                            let id = self.new_task(label, parent, args, debug, origin);
+                            let task = self.processes[id].inner.as_mut_task().unwrap();
+                            task.new_refinement();
+                            for (method_id, method) in template.methods.drain(..).enumerate() {
+                                let name = method.get_name();
+                                let debug = name.format(&st, true);
+                                let args: Vec<_> =
+                                    name.iter().map(|var_id| st.var_as_cst(*var_id)).collect();
+                                let am = ActingModel {
+                                    lv: LValue::Nil,
+                                    lv_om: LValue::Nil,
+                                    lv_expanded: None,
+                                    runtime_info: Default::default(),
+                                    chronicle: Some(method),
+                                };
+                                let _ = self.new_method(
+                                    RefinementLabel {
+                                        refinement_id: 0,
+                                        method_label: MethodLabel::Possibility(method_id),
+                                    },
+                                    &id,
+                                    debug,
+                                    args,
+                                    am,
+                                    origin,
+                                );
+                            }
                         }
                         _ => unreachable!(),
                     }
                 }
                 ActingProcessModel::Resource(_acq) => {
-                    let _id = self.new_acquire(label, parent, ProcessOrigin::Execution);
+                    let _id = self.new_acquire(label, parent, origin);
                 }
             }
         }
@@ -1969,7 +2006,8 @@ impl InnerActingManager {
         }
     }
 
-    pub(crate) async fn absorb_choices(&mut self, choices: Vec<Choice>) {
+    pub(crate) async fn absorb_choices(&mut self, choices: Vec<Choice>) -> Vec<ActingProcessId> {
+        let mut updated = vec![];
         let mut updates: Vec<ActingValUpdate> = vec![];
         let mut reservations: Vec<Reservation> = vec![];
 
@@ -1988,6 +2026,7 @@ impl InnerActingManager {
             let id = self
                 .get_id(process_ref.clone())
                 .unwrap_or_else(|| panic!("path {process_ref} does not exist."));
+            updated.push(id);
             let process = &self.processes[id];
             match choice_inner {
                 ChoiceInner::Arbitrary(a) => {
@@ -2036,7 +2075,8 @@ impl InnerActingManager {
             }
         }
         self.reserve_all(reservations).await;
-        self.set_planner_vals(updates)
+        self.set_planner_vals(updates);
+        updated
     }
 }
 

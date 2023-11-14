@@ -114,7 +114,7 @@ pub async fn rae(
                         let acting_manager_2 = acting_manager.clone();
                         let future = (Box::pin(async move {
                             let id = acting_manager_2.get_id(pr2.clone()).await.unwrap();
-                            let watcher = acting_manager_2.subscribe_on_plan_update().await;
+                            let watcher = acting_manager_2.subscribe_on_plan_update(vec![id]).await;
                             if is_task {
                                 if let Some(mut watcher) = watcher {
                                     log2.info(format!("({}) Waiting on plan update.", id));
@@ -123,14 +123,14 @@ pub async fn rae(
 
                                     tokio::select! {
                                         _ = tokio::time::sleep(duration) => {
-                                            log2.info(format!("({}) Going to execute without a plan", id));
+                                            log2.info(format!("({}) Going to execute without a plan.", id));
                                         }
                                         r = watcher.recv() => {
-                                             let _ = r.unwrap_or_else(|_| {
+                                             let _ = r.unwrap_or_else(|| {
                                                  eprintln!("error on watcher");
-                                                 false
+                                                 vec![]
                                             });
-                                            log2.info("plan available, going to execute now");
+                                            log2.info(format!("({}) Plan available, going to execute now.", id));
                                         }
                                     }
                                 }

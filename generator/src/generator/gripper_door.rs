@@ -2,12 +2,12 @@ use crate::config::{GetElement, Recipe};
 use crate::generator::gripper::GripperTask::Place;
 use crate::generator::gripper::Object::{Ball, Robby};
 use crate::generator::gripper::{
-    GripperConfig, GripperTask, Object, Room, AT_ROBBY, BALL, POS, ROOM, LEFT, RIGHT, EMPTY, CARRY
+    GripperConfig, GripperTask, Object, Room, AT_ROBBY, BALL, CARRY, EMPTY, LEFT, POS, RIGHT, ROOM,
 };
 use crate::generator::{populate_topology, write_dot_to_file};
 use crate::{Generator, Problem, Task};
 use petgraph::dot::Dot;
-use petgraph::Graph;
+use petgraph::{Graph, Undirected};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use sompas_structs::list;
@@ -38,7 +38,7 @@ impl Generator for GripperDoorGenerator {
 pub struct GripperDoorProblem {
     tasks: Vec<GripperTask>,
     //Topology
-    graph: Graph<Room<Object>, Door>,
+    graph: Graph<Room<Object>, Door, Undirected>,
 }
 
 #[derive(Debug)]
@@ -175,7 +175,7 @@ impl Problem for GripperDoorProblem {
                         facts.push((AT_ROBBY.into(), room_lv.clone()));
                         facts.push((list!(CARRY.into(), LEFT.into()), EMPTY.into()));
                         facts.push((list!(CARRY.into(), RIGHT.into()), EMPTY.into()));
-                    },
+                    }
                     Ball(_) => {
                         facts.push((list!(POS.into(), o.to_string().into()), room_lv.clone()))
                     }
@@ -194,21 +194,7 @@ impl Problem for GripperDoorProblem {
     }
 
     fn get_static_facts(&self) -> Vec<(LValue, LValue)> {
-        let mut facts = vec![];
-        for id in self.graph.edge_indices() {
-            let (start, end) = self.graph.edge_endpoints(id).unwrap();
-            let door = self.graph.edge_weight(id).unwrap();
-            facts.push((
-                list!(
-                    CONNECTS.into(),
-                    self.graph.node_weight(start).unwrap().to_string().into(),
-                    door.to_string().into(),
-                    self.graph.node_weight(end).unwrap().to_string().into()
-                ),
-                LValue::True
-            ));
-        }
-        facts
+        export_connects(&self.graph)
     }
 
     fn report(&self, path: PathBuf) -> PathBuf {
@@ -235,4 +221,46 @@ impl Problem for GripperDoorProblem {
 
         write_dot_to_file(self, path, format!("{:?}", dot))
     }
+}
+
+pub fn export_connects<T: ToString>(graph: &Graph<T, Door, Undirected>) -> Vec<(LValue, LValue)> {
+    let mut facts = vec![];
+    for id in graph.edge_indices() {
+        let (start, end) = graph.edge_endpoints(id).unwrap();
+        let door: LValue = graph.edge_weight(id).unwrap().to_string().into();
+        let n1: LValue = graph.node_weight(start).unwrap().to_string().into();
+        let n2: LValue = graph.node_weight(end).unwrap().to_string().into();
+        facts.push((
+            list!(CONNECTS.into(), n1.clone(), door.clone(), n2.clone()),
+            LValue::True,
+        ));
+        facts.push((
+            list!(CONNECTS.into(), n2.clone(), door.clone(), n1.clone()),
+            LValue::True,
+        ));
+        for index_1 in graph.node_indices() {
+            let n1: LValue = graph.node_weight(index_1).unwrap().to_string().into();
+            facts.push((
+                list!(CONNECTS.into(), n1.clone(), door.clone(), n1.clone()),
+                LValue::Nil,
+            ));
+            for index_2 in graph.node_indices().filter(|ni| {
+                ni > &index_1
+                    && !(ni == &start && index_1 == end)
+                    && !(ni == &end && index_1 == start)
+            }) {
+                let n2: LValue = graph.node_weight(index_2).unwrap().to_string().into();
+                facts.push((
+                    list!(CONNECTS.into(), n1.clone(), door.clone(), n2.clone()),
+                    LValue::Nil,
+                ));
+                facts.push((
+                    list!(CONNECTS.into(), n2, door.clone(), n1.clone()),
+                    LValue::Nil,
+                ));
+            }
+        }
+    }
+
+    facts
 }

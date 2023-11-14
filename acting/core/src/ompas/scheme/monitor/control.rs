@@ -4,7 +4,7 @@ use crate::ompas::interface::select_mode::{Planner, SelectMode};
 use crate::ompas::interface::trigger_collection::{JobCollection, JobHandle, PendingJob, Response};
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ActingProcessKind;
-use crate::ompas::manager::acting::ActingManager;
+use crate::ompas::manager::acting::{ActingManager, MAX_REACTIVITY};
 use crate::ompas::manager::monitor::task_check_wait_for;
 use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::platform_config::PlatformConfig;
@@ -598,7 +598,7 @@ pub async fn set_planner_reactivity(env: &LEnv, reactivity: LValue) -> Result<()
 pub async fn get_planner_reactivity(env: &LEnv) -> Result<LValue, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
     let f = ctx.acting_manager.get_planner_reactivity();
-    if f < f64::MAX {
+    if f < MAX_REACTIVITY {
         Ok(f.into())
     } else {
         Ok("inf".into())

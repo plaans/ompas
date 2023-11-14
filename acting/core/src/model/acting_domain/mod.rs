@@ -56,7 +56,6 @@ impl OMPASDomain {
         let mut amc = ActingModelCollection::default();
         if OMPAS_PRE_COMPUTE_MODELS.get() {
             amc.pre_compute_acting_models(&self, env, state, st).await;
-            println!("Models pre computed");
         }
         self.acting_model_collection = Some(amc)
     }

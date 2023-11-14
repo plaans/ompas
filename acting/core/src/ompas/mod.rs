@@ -19,7 +19,6 @@ use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
-use std::time::Duration;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 pub mod error;
@@ -120,7 +119,7 @@ pub async fn rae(
                                 if let Some(mut watcher) = watcher {
                                     log2.info(format!("({}) Waiting on plan update.", id));
 
-                                    let duration = Duration::from_secs_f64(acting_manager_2.get_planner_reactivity());
+                                    let duration = acting_manager_2.get_planner_reactivity_duration();
 
                                     tokio::select! {
                                         _ = tokio::time::sleep(duration) => {

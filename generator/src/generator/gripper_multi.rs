@@ -1,12 +1,14 @@
 use crate::config::{GetElement, Recipe};
 use crate::generator::gripper::GripperTask::Place;
-use crate::generator::gripper::{GripperConfig, GripperTask, Room, BALL, POS, ROOM, LEFT, RIGHT, CARRY, EMPTY};
-use crate::generator::gripper_door::{Door, GripperDoorConfig, CONNECTS, DOOR, OPENED};
+use crate::generator::gripper::{
+    GripperConfig, GripperTask, Room, BALL, CARRY, EMPTY, LEFT, POS, RIGHT, ROOM,
+};
+use crate::generator::gripper_door::{export_connects, Door, GripperDoorConfig, DOOR, OPENED};
 use crate::generator::gripper_multi::Object::{Ball, Robot};
 use crate::generator::{populate_topology, write_dot_to_file};
 use crate::{Generator, Problem, Task};
 use petgraph::dot::Dot;
-use petgraph::Graph;
+use petgraph::{Graph, Undirected};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use sompas_structs::list;
@@ -31,7 +33,7 @@ impl Generator for GripperMultiGenerator {
 pub struct GripperMultiProblem {
     tasks: Vec<GripperTask>,
     //Topology
-    graph: Graph<Room<Object>, Door>,
+    graph: Graph<Room<Object>, Door, Undirected>,
 }
 
 pub struct GripperMultiConfig {
@@ -192,10 +194,15 @@ impl Problem for GripperMultiProblem {
                 match o {
                     Robot(_) => {
                         facts.push((list![AT_ROB.into(), label.clone()], room_lv.clone()));
-                        facts.push((list![CARRY.into(), label.clone(), LEFT.into()], EMPTY.into()));
-                        facts.push((list![CARRY.into(), label.clone(), RIGHT.into()], EMPTY.into()));
-
-                    },
+                        facts.push((
+                            list![CARRY.into(), label.clone(), LEFT.into()],
+                            EMPTY.into(),
+                        ));
+                        facts.push((
+                            list![CARRY.into(), label.clone(), RIGHT.into()],
+                            EMPTY.into(),
+                        ));
+                    }
                     _ => facts.push((list!(POS.into(), label), room_lv.clone())),
                 }
             }
@@ -212,21 +219,7 @@ impl Problem for GripperMultiProblem {
     }
 
     fn get_static_facts(&self) -> Vec<(LValue, LValue)> {
-        let mut facts = vec![];
-        for id in self.graph.edge_indices() {
-            let (start, end) = self.graph.edge_endpoints(id).unwrap();
-            let door = self.graph.edge_weight(id).unwrap();
-            facts.push((
-                list!(
-                    CONNECTS.into(),
-                    self.graph.node_weight(start).unwrap().to_string().into(),
-                    door.to_string().into(),
-                    self.graph.node_weight(end).unwrap().to_string().into()
-                ),
-                LValue::True
-            ));
-        }
-        facts
+        export_connects(&self.graph)
     }
 
     fn report(&self, path: PathBuf) -> PathBuf {

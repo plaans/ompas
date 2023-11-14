@@ -58,7 +58,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Display, Write};
 use std::mem;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::{mpsc, watch, RwLock};
 
@@ -189,10 +189,7 @@ impl PlannerManager {
     }
 
     async fn wait_next_cycle(update_config: &mut UpdateConfig) -> Vec<PlannerUpdate> {
-        tokio::time::sleep(Duration::from_secs_f64(
-            update_config.planner_reactivity.get_planner_reactivity(),
-        ))
-        .await;
+        tokio::time::sleep(update_config.planner_reactivity.get_duration()).await;
         update_config.wait_on_update().await
     }
 
@@ -483,15 +480,13 @@ impl PlannerInstance {
             stat.duration =
                 crate::ompas::manager::acting::interval::Interval::new(start, Some(end)).duration();
             //println!("sending update");
-            if plan_sender
-                .send(PlannerResult {
-                    stat,
-                    update,
-                    debug_date,
-                })
-                .is_err()
-            {
-                panic!("error sending plan update");
+            match plan_sender.send(PlannerResult {
+                stat,
+                update,
+                debug_date,
+            }) {
+                Ok(_) => {}
+                Err(e) => panic!("Error sending plan update: {}", e),
             }
         });
 

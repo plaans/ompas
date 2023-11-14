@@ -11,7 +11,7 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 export OMPAS_RESOURCE_ENCODING=addition
 
 # print the generates chronicles
-export OMPAS_CHRONICLE_DEBUG=off
+export OMPAS_CHRONICLE_DEBUG=on
 
 export OMPAS_PRE_COMPUTE_MODELS=true
 

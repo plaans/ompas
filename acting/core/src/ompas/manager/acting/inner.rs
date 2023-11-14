@@ -642,6 +642,7 @@ impl InnerActingManager {
             end,
             TaskProcess::new(new_args),
         ));
+        self.set_start(&id, None);
         self.notify_planner(PlannerUpdate::ProblemUpdate(id));
 
         ProcessRef::Relative(0, vec![label])
@@ -844,7 +845,7 @@ impl InnerActingManager {
 
                 self.processes[*parent]
                     .inner
-                    .as_mut_method()
+                    .as_mut_refinement()
                     .unwrap()
                     .add_process(label, id);
                 if origin != ProcessOrigin::Planner {
@@ -1108,7 +1109,7 @@ impl InnerActingManager {
 
                 self.processes[*parent]
                     .inner
-                    .as_mut_method()
+                    .as_mut_refinement()
                     .unwrap()
                     .add_process(label, id);
                 if origin != ProcessOrigin::Planner {
@@ -2027,11 +2028,9 @@ impl InnerActingManager {
                             update(arg.id, cst)
                         }
                         let parent = process.parent();
-                        self.processes[parent]
-                            .inner
-                            .as_mut_task()
-                            .unwrap()
-                            .set_suggested(r.refinement_label.refinement_id, &id);
+                        if let Some(task) = self.processes[parent].inner.as_mut_task() {
+                            task.set_suggested(r.refinement_label.refinement_id, &id);
+                        }
                     }
                 }
             }

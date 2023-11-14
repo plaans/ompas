@@ -4,7 +4,7 @@ use crate::generator::gripper::Object::{Ball, Robby};
 use crate::generator::write_dot_to_file;
 use crate::{Generator, Problem, Task};
 use petgraph::dot::Dot;
-use petgraph::Graph;
+use petgraph::{Graph, Undirected};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use sompas_structs::list;
 use sompas_structs::lvalue::LValue;
@@ -16,15 +16,14 @@ use std::path::PathBuf;
 pub const BALL: &str = "ball";
 pub const ROOM: &str = "room";
 pub const TASK: &str = "task";
-pub const EMPTY: &str ="empty";
-pub const LEFT: &str= "left";
-pub const RIGHT: &str= "right";
+pub const EMPTY: &str = "empty";
+pub const LEFT: &str = "left";
+pub const RIGHT: &str = "right";
 //State functions
 pub const POS: &str = "pos";
 pub const AT_ROBBY: &str = "at-robby";
 pub const ROBBY: &str = "robby";
-pub const CARRY: &str= "carry";
-
+pub const CARRY: &str = "carry";
 
 //Tasks
 pub const PLACE: &str = "place";
@@ -41,7 +40,7 @@ impl Generator for GripperGenerator {
 pub struct GripperProblem {
     tasks: Vec<GripperTask>,
     //Topology
-    graph: Graph<Room<Object>, Connected>,
+    graph: Graph<Room<Object>, Connected, Undirected>,
 }
 
 pub enum GripperTask {
@@ -212,7 +211,7 @@ impl Problem for GripperProblem {
                         facts.push((AT_ROBBY.into(), room_lv.clone()));
                         facts.push((list!(CARRY.into(), LEFT.into()), EMPTY.into()));
                         facts.push((list!(CARRY.into(), RIGHT.into()), EMPTY.into()));
-                    },
+                    }
                     Ball(_) => {
                         facts.push((list!(POS.into(), o.to_string().into()), room_lv.clone()))
                     }

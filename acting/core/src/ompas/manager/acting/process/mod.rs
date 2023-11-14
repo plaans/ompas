@@ -260,22 +260,22 @@ impl ActingProcessInner {
             None
         }
     }
-
-    pub fn as_abstract_model(&self) -> Option<&RefinementProcess> {
-        if let Self::AbstractModel(method) = self {
-            Some(method)
-        } else {
-            None
-        }
-    }
-
-    pub fn as_mut_abstract_model(&mut self) -> Option<&mut RefinementProcess> {
-        if let Self::AbstractModel(method) = self {
-            Some(method)
-        } else {
-            None
-        }
-    }
+    //
+    // pub fn as_abstract_model(&self) -> Option<&RefinementProcess> {
+    //     if let Self::AbstractModel(method) = self {
+    //         Some(method)
+    //     } else {
+    //         None
+    //     }
+    // }
+    //
+    // pub fn as_mut_abstract_model(&mut self) -> Option<&mut RefinementProcess> {
+    //     if let Self::AbstractModel(method) = self {
+    //         Some(method)
+    //     } else {
+    //         None
+    //     }
+    // }
 
     pub fn as_refinement(&self) -> Option<&RefinementProcess> {
         match self {

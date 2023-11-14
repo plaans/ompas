@@ -39,6 +39,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::time::Duration as OtherDuration;
 use std::{fs, thread};
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, watch, RwLock};
@@ -62,6 +63,9 @@ pub struct ActingTreeDisplayer {
 }
 
 pub type RefInnerActingManager = Arc<RwLock<InnerActingManager>>;
+
+pub const MAX_REACTIVITY: f64 = 3600.0;
+
 #[derive(Clone)]
 pub struct PlannerReactivity {
     inner: Arc<AtomicF64>,
@@ -78,6 +82,15 @@ impl Default for PlannerReactivity {
 impl PlannerReactivity {
     pub fn get_planner_reactivity(&self) -> f64 {
         self.inner.load(Ordering::Relaxed)
+    }
+
+    pub fn get_duration(&self) -> OtherDuration {
+        let reactivity = self.get_planner_reactivity();
+        if reactivity > MAX_REACTIVITY {
+            OtherDuration::from_secs_f64(MAX_REACTIVITY)
+        } else {
+            OtherDuration::from_secs_f64(reactivity)
+        }
     }
 }
 
@@ -126,7 +139,11 @@ impl ActingManager {
     }
 
     pub fn get_planner_reactivity(&self) -> f64 {
-        self.planner_reactivity.inner.load(Ordering::Relaxed)
+        self.planner_reactivity.get_planner_reactivity()
+    }
+
+    pub fn get_planner_reactivity_duration(&self) -> OtherDuration {
+        self.planner_reactivity.get_duration()
     }
 
     pub fn set_planner_reactivity(&self, planner_reactivity: f64) {
@@ -360,7 +377,7 @@ impl ActingManager {
             .get(method_id)
             .unwrap()
             .inner
-            .as_method()
+            .as_refinement()
             .unwrap()
             .childs
             .keys()
@@ -375,7 +392,7 @@ impl ActingManager {
             .get(method_id)
             .unwrap()
             .inner
-            .as_method()
+            .as_refinement()
             .unwrap()
             .childs
             .keys()
@@ -390,7 +407,7 @@ impl ActingManager {
             .get(method_id)
             .unwrap()
             .inner
-            .as_method()
+            .as_refinement()
             .unwrap()
             .childs
             .keys()

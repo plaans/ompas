@@ -127,12 +127,13 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
             },
         },
     };
-
+    //If the task is not high level, therefore the start value has not been set yet.
+    if !matches!(pr, ProcessRef::Relative(0, _)) {
+        acting_manager.set_start(&task_id, None).await;
+    }
     let log = ctx.log.clone();
     let debug = acting_manager.get_debug(&task_id).await.unwrap();
     log.debug(format!("({task_id}) Refine {debug} "));
-
-    acting_manager.set_start(&task_id, None).await;
 
     let rt: RefinementTrace = select(task_id, env)
         .await

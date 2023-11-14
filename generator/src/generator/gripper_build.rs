@@ -1,13 +1,15 @@
 use crate::config::{GetElement, Recipe};
-use crate::generator::gripper::{GripperConfig, GripperTask, Room, BALL, POS, ROOM, CARRY, LEFT, RIGHT, EMPTY};
+use crate::generator::gripper::{
+    GripperConfig, GripperTask, Room, BALL, CARRY, EMPTY, LEFT, POS, RIGHT, ROOM,
+};
 use crate::generator::gripper_build::ToyPart::{Head, LeftArm, LeftLeg, RightArm, RightLeg, Torso};
-use crate::generator::gripper_door::{Door, GripperDoorConfig, CONNECTS, DOOR, OPENED};
+use crate::generator::gripper_door::{export_connects, Door, GripperDoorConfig, DOOR, OPENED};
 use crate::generator::gripper_multi::{GripperMultiConfig, AT_ROB};
 use crate::generator::gripper_multi::{Object as OtherObject, ROBOT};
 use crate::generator::{populate_topology, write_dot_to_file};
 use crate::{Generator, Problem, Task};
 use petgraph::dot::Dot;
-use petgraph::Graph;
+use petgraph::{Graph, Undirected};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use sompas_structs::list;
@@ -164,7 +166,7 @@ pub struct GripperBuildProblem {
     tasks: Vec<GripperBuildTask>,
     //Topology
     ether: Vec<Object>,
-    graph: Graph<Room<Object>, Door>,
+    graph: Graph<Room<Object>, Door, Undirected>,
 }
 
 pub struct GripperBuildConfig {
@@ -316,7 +318,7 @@ impl Problem for GripperBuildProblem {
                             ToyPart::Torso(_) => torsos.push(label),
                         }
                     }
-                },
+                }
                 _ => {}
             }
         };
@@ -371,7 +373,10 @@ impl Problem for GripperBuildProblem {
                 match o {
                     Object::OtherObject(OtherObject::Robot(_)) => {
                         facts.push((list![AT_ROB.into(), label.clone()], room_lv.clone()));
-                        facts.push((list![CARRY.into(), label.clone(), LEFT.into()], EMPTY.into()));
+                        facts.push((
+                            list![CARRY.into(), label.clone(), LEFT.into()],
+                            EMPTY.into(),
+                        ));
                         facts.push((list![CARRY.into(), label, RIGHT.into()], EMPTY.into()));
                     }
                     other => {
@@ -435,19 +440,8 @@ impl Problem for GripperBuildProblem {
             })
         });
 
-        for id in self.graph.edge_indices() {
-            let (start, end) = self.graph.edge_endpoints(id).unwrap();
-            let door = self.graph.edge_weight(id).unwrap();
-            facts.push((
-                list!(
-                    CONNECTS.into(),
-                    self.graph.node_weight(start).unwrap().to_string().into(),
-                    door.to_string().into(),
-                    self.graph.node_weight(end).unwrap().to_string().into()
-                ),
-                LValue::True
-            ));
-        }
+        let mut connects_facts = export_connects(&self.graph);
+        facts.append(&mut connects_facts);
         facts
     }
 

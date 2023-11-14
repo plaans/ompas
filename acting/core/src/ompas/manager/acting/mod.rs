@@ -13,6 +13,7 @@ use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::monitor::MonitorManager;
 use crate::ompas::manager::planning::plan_update::ActingTreeUpdate;
+use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
 use crate::ompas::manager::planning::problem_update::ExecutionProblem;
 use crate::ompas::manager::planning::PlannerManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
@@ -507,7 +508,7 @@ impl ActingManager {
 
     pub async fn subscribe_on_plan_update(
         &self,
-        watched_processes: Vec<ActingProcessId>,
+        watched_processes: FilterWatchedProcesses,
     ) -> Option<mpsc::UnboundedReceiver<Vec<ActingProcessId>>> {
         self.inner
             .write()

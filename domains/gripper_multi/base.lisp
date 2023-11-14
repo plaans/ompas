@@ -4,7 +4,8 @@
     (set-current-dir gripper-multi-path)
     (read "../gripper_door/base.lisp")
 
-    (def-types robot)
+    (remove-object robby)
+
     ; Additional state functions
     (remove-state-function at-robby)
     (def-state-function at-rob (:params (?r robot)) (:result room))
@@ -16,7 +17,7 @@
         (:params (?r robot) (?from room) (?to room) (?d door))
         (:pre-conditions
             (= (at-rob ?r) ?from)
-            (connected ?from ?d ?to)
+            (connects ?from ?d ?to)
             (opened ?d))
         (:effects
             ('at-rob ?r ?to)))

@@ -63,6 +63,6 @@ pub enum SelectConfig {
 #[serde(rename_all = "lowercase")]
 pub enum ContinuousPlanningConfig {
     No,
-    Satisfactory,
-    Optimality,
+    Satisfactory(f64),
+    Optimality(f64),
 }

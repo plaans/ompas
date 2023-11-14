@@ -27,7 +27,9 @@ use crate::ompas::manager::acting::{AMId, ActingProcessId, MethodModel};
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::planning::plan_update::{ActingTreeUpdate, Choice, ChoiceInner};
-use crate::ompas::manager::planning::planner_manager_interface::PlannerManagerInterface;
+use crate::ompas::manager::planning::planner_manager_interface::{
+    FilterWatchedProcesses, PlannerManagerInterface,
+};
 use crate::ompas::manager::planning::problem_update::{PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
@@ -1632,7 +1634,7 @@ impl InnerActingManager {
         self.planner_manager_interface.is_some()
     }
 
-    pub fn notify_plan_update(&mut self, updated: Vec<ActingProcessId>) {
+    pub fn notify_plan_update(&mut self, updated: FilterWatchedProcesses) {
         if let Some(planner) = &mut self.planner_manager_interface {
             planner.notify_update_tree(updated);
         }
@@ -1652,7 +1654,7 @@ impl InnerActingManager {
 
     pub async fn subscriber_on_plan_update(
         &mut self,
-        watched_processes: Vec<ActingProcessId>,
+        watched_processes: FilterWatchedProcesses,
     ) -> Option<mpsc::UnboundedReceiver<Vec<ActingProcessId>>> {
         self.planner_manager_interface
             .as_mut()
@@ -1818,7 +1820,7 @@ impl InnerActingManager {
         } = update;
         self.add_processes_from_chronicles(acting_models);
         let updated = self.absorb_choices(choices).await;
-        self.notify_plan_update(updated);
+        self.notify_plan_update(FilterWatchedProcesses::Some(updated));
     }
 
     fn add_sub_processes_from_model(&mut self, parent: &ActingProcessId, origin: ProcessOrigin) {

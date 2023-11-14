@@ -31,6 +31,10 @@ impl InstanceSet {
         self.elements.insert(e.to_string());
     }
 
+    pub fn remove_element(&mut self, e: &str) {
+        self.elements.remove(e);
+    }
+
     pub fn get_instance(&self) -> Vec<String> {
         self.elements.clone().to_vec()
     }
@@ -128,6 +132,12 @@ impl InstanceCollection {
         }
         let domain = self.st.get_type_as_domain(t).unwrap();
         self.st.new_constant_symbol(i, domain);
+    }
+
+    pub fn remove_instance(&mut self, i: &str) {
+        for (_, set) in &mut self.inner {
+            set.remove_element(i)
+        }
     }
 
     pub fn is_of_type(&self, i: &str, t: &str) -> bool {

@@ -138,6 +138,7 @@ impl From<ModModel> for LModule {
         );
         module.add_async_fn(REMOVE_METHOD, remove_method, DOC_REMOVE_METHOD, false);
         module.add_async_fn(REMOVE_TASK, remove_task, DOC_REMOVE_TASK, false);
+        module.add_async_fn(REMOVE_OBJECT, remove_object, DOC_REMOVE_OBJECT, false);
 
         //Macros
         module.add_macro(
@@ -1006,6 +1007,13 @@ pub async fn remove_method(env: &LEnv, label: String) {
 pub async fn remove_task(env: &LEnv, label: String) {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
     ctx.domain.remove_task(&label).await;
+}
+
+#[async_scheme_fn]
+pub async fn remove_object(env: &LEnv, label: String) {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
+
+    ctx.state_manager.remove_instance(&label).await;
 }
 
 #[cfg(test)]

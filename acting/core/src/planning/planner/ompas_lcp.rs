@@ -236,7 +236,7 @@ pub async fn run_planner(
         match result {
             SolverResult::Unsat => {
                 if fully_populated {
-                    return Ok(SolverResult::Interrupt(None));
+                    return Ok(SolverResult::Unsat);
                 }
                 //println!("unsat")
             } // continue (increase depth)
@@ -338,7 +338,7 @@ async fn solve_finite_problem(
         encoding,
     }) = encoded
     else {
-        return SolverResult::Interrupt(None);
+        return SolverResult::Unsat;
     };
     if let Some(metric) = metric {
         model.enforce(metric.le_lit(cost_upper_bound), []);

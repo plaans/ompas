@@ -80,6 +80,10 @@ impl StateManager {
         self.instance.write().await.add_instance(instance, r#type);
     }
 
+    pub async fn remove_instance(&self, instance: &str) {
+        self.instance.write().await.remove_instance(instance)
+    }
+
     pub async fn instance(&self, i: &str, t: &str) -> LValue {
         self.instance.read().await.is_of_type(i, t).into()
     }

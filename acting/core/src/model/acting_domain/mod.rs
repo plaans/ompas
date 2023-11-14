@@ -11,9 +11,8 @@ use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::OMPAS_PRE_COMPUTE_MODELS;
-use aries::core::INT_CST_MAX;
 use im::HashMap;
-use ompas_language::exec::resource::{MAX_Q, QUANTITY};
+use ompas_language::exec::resource::{MAX_Q, MAX_QUANTITY, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE};
 use ompas_language::*;
@@ -72,7 +71,7 @@ impl OMPASDomain {
                         st.get_type_as_domain(TYPE_OBJECT).unwrap(),
                     ),
                 )]),
-                Domain::IntRange(0, INT_CST_MAX as i64),
+                Domain::IntRange(0, MAX_QUANTITY),
                 TYPE_INT.to_string(),
                 None,
             ),

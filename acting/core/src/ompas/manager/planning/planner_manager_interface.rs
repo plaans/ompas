@@ -8,7 +8,12 @@ use tokio::sync::{mpsc, RwLock};
 
 pub struct PlannerWatcher {
     sender: mpsc::UnboundedSender<Vec<ActingProcessId>>,
-    watched_processes: Vec<ActingProcessId>,
+    watched_processes: FilterWatchedProcesses,
+}
+
+pub enum FilterWatchedProcesses {
+    All,
+    Some(Vec<ActingProcessId>),
 }
 
 pub struct PlannerManagerInterface {
@@ -33,25 +38,49 @@ impl PlannerManagerInterface {
         let _ = self.planner_update_sender.send(pu);
     }
 
-    pub fn notify_update_tree(&mut self, updated: Vec<ActingProcessId>) {
+    pub fn notify_update_tree(&mut self, updated: FilterWatchedProcesses) {
         let mut too_remove = vec![];
-        let updated = updated.to_set();
-        for (
-            id,
-            PlannerWatcher {
-                sender,
-                watched_processes,
-            },
-        ) in self.watchers.iter().enumerate()
-        {
-            let watched_set: HashSet<_> = watched_processes.iter().collect();
-            let inter: Vec<_> = watched_set
-                .intersection(&updated.iter().collect())
-                .map(|id| **id)
-                .collect();
-            if !inter.is_empty() {
-                if let Err(_) = sender.send(inter) {
-                    too_remove.push(id)
+        match updated {
+            FilterWatchedProcesses::All => {
+                for (
+                    id,
+                    PlannerWatcher {
+                        sender,
+                        watched_processes: _,
+                    },
+                ) in self.watchers.iter().enumerate()
+                {
+                    if let Err(_) = sender.send(vec![]) {
+                        too_remove.push(id)
+                    }
+                }
+            }
+            FilterWatchedProcesses::Some(updated) => {
+                let updated = updated.to_set();
+                for (
+                    id,
+                    PlannerWatcher {
+                        sender,
+                        watched_processes,
+                    },
+                ) in self.watchers.iter().enumerate()
+                {
+                    let watched: Vec<_> = match watched_processes {
+                        FilterWatchedProcesses::All => updated.clone().to_vec(),
+                        FilterWatchedProcesses::Some(watched_processes) => {
+                            let watched_set: HashSet<_> = watched_processes.iter().collect();
+                            watched_set
+                                .intersection(&updated.iter().collect())
+                                .map(|id| **id)
+                                .collect()
+                        }
+                    };
+
+                    if !watched.is_empty() {
+                        if let Err(_) = sender.send(watched) {
+                            too_remove.push(id)
+                        }
+                    }
                 }
             }
         }
@@ -64,7 +93,7 @@ impl PlannerManagerInterface {
 
     pub fn subscribe_on_update(
         &mut self,
-        watched_processes: Vec<ActingProcessId>,
+        watched_processes: FilterWatchedProcesses,
     ) -> mpsc::UnboundedReceiver<Vec<ActingProcessId>> {
         let (tx, rx) = mpsc::unbounded_channel();
         self.watchers.push(PlannerWatcher {

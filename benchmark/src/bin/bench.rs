@@ -14,10 +14,10 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::{Path, PathBuf};
-use tokio::process::{Command};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 use structopt::StructOpt;
+use tokio::process::Command;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "bench", about = "Program that benchmarks the OMPAS system.")]
@@ -82,8 +82,7 @@ async fn main() {
         n_run,
     } in &config.jobs
     {
-
-        let mut job_dir =  benchmark_working_dir();
+        let mut job_dir = benchmark_working_dir();
         job_dir.push(&domain.label);
 
         let mut benchmark_log_dir = job_dir.clone();
@@ -92,7 +91,7 @@ async fn main() {
         let domain_path = match domain.domain_path.canonicalize() {
             Ok(p) => p,
             Err(e) => {
-                bar.println(format!("Error with domain_path of {}: {}",domain.label ,e));
+                bar.println(format!("Error with domain_path of {}: {}", domain.label, e));
                 bar.println(format!("Skipping job {}", domain.label));
                 continue 'loop_job;
             }
@@ -109,7 +108,10 @@ async fn main() {
         let problem_dir_path = match problem_config.problem_dir_path.canonicalize() {
             Ok(p) => p,
             Err(e) => {
-                bar.println(format!("Error with problem_dir_path of {}: {}",domain.label ,e));
+                bar.println(format!(
+                    "Error with problem_dir_path of {}: {}",
+                    domain.label, e
+                ));
                 bar.println(format!("Skipping job {}", domain.label));
                 continue 'loop_job;
             }
@@ -184,7 +186,8 @@ async fn main() {
                 let config_path = config.path.to_str().unwrap();
 
                 let mut problem_config_path: PathBuf = problems_path.clone();
-                let problem_config_name = format!("{}_{}", problem.label.replace(".lisp", ""), config.label);
+                let problem_config_name =
+                    format!("{}_{}", problem.label.replace(".lisp", ""), config.label);
                 problem_config_path.push(format!("{}.lisp", problem_config_name));
                 let mut file = OpenOptions::new()
                     .write(true)
@@ -193,7 +196,7 @@ async fn main() {
                     .open(problem_config_path.clone())
                     .unwrap();
                 let content = format!(
-"(begin
+                    "(begin
     (read \"{}\")
     (read \"{}\")
     {}
@@ -213,7 +216,6 @@ async fn main() {
                         first = false
                     }
                     let start = SystemTime::now();
-
 
                     let mut command = Command::new(domain.get_binary());
                     command.args(["-d", config_path]);
@@ -266,10 +268,10 @@ async fn main() {
 
     bar.finish();
 
-    /*send_email(
+    send_email(
         &config.mail,
         benchmark_data.format_data("ompas-bench".to_string()),
-    )*/
+    )
 }
 
 fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, String, String) {
@@ -284,16 +286,16 @@ fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, Strin
     let start = match heuristic.continuous_planning {
         ContinuousPlanningConfig::No => {
             config_name.push_str("_reactive");
-            "(start)"
+            "(start)".to_string()
         }
-        ContinuousPlanningConfig::Satisfactory => {
+        ContinuousPlanningConfig::Satisfactory(r) => {
             config_name.push_str("_satisfactory");
 
-            "(start-with-planner false)"
+            format!("(set-planner-reactivity {}) (start-with-planner false)", r)
         }
-        ContinuousPlanningConfig::Optimality => {
+        ContinuousPlanningConfig::Optimality(r) => {
             config_name.push_str("_optimality");
-            "(start-with-planner true)"
+            format!("(set-planner-reactivity {}) (start-with-planner true)", r)
         }
     };
 
@@ -313,13 +315,13 @@ fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, Strin
     (
         config_name,
         format!(
-"(begin
+            "(begin
     (read \"{}\") ; loading domain
     (set-log-level debug) ;setting log-level
     (set-select {})) ; define the algorithm of select",
             domain, select,
         ),
-        start.to_string()
+        start.to_string(),
     )
 }
 

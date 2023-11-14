@@ -17,7 +17,7 @@
         (:pre-conditions
             (= (at-rob ?ro) ?a)
             (!= ?a ?r)
-            (connected ?a ?d ?n)
+            (connects ?a ?d ?n)
             (opened ?d))
         (:body
             (do
@@ -30,7 +30,7 @@
         (:pre-conditions
             (= (at-rob ?ro) ?a)
             (!= ?a ?r)
-            (connected ?a ?d ?n)
+            (connects ?a ?d ?n)
             (! (opened ?d)))
         (:body
             (do

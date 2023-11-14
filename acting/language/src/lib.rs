@@ -138,6 +138,7 @@ pub mod exec {
         pub const LOCKED: &str = "locked";
         pub const MAX_Q: &str = "max-q";
         pub const QUANTITY: &str = "quantity";
+        pub const MAX_QUANTITY: i64 = 1000;
     }
 
     pub mod state {
@@ -613,6 +614,9 @@ pub mod monitor {
 
         pub const REMOVE_TASK: &str = "remove-task";
         pub const DOC_REMOVE_TASK: &str = "Removes task and its methods from the domain definition";
+
+        pub const REMOVE_OBJECT: &str = "remove-object";
+        pub const DOC_REMOVE_OBJECT: &str = "Removes an object from the instance collection.";
 
         //Macros
 

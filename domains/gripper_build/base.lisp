@@ -37,7 +37,7 @@
                 (check_pos (head_of ?t))
                 (check_pos (torso_of ?t))
                 (define new_pos
-                    (lambda (?o) (effect 'pos ?o ?t)))
+                    (lambda (?o) (effect 'pos ?o 'ether)))
                 (effect 'built ?t true)
                 (effect 'pos ?t r_pos)
                 (new_pos (right_arm_of ?t))

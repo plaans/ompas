@@ -19,7 +19,7 @@ export OMPAS_PRE_COMPUTE_MODELS=true
 export OMPAS_DELIBERATION_FREQUENCY=1
 
 # print the plan formatted for the acting tree
-export OMPAS_PLAN_OUTPUT=false
+export OMPAS_PLAN_OUTPUT=true
 
 # print the continuous planning deliberation phases
 export OMPAS_DEBUG_CONTINUOUS_PLANNING=true

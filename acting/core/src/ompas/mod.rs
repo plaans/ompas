@@ -6,6 +6,7 @@ use crate::ompas::interface::trigger_collection::Response;
 use crate::ompas::interface::trigger_collection::TaskProcess;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingManager;
+use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
 use futures::FutureExt;
@@ -114,7 +115,7 @@ pub async fn rae(
                         let acting_manager_2 = acting_manager.clone();
                         let future = (Box::pin(async move {
                             let id = acting_manager_2.get_id(pr2.clone()).await.unwrap();
-                            let watcher = acting_manager_2.subscribe_on_plan_update(vec![id]).await;
+                            let watcher = acting_manager_2.subscribe_on_plan_update(FilterWatchedProcesses::Some(vec![id])).await;
                             if is_task {
                                 if let Some(mut watcher) = watcher {
                                     log2.info(format!("({}) Waiting on plan update.", id));

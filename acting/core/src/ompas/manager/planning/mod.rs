@@ -16,6 +16,7 @@ use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::plan_update::*;
+use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
 use crate::ompas::manager::planning::planner_stat::{
     PlannerStat, PlanningInstanceStat, PlanningStatus,
 };
@@ -309,13 +310,17 @@ impl PlannerManager {
                     update,
                     debug_date
                 }) = planner_instance.wait_on_plan() => {
-                    debug_date.print_msg("planning instance terminated");
                     stats.write().await.add_stat(stat);
                     if let Some(update) = update {
                         debug_date.print_msg("Updating Acting tree");
                         acting_manager.write().await.update_acting_tree(update).await;
                         debug_date.print_msg("Acting Tree Updated");
+                    }else {
+                        debug_date.print_msg("Planner did not find a solution");
+                        acting_manager.write().await.notify_plan_update(FilterWatchedProcesses::All)
                     }
+                    debug_date.print_msg("Planning instance terminated");
+
                 }
                 _ = process.recv() => {
                     //println!("killing process planner manager");

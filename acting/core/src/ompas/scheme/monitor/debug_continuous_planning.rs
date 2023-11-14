@@ -2,6 +2,7 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::ActingProcessId;
 use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::partial_state::Fact;
 use crate::ompas::scheme::exec::state::ModState;
@@ -81,9 +82,8 @@ async fn wait_on_planner(env: &LEnv) -> LResult {
         .get_context::<ModControl>(MOD_CONTROL)?
         .acting_manager
         .clone();
-    let high_level_tasks = acting_manager.get_all_high_level_tasks().await;
     let mut recv = acting_manager
-        .subscribe_on_plan_update(high_level_tasks)
+        .subscribe_on_plan_update(FilterWatchedProcesses::All)
         .await
         .unwrap();
     recv.recv()

@@ -372,9 +372,8 @@ impl InnerActingManager {
             .filter_map(|refinement| {
                 refinement
                     .get_executed()
-                    .map(|id| self.processes[*id].am_id())
+                    .map(|id| self.get_refinement_lv(id))
             })
-            .map(|id| self.models[id].lv.clone())
             .collect()
     }
 }

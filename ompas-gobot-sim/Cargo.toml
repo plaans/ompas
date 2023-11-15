@@ -28,17 +28,18 @@ ompas-language = {path = "../acting/language"}
 aries_planning = {path = "../aries/planning/planning"}
 env_param = {path = "../aries/env_param"}
 
-im = "15.0.0"
+im = {workspace = true}
 structopt = { workspace = true}
 serde = { workspace = true}
 serde_json = { workspace = true}
-tokio = { version = "1.17.0", features = ["full", "time"] }
-byteorder = "1.4.3"
+tokio = {workspace= true}
 async-trait = {workspace =true}
 macro_rules_attribute = {workspace =true}
 tonic = { workspace =true }
 tokio-stream = {workspace = true}
 map-macro = {workspace = true}
+
+byteorder = "1.4.3"
 xshell = "0.2.3"
 
 

@@ -38,7 +38,7 @@ export OMPAS_LOG=false
 # Environment variables for scheme
 export SOMPAS_DEBUG=false
 
-export ARIES_PRINT_PLANNER_OUTPUT=false
+export ARIES_PRINT_PLANNER_OUTPUT=true
 export ARIES_LCP_TIME_SCALE=1000
 export ARIES_PRINT_INITIAL_PROPAGATION=false
 export ARIES_LCP_RELAXED_TEMPORAL_CONSTRAINT_TASK_METHOD=true;

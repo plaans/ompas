@@ -57,7 +57,7 @@ async fn main() {
     let bar = ProgressBar::new(0);
     bar.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}/{eta_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
         )
         .unwrap()
         .progress_chars("##-"),
@@ -170,7 +170,7 @@ async fn main() {
 
         let n_problem = configs.len() * problems.len() * (*n_run as usize);
         bar.println(format!("{} run to do...", n_problem));
-        bar.enable_steady_tick(Duration::from_secs(1));
+        bar.enable_steady_tick(Duration::from_micros(1));
         bar.reset();
         bar.set_length(n_problem.try_into().unwrap());
 
@@ -202,6 +202,7 @@ async fn main() {
     {}
     (wait-end-all {})
     (export-report {})
+    (stop)
     (exit 0))",
                     config_path, problem_path, config.start, timeout, problem_config_name,
                 );
@@ -251,7 +252,7 @@ async fn main() {
                                 //bar.println!("command ok!")
                             }
                         }
-                        let _r = c.wait();
+                        let _ = c.wait().await;
                     } else {
                         panic!("panic");
                     }
@@ -268,10 +269,9 @@ async fn main() {
 
     bar.finish();
 
-    send_email(
-        &config.mail,
-        benchmark_data.format_data("ompas-bench".to_string()),
-    )
+    if let Some(email) = &config.mail {
+        send_email(email, benchmark_data.format_data("ompas-bench".to_string()))
+    }
 }
 
 fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, String, String) {
@@ -291,17 +291,24 @@ fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, Strin
         ContinuousPlanningConfig::Satisfactory(r) => {
             config_name.push_str("_satisfactory");
 
-            format!("(set-planner-reactivity {}) (start-with-planner false)", r)
+            format!(
+                "(set-planner-reactivity {})\n\t(start-with-planner false)",
+                r
+            )
         }
         ContinuousPlanningConfig::Optimality(r) => {
             config_name.push_str("_optimality");
-            format!("(set-planner-reactivity {}) (start-with-planner true)", r)
+            format!(
+                "(set-planner-reactivity {})\n\t(start-with-planner true)",
+                r
+            )
         }
     };
 
     let domain = match &heuristic.specific_domain {
         None => domain.canonicalize().unwrap().to_str().unwrap().to_string(),
         Some(s) => {
+            config_name.push('_');
             config_name.push_str(s.label.as_str());
             s.domain
                 .canonicalize()
@@ -317,7 +324,7 @@ fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, Strin
         format!(
             "(begin
     (read \"{}\") ; loading domain
-    (set-log-level debug) ;setting log-level
+    (set-log-level info) ;setting log-level
     (set-select {})) ; define the algorithm of select",
             domain, select,
         ),

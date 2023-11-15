@@ -16,13 +16,13 @@
 
     ;actions
     (def-command move (:params (?from room) (?to room)))
-    (def-command-om-model move
+    (def-command-pddl-model move
       (:params (?from room) (?to room))
-      (:body
-            (do
-                (check (= (at-robby) ?from))
-                (check (!= ?from ?to))
-                (transitive-effect 1 'at-robby ?to))))
+      (:pre-conditions
+         (= (at-robby) ?from)
+         (!= ?from ?to))
+      (:effects
+            (durative 1 'at-robby ?to)))
 
     (def-command pick (:params (?o carriable) (?r room) (?g gripper)))
     (def-command-pddl-model pick

@@ -60,12 +60,7 @@ impl From<ModState> for LModule {
         module.add_async_fn(ASSERT, assert, DOC_ASSERT, false);
         module.add_async_fn(ASSERT_SHORT, assert, DOC_ASSERT_SHORT, false);
         module.add_async_fn(EFFECT, effect, DOC_EFFECT, false);
-        module.add_async_fn(
-            TRANSITIVE_EFFECT,
-            transitive_effect,
-            DOC_TRANSITIVE_EFFECT,
-            false,
-        );
+        module.add_async_fn(DURATIVE_EFFECT, durative_effect, DOC_DURATIVE_EFFECT, false);
         module.add_async_fn(RETRACT, retract, DOC_RETRACT, false);
         module.add_async_fn(RETRACT_SHORT, retract, DOC_RETRACT_SHORT, false);
         module.add_async_fn(READ_STATE, read_state, DOC_READ_STATE, false);
@@ -137,10 +132,10 @@ async fn effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
 }
 
 #[async_scheme_fn]
-async fn transitive_effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+async fn durative_effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     if args.len() < 3 {
         return Err(LRuntimeError::wrong_number_of_args(
-            TRANSITIVE_EFFECT,
+            DURATIVE_EFFECT,
             args,
             3..usize::MAX,
         ));

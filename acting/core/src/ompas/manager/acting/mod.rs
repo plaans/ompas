@@ -271,10 +271,6 @@ impl ActingManager {
         id
     }
 
-    pub async fn new_refinement(&self, parent: &ActingProcessId) -> usize {
-        self.inner.write().await.new_refinement(parent)
-    }
-
     pub async fn set_failed_method(&self, method: &ActingProcessId) {
         self.inner.write().await.set_failed_method(method)
     }

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct BenchConfig {
-    pub mail: MailConfig,
+    pub mail: Option<MailConfig>,
     pub jobs: Vec<JobConfig>,
     pub view: bool,
 }

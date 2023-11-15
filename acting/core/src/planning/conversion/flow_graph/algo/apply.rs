@@ -21,8 +21,8 @@ use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::RELEASE;
 use ompas_language::exec::state::{
-    ASSERT, ASSERT_SHORT, EFFECT, INSTANCE, INSTANCES, READ_STATE, READ_STATIC_STATE,
-    TRANSITIVE_EFFECT, WAIT_FOR,
+    ASSERT, ASSERT_SHORT, DURATIVE_EFFECT, EFFECT, INSTANCE, INSTANCES, READ_STATE,
+    READ_STATIC_STATE, WAIT_FOR,
 };
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
@@ -68,7 +68,7 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(ASSERT, convert_assert);
         d.add_conversion(ASSERT_SHORT, convert_assert);
         d.add_conversion(EFFECT, convert_assert);
-        d.add_conversion(TRANSITIVE_EFFECT, convert_transitive_effect);
+        d.add_conversion(DURATIVE_EFFECT, convert_transitive_effect);
         d.add_conversion(READ_STATE, convert_read_state);
         d.add_conversion(READ_STATIC_STATE, convert_read_state);
         d.add_conversion(EQ, convert_eq);

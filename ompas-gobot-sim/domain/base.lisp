@@ -1,4 +1,6 @@
 (begin
+
+    (def-init (sleep 1))
     ;types declaration
     ;(def-types machine robot package belt (parking_area interact_area area) tile)
     (def-types machine package (robot parking_area belt location) interact_area)
@@ -28,7 +30,7 @@
     (def-state-function robot.battery (:params (?r robot)) (:result float))
     (def-state-function robot.velocity (:params (?r robot)) (:result (tuple float float)))
     (def-state-function robot.rotation_speed (:params (?r robot)) (:result float))
-    (def-state-function robot.in_station (:params (?r robot)) (:result bool))
+    (def-state-function robot.in_station (:params (?r robot)) (:result boolean))
     (def-state-function robot.in_interact_areas (:params (?r robot)) (:result (list interact_area)))
     (def-function robot.default_velocity (:params (?r robot)) (:result int))
     (def-function robot.drain_rate (:params (?r robot)) (:result float))

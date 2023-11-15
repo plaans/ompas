@@ -20,7 +20,7 @@
             (connects ?from ?d ?to)
             (opened ?d))
         (:effects
-            ('at-rob ?r ?to)))
+            (durative 1 'at-rob ?r ?to)))
 
     (def-command pick (:params (?ro robot) (?o carriable) (?r room) (?g gripper)))
     (def-command-pddl-model pick

@@ -580,22 +580,22 @@ pub async fn populate_problem<'a>(
                               (ci, instance_id): (&ChronicleInstance, usize)|
      -> Vec<ChronicleInstance> {
         let chronicle = &ci.instantiated_chronicle;
-        // if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
-        //     println!(
-        //         "instantiated:{}\nmodel:{}",
-        //         chronicle,
-        //         ci.am.chronicle.as_ref().unwrap()
-        //     )
-        // }
         if ci.origin != ChronicleOrigin::Original {
             let kind = chronicle.get_debug().kind;
             let label = chronicle.get_name()[0].format(st, true);
-            if kind == ChronicleKind::Command {
-                commands.insert(label);
-            } else if kind == ChronicleKind::Method {
-                methods.insert(label);
-                tasks.insert(chronicle.get_task()[0].format(st, true));
-            }
+            match kind {
+                ChronicleKind::Command => {
+                    commands.insert(label);
+                }
+                ChronicleKind::Method => {
+                    methods.insert(label);
+                    tasks.insert(chronicle.get_task()[0].format(st, true));
+                }
+                ChronicleKind::Task => {
+                    tasks.insert(label);
+                }
+                ChronicleKind::Root => {}
+            };
         }
         let mut new = vec![];
         'loop_task: for (task_id, subtask) in chronicle.get_subtasks().iter().enumerate() {

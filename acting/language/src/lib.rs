@@ -154,8 +154,10 @@ pub mod exec {
         pub const EFFECT: &str = "effect";
         pub const DOC_EFFECT: &str = "Same as assert.";
 
-        pub const TRANSITIVE_EFFECT: &str = "transitive-effect";
-        pub const DOC_TRANSITIVE_EFFECT: &str= "Update of a fact that takes a given duration. During the transition, the fact is considered as unknown.";
+        pub const DURATIVE: &str = "durative";
+
+        pub const DURATIVE_EFFECT: &str = "durative-effect";
+        pub const DOC_DURATIVE_EFFECT: &str= "Update of a fact that takes a given duration. During the transition, the fact is considered as unknown.";
 
         pub const RETRACT: &str = "retract";
         pub const DOC_RETRACT: &str = "Remove a fact from the inner world.";

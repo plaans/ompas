@@ -14,11 +14,11 @@ use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::manager::state::{StateManager, StateType};
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::planning::conversion::context::ConversionContext;
-use ompas_language::exec::state::EFFECT;
+use ompas_language::exec::state::{DURATIVE_EFFECT, EFFECT};
 use ompas_language::monitor::model::*;
 use ompas_language::sym_table::TYPE_OBJECT;
 use ompas_middleware::logger::LogClient;
-use sompas_core::modules::list::{car, cons, first};
+use sompas_core::modules::list::{car, first};
 use sompas_core::{eval, expand, get_root_env, parse};
 use sompas_language::kind::*;
 use sompas_language::predicate::*;
@@ -390,8 +390,10 @@ pub async fn add_function(
         .await?;
     Ok(())
 }
+use ompas_language::exec::state::DURATIVE;
 
-async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
+#[function_name::named]
+async fn generate_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
 
     let st: RefSymTable = ctx.st.clone();
@@ -407,13 +409,13 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
             let params: Parameters = Parameters::try_from_lvalue(
                 model
                     .get(&PARAMETERS.into())
-                    .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?,
+                    .ok_or_else(|| LRuntimeError::new(function_name!(), "missing :params"))?,
                 &st,
             )
             .await?;
             let conds = model
                 .get(&PRE_CONDITIONS.into())
-                .ok_or_else(|| LRuntimeError::new("create_model", "missing :pre-conditions"))?;
+                .ok_or_else(|| LRuntimeError::new(function_name!(), "missing :pre-conditions"))?;
             let mut str_conds = "(do".to_string();
             if let LValue::List(conds) = conds {
                 for cond in conds.iter() {
@@ -429,8 +431,14 @@ async fn create_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResult
             let mut str_effects = "(do".to_string();
             if let LValue::List(effects) = effects {
                 for effect in effects.iter() {
-                    let cons = cons(env, &[EFFECT.into(), effect.into()])?;
-                    str_effects.push_str(cons.to_string().as_str());
+                    let mut expr = effect.to_string();
+                    if expr.contains(DURATIVE) {
+                        expr = expr.replace(DURATIVE, DURATIVE_EFFECT)
+                    } else {
+                        expr.remove(0);
+                        expr.insert_str(0, format!("({} ", EFFECT).as_str());
+                    }
+                    str_effects.push_str(expr.as_str());
                 }
                 str_effects.push(')');
             } else {
@@ -564,7 +572,7 @@ pub async fn add_command_model(
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
-    let model = create_model(env, model).await?;
+    let model = generate_model(env, model).await?;
     let kind = ModelKind::PlanModel;
     ctx.domain.add_command_model(label, model, kind).await?;
     Ok(())
@@ -646,7 +654,7 @@ pub async fn add_task_model(
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
-    let model = create_model(env, model).await?;
+    let model = generate_model(env, model).await?;
     let kind = ModelKind::PlanModel;
     ctx.domain.add_task_model(label, model, kind).await?;
     Ok(())

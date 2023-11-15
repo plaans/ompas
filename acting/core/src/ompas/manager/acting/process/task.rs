@@ -71,7 +71,7 @@ impl TaskProcess {
         Self {
             abstract_model: None,
             args,
-            refinements: vec![],
+            refinements: vec![Refinement::default()],
         }
     }
 

@@ -19,7 +19,7 @@ ompas-middleware = {path = "../../middleware"}
 
 aries_planning = {path = "../../aries/planning/planning"}
 aries_planners = {path = "../../aries/planning/planners"}
-aries = {path = "../../aries/solver"}
+aries = {path = "../../aries/solver", features = ["cpu_cycles"]}
 env_param = {path = "../../aries/env_param"}
 
 tokio = { workspace = true }

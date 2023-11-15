@@ -345,7 +345,7 @@ impl InnerActingManager {
 
     pub fn get_refinement_lv(&self, id: &ActingProcessId) -> LValue {
         let mut list = vec![];
-        for arg in &self.processes[*id].inner.as_method().unwrap().args {
+        for arg in &self.processes[*id].inner.as_refinement().unwrap().args {
             list.push(self.get_acting_var_acting_val(&arg.id).as_cst().unwrap())
         }
         list.into()
@@ -1863,8 +1863,6 @@ impl InnerActingManager {
                         Label::SyntheticTask(id) => {
                             let mut template = templates.remove(&id).unwrap();
                             let id = self.new_task(label, parent, args, debug, origin);
-                            let task = self.processes[id].inner.as_mut_task().unwrap();
-                            task.new_refinement();
                             for (method_id, method) in template.methods.drain(..).enumerate() {
                                 let name = method.get_name();
                                 let debug = name.format(&st, true);
@@ -1987,7 +1985,7 @@ impl InnerActingManager {
                                 .collect();
 
                             let action = self.processes[parent].inner.as_mut_task().unwrap();
-                            if action.refinements.len() == refinement_label.refinement_id {
+                            for _ in action.refinements.len()..refinement_label.refinement_id + 1 {
                                 action.new_refinement();
                             }
 

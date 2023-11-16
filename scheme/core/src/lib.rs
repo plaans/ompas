@@ -480,7 +480,7 @@ pub async fn eval(
     let log = root_env.log.clone();
     let mut debug: LDebug = Default::default();
     debug.log = log.clone();
-    debug.push(Unininterruptible, lv);
+    //debug.push(Unininterruptible, lv);
 
     let mut interrupted = false;
     let error = interrupted!();
@@ -518,64 +518,75 @@ pub async fn eval(
                     results.pop_n(p.n);
                     scopes.revert_scope();
                     results.push(error.clone());
+                    debug.log_last_result(&results);
                 }
-                StackKind::CoreOperator(co) => match co {
-                    CoreOperatorFrame::If(_) => {
-                        results.pop();
-                        results.push(error.clone());
-                        scopes.revert_scope();
+                StackKind::CoreOperator(co) => {
+                    match co {
+                        CoreOperatorFrame::If(_) => {
+                            results.pop();
+                            results.push(error.clone());
+                            scopes.revert_scope();
+                        }
+                        CoreOperatorFrame::Begin(b) => {
+                            let mut r = results.pop_n(b.n);
+                            scopes.revert_scope();
+                            results.push(r.pop().unwrap());
+                        }
+                        CoreOperatorFrame::Do(_) => {
+                            scopes.revert_scope();
+                            //results.pop();
+                        }
+                        CoreOperatorFrame::Define(_) => {
+                            scopes.revert_scope();
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::Lambda => {
+                            scopes.revert_scope();
+                        }
+                        CoreOperatorFrame::Await => {
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::Interrupt => {
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::Eval => {
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::Expand => {
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::Parse => {
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::Enr => {
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::EvalEnd => {
+                            scopes.revert_scope();
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::EnrEnd => {
+                            scopes.revert_scope();
+                            results.pop();
+                            results.push(error.clone());
+                        }
+                        CoreOperatorFrame::IfEnd => {
+                            scopes.revert_scope();
+                            results.pop();
+                            results.push(error.clone())
+                        }
                     }
-                    CoreOperatorFrame::Begin(b) => {
-                        let mut r = results.pop_n(b.n);
-                        scopes.revert_scope();
-                        results.push(r.pop().unwrap());
-                    }
-                    CoreOperatorFrame::Do(_) => {
-                        scopes.revert_scope();
-                    }
-                    CoreOperatorFrame::Define(_) => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                    CoreOperatorFrame::Lambda => {
-                        scopes.revert_scope();
-                        scopes.revert_scope();
-                    }
-                    CoreOperatorFrame::Await => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                    CoreOperatorFrame::Interrupt => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                    CoreOperatorFrame::Eval => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                    CoreOperatorFrame::Expand => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                    CoreOperatorFrame::Parse => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                    CoreOperatorFrame::Enr => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                    CoreOperatorFrame::EvalEnd => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                    CoreOperatorFrame::EnrEnd => {
-                        results.pop();
-                        results.push(error.clone());
-                    }
-                },
+                    debug.log_last_result(&results);
+                }
             }
-            debug.log_last_result(&results);
             continue;
         } else if interrupted && current.interruptibily == Unininterruptible {
             //println!("interrupt avoided");
@@ -881,16 +892,9 @@ pub async fn eval(
                             .get_macro(proc.to_string().as_str())
                             .is_some()
                         {
-                            //debug.push(interruptibility, list!())
                             queue.push(StackFrame::new(CoreOperatorFrame::Eval, interruptibility));
                             queue
                                 .push(StackFrame::new(CoreOperatorFrame::Expand, interruptibility));
-                            // debug
-                            //     .push(interruptibility, list!(LPrimitive::Eval.into(), lv.clone()));
-                            // debug.push(
-                            //     interruptibility,
-                            //     list!(LPrimitive::Expand.into(), lv.clone()),
-                            // );
                             results.push(lv.clone());
                         } else {
                             scopes.new_scope();
@@ -929,6 +933,7 @@ pub async fn eval(
                             l.get_body().clone(),
                             interruptibility,
                         ));
+                        scopes.revert_scope();
                         scopes.new_defined_scope(temp_env);
                     }
                     LValue::Fn(fun) => {
@@ -980,6 +985,7 @@ pub async fn eval(
                         debug.log_last_result(&results);
                     }
                     lv => {
+                        scopes.revert_scope();
                         let e = wrong_type!("eval", lv, KindLValue::Fn);
                         expression_error = exps.into();
                         break Err(e);
@@ -1000,9 +1006,11 @@ pub async fn eval(
 
                     match result {
                         LValue::True => {
+                            queue.push(StackFrame::new(CoreOperatorFrame::IfEnd, interruptibility));
                             queue.push(StackFrame::new_lvalue(i.conseq.clone(), interruptibility))
                         }
                         LValue::Nil => {
+                            queue.push(StackFrame::new(CoreOperatorFrame::IfEnd, interruptibility));
                             queue.push(StackFrame::new_lvalue(i.alt.clone(), interruptibility))
                         }
                         lv => {
@@ -1011,10 +1019,12 @@ pub async fn eval(
                             break Err(e.chain("if condition must return a boolean."));
                         }
                     };
-                    scopes.revert_scope()
+                    scopes.revert_scope();
+                    scopes.new_scope();
                 }
                 CoreOperatorFrame::Do(mut df) => {
                     if df.rest.is_empty() {
+                        debug.log_last_result(&results);
                         scopes.revert_scope();
                     } else {
                         let result = results.pop().unwrap();
@@ -1030,15 +1040,14 @@ pub async fn eval(
                     }
                 }
                 CoreOperatorFrame::Begin(b) => {
+                    scopes.revert_scope();
                     let mut r = results.pop_n(b.n);
                     results.push(r.pop().unwrap());
                     debug.log_last_result(&results);
-                    scopes.revert_scope();
                 }
                 CoreOperatorFrame::Lambda => {
+                    scopes.revert_scope();
                     debug.log_last_result(&results);
-                    scopes.revert_scope();
-                    scopes.revert_scope();
                 }
                 CoreOperatorFrame::Await => {
                     let result = results.pop().unwrap();
@@ -1074,6 +1083,7 @@ pub async fn eval(
                         break Err(wrong_type!(EVAL, &result, KindLValue::Handler)
                             .chain("Await argument must be a LValue::Handler."));
                     };
+                    debug.log_last_result(&results);
                 }
                 CoreOperatorFrame::Interrupt => {
                     let mut result = results.pop().unwrap();
@@ -1090,14 +1100,16 @@ pub async fn eval(
                         expression_error = list![LPrimitive::Await.into(), result];
                         break Err(e.chain("Interrupt argument must be a LValue::Handler."));
                     };
+                    debug.log_last_result(&results);
                 }
                 CoreOperatorFrame::Eval => {
+                    scopes.new_scope();
                     queue.push(StackFrame::new(
                         CoreOperatorFrame::EvalEnd,
                         interruptibility,
                     ));
                     let r = results.pop().unwrap();
-                    debug.push(interruptibility, list![LPrimitive::Eval.into(), r.clone()]);
+                    //debug.push(interruptibility, list![LPrimitive::Eval.into(), r.clone()]);
                     queue.push(StackFrame::new_lvalue(r, interruptibility));
                 }
                 CoreOperatorFrame::Expand => {
@@ -1105,13 +1117,16 @@ pub async fn eval(
                     scopes.new_scope();
                     results.push(expand(&result, true, scopes.get_last_mut()).await?);
                     scopes.revert_scope();
-                    debug.push(Unininterruptible, list!(LPrimitive::Expand.into(), result));
+                    //debug.push(Unininterruptible, list!(LPrimitive::Expand.into(), result));
                     debug.log_last_result(&results);
                 }
                 CoreOperatorFrame::Parse => {
                     let result = results.pop().unwrap();
-                    if let LValue::String(s) = result {
+                    if let LValue::String(s) = &result {
+                        scopes.new_scope();
                         results.push(parse(s.as_str(), scopes.get_last_mut()).await?);
+                        scopes.revert_scope();
+                        //debug.push(Unininterruptible, list!(LPrimitive::Parse.into(), result));
                         debug.log_last_result(&results);
                     } else {
                         let e = wrong_type!("eval", &result, KindLValue::String);
@@ -1131,11 +1146,14 @@ pub async fn eval(
                         }
                         expr => expr,
                     };
-                    debug.pop();
+                    scopes.new_scope();
                     queue.push(StackFrame::new(CoreOperatorFrame::EnrEnd, interruptibility));
                     queue.push(StackFrame::new_lvalue(expr, interruptibility));
                 }
-                CoreOperatorFrame::EvalEnd | CoreOperatorFrame::EnrEnd => {
+                CoreOperatorFrame::EvalEnd
+                | CoreOperatorFrame::EnrEnd
+                | CoreOperatorFrame::IfEnd => {
+                    scopes.revert_scope();
                     debug.log_last_result(&results);
                 }
             },
@@ -1143,7 +1161,12 @@ pub async fn eval(
     };
 
     match result {
-        Ok(_) => result,
+        Ok(_) => {
+            assert_eq!(results.len(), 0);
+            assert_eq!(debug.len(), 0);
+            assert_eq!(scopes.len(), 1);
+            result
+        }
         Err(e) => unstack(expression_error, e, results, queue),
     }
 }

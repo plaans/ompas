@@ -34,6 +34,7 @@ impl From<ProcedureFrame> for StackKind {
 
 pub enum CoreOperatorFrame {
     If(IfFrame),
+    IfEnd,
     Begin(BeginFrame),
     Do(DoFrame),
     Define(DefineFrame),
@@ -103,6 +104,9 @@ impl Unstack for CoreOperatorFrame {
             }
             CoreOperatorFrame::EnrEnd => {
                 list!(LPrimitive::Enr.into(), results.pop().unwrap())
+            }
+            CoreOperatorFrame::IfEnd => {
+                list!(LPrimitive::If.into(), results.pop().unwrap())
             }
         }
     }
@@ -240,6 +244,10 @@ impl<'a> ScopeCollection<'a> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.inner.len() + 1
+    }
+
     pub fn new_defined_scope(&mut self, env: LEnv) {
         self.inner.push(env)
     }
@@ -306,6 +314,9 @@ pub struct Results {
 }
 
 impl Results {
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
     pub fn last(&self) -> Option<&LValue> {
         self.inner.last()
     }
@@ -330,6 +341,9 @@ pub struct LDebug {
 }
 
 impl LDebug {
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
     pub fn push(&mut self, i: Interruptibility, s: impl Display) {
         self.inner.push(format!(
             "{}: {}",
@@ -346,10 +360,8 @@ impl LDebug {
     }
 
     pub fn log_last_result(&mut self, results: &Results) {
-        self.log.trace(format!(
-            "{} => {}",
-            self.inner.pop().unwrap(),
-            results.last().unwrap()
-        ))
+        let debug = self.inner.pop().unwrap();
+        let last_result = results.last().unwrap();
+        self.log.trace(format!("{} => {}", debug, last_result))
     }
 }

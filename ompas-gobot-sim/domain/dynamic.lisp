@@ -48,7 +48,7 @@
 
     (def-task t_charge '(?r robot))
     (def-method m_charge
-        '((:task t_charge)
+        ((:task t_charge)
             (:params (?r robot))
             (:pre-conditions true)
             (:score 0)
@@ -59,7 +59,7 @@
 
     (def-task t_check_battery '(?r robot))
     (def-method m_check_battery
-         '((:task t_check_battery)
+         ((:task t_check_battery)
           (:params (?r robot))
           (:pre-conditions true)
           (:score 0)
@@ -77,7 +77,7 @@
         (lambda (?r) (async (t_check_battery ?r)))))
     
     (def-method m_check_initial_robots_batteries
-        '((:task t_check_rob_bat)
+        ((:task t_check_rob_bat)
         (:params)
         (:pre-conditions true)
         (:score 0)
@@ -90,7 +90,7 @@
 
     (def-task t_check_batteries_new_robots '(?l list))
     (def-method m_check_oncoming_robots
-        '((:task t_check_batteries_new_robots)
+        ((:task t_check_batteries_new_robots)
         (:params (?l list))
         (:pre-conditions true)
         (:score 0)

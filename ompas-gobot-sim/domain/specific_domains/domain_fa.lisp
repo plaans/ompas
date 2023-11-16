@@ -1,5 +1,6 @@
 (begin
-    (read godot_domain/state_functions.lisp)
-    (read godot_domain/jobshop_advanced.lisp)
-    (read godot_domain/problems/ft06.lisp)
+    (set-current-dir (concatenate (get-env-var "OMPAS_PATH") "/ompas-gobot-sim/domain"))
+    (read base.lisp)
+    (read lambdas.lisp)
+    (read fa.lisp)
 )

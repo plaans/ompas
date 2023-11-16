@@ -3,4 +3,4 @@
     (read base.lisp)
     (read lambdas.lisp)
     ;(read plan_model.lisp)
-    (read jobshop.lisp))
+    (read om.lisp))

@@ -2342,11 +2342,8 @@ impl InnerActingManager {
                     "style=\"rounded, dashed, filled\", fillcolor=\"#cecece\""
                 )
             }
-            ActingProcessInner::Task(_) => {
+            ActingProcessInner::Task(_) | ActingProcessInner::AbstractModel(_) => {
                 write!(str, "style=\"rounded, filled, dashed\"")
-            }
-            ActingProcessInner::AbstractModel(_) => {
-                todo!()
             }
             ActingProcessInner::Method(_) => {
                 write!(str, "style = \"dashed, filled\", peripheries=2")

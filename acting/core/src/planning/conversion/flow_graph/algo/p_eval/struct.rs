@@ -214,6 +214,8 @@ pub enum PCoreOperatorFrame {
     Expand,
     Parse,
     Async,
+    Interrupt,
+    Race,
     Interruptible,
     Uninterruptible,
 }
@@ -285,6 +287,12 @@ impl PUnstack for PCoreOperatorFrame {
                     LPrimitive::Uninterruptible.into(),
                     results.pop().unwrap().lvalue
                 )
+            }
+            PCoreOperatorFrame::Interrupt => {
+                list!(LPrimitive::Interrupt.into(), results.pop().unwrap().lvalue)
+            }
+            PCoreOperatorFrame::Race => {
+                list!(LPrimitive::Race.into(), results.pop().unwrap().lvalue)
             }
         })
     }

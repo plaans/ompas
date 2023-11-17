@@ -1,7 +1,7 @@
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::manager::acting::ActingProcessId;
 use ompas_language::exec::acting_context::*;
-use sompas_macros::async_scheme_fn;
+use sompas_macros::scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
@@ -28,14 +28,14 @@ impl From<ModActingContext> for Context {
 impl From<ModActingContext> for LModule {
     fn from(m: ModActingContext) -> Self {
         let mut module = LModule::new(m, MOD_ACTING_CONTEXT, DOC_MOD_CONTEXT);
-        module.add_async_mut_fn(DEF_PROCESS_ID, def_process_id, DOC_DEF_PROCESS_ID);
-        module.add_async_mut_fn(DEF_LABEL, def_label, DOC_DEF_LABEL);
+        module.add_mut_fn(DEF_PROCESS_ID, def_process_id, DOC_DEF_PROCESS_ID);
+        module.add_mut_fn(DEF_LABEL, def_label, DOC_DEF_LABEL);
         module
     }
 }
 
-#[async_scheme_fn]
-pub async fn def_process_id(env: &mut LEnv, id: ActingProcessId) {
+#[scheme_fn]
+pub fn def_process_id(env: &mut LEnv, id: ActingProcessId) {
     env.update_context(ModActingContext::new(ProcessRef::Id(id)))
 }
 
@@ -44,8 +44,8 @@ pub const ACQUIRE: &str = ompas_language::supervisor::ACQUIRE;
 pub const COMMAND: &str = ompas_language::supervisor::COMMAND;
 pub const TASK: &str = ompas_language::supervisor::TASK;
 
-#[async_scheme_fn]
-pub async fn def_label(env: &mut LEnv, kind: String, id: usize) {
+#[scheme_fn]
+pub fn def_label(env: &mut LEnv, kind: String, id: usize) {
     let ctx = env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)
         .unwrap()

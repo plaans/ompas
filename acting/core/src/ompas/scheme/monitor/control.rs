@@ -233,7 +233,7 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
 
     let (tx, rx) = mpsc::unbounded_channel();
 
-    *ctx.task_stream.write().await = Some(tx);
+    *ctx.task_stream.write().await = Some(tx.clone());
 
     let start_result: String = ctx.platform.start(Default::default()).await?;
 

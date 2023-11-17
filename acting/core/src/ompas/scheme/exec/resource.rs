@@ -1,20 +1,19 @@
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::process::ProcessOrigin;
-use crate::ompas::manager::acting::ActingProcessId;
+use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
 use crate::ompas::manager::resource::{
     Capacity, Quantity, ResourceHandler, ResourceManager, WaitAcquire, WaiterPriority,
 };
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::StateManager;
-use crate::ompas::scheme::exec::acting_context::ModActingContext;
+use crate::ompas::scheme::exec::acting_context::{def_label, ModActingContext};
 use crate::ompas::scheme::exec::ModExec;
 use futures::FutureExt;
 use macro_rules_attribute::macro_rules_attribute;
 use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
 use ompas_language::exec::mode::*;
 use ompas_language::exec::resource::*;
-use ompas_language::exec::MOD_EXEC;
 use ompas_language::sym_table::TYPE_OBJECT;
 use ompas_middleware::logger::LogClient;
 use ompas_utils::dyn_async;
@@ -36,6 +35,7 @@ use std::convert::{TryFrom, TryInto};
 pub struct ModResource {
     resource_manager: ResourceManager,
     state_manager: StateManager,
+    acting_manager: ActingManager,
     log: LogClient,
 }
 
@@ -44,6 +44,7 @@ impl ModResource {
         Self {
             resource_manager: exec.acting_manager.resource_manager.clone(),
             state_manager: exec.acting_manager.state_manager.clone(),
+            acting_manager: exec.acting_manager.clone(),
             log: exec.log.clone(),
         }
     }
@@ -106,7 +107,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
     let pr = &env
         .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
         .process_ref;
-    let acting_manager = env.get_context::<ModExec>(MOD_EXEC)?.acting_manager.clone();
+    let acting_manager = ctx.acting_manager.clone();
     let label: String = args
         .get(0)
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
@@ -275,8 +276,8 @@ pub async fn __acquire_in_list__(
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE_IN_LIST, args, 1..2))?
         .try_into()?;
     let d: usize = thread_rng().gen();
-    env.get_context::<ModResource>(MOD_RESOURCE)?
-        .log
+    let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
+    ctx.log
         .info(format!("Acquire element from {}, id: {} ", args[0], d));
     //let capacity = args.get(1).cloned();
     let rest = if args.len() > 1 {
@@ -285,18 +286,42 @@ pub async fn __acquire_in_list__(
         vec![]
     };
 
+    let acting_manager = ctx.acting_manager.clone();
+
     let env = env.clone();
 
-    let f: LFuture = (Box::pin(async move {
-        let receivers: Vec<(LEnv, Vec<LValue>, usize)> = resources
-            .iter_mut()
-            .map(|r| {
-                let mut vec = vec![r.clone()];
-                vec.append(&mut rest.clone());
-                (env.clone(), vec, d)
-            })
-            .collect();
+    let pr = &env
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
+        .process_ref;
 
+    let parent = acting_manager.get_id(pr.clone()).await.unwrap();
+
+    let mut ids = vec![];
+    for _ in 0..resources.len() - 1 {
+        let label_id = acting_manager.get_number_acquire(parent).await;
+        ids.push(
+            acting_manager
+                .new_acquire(
+                    Label::ResourceAcquisition(label_id),
+                    &parent,
+                    ProcessOrigin::Execution,
+                )
+                .await,
+        );
+    }
+    let receivers: Vec<(LEnv, Vec<LValue>, usize)> = resources
+        .iter_mut()
+        .zip(ids)
+        .map(|(r, id)| {
+            let mut vec = vec![r.clone()];
+            vec.append(&mut rest.clone());
+            let mut env = env.clone();
+            let _ = def_label(&mut env, &[ACQUIRE.into(), id.into()]);
+            (env.clone(), vec, d)
+        })
+        .collect();
+
+    let f: LFuture = (Box::pin(async move {
         tokio::select! {
             _ = rx.recv() =>  {
                 Ok(LValue::Err(LValue::Nil.into()))

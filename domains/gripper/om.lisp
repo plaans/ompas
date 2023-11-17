@@ -30,11 +30,15 @@
                 (define ?a (pos ?o))
                 (go2 ?a)
                 (define ?g (arbitrary (instances gripper)))
+                (define res_g (acquire ?g))
                 (pick ?o ?a ?g)
+                (release rh)
+                (define rh (acquire 'robby))
                 (go2 ?r)
                 (drop ?o ?r ?g)
                 (release rh)
-                )))
+                (release ?g)
+            )))
 
 
     (def-method move_and_drop

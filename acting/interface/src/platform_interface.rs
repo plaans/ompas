@@ -70,7 +70,7 @@ pub mod command_request {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandExecutionRequest {
     #[prost(message, repeated, tag = "1")]
-    pub arguments: ::prost::alloc::vec::Vec<Expression>,
+    pub arguments: ::prost::alloc::vec::Vec<Atom>,
     #[prost(uint64, tag = "2")]
     pub command_id: u64,
 }
@@ -145,7 +145,7 @@ pub struct InitGetUpdate {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Event {
-    #[prost(oneof = "event::Event", tags = "1, 2")]
+    #[prost(oneof = "event::Event", tags = "1, 2, 3")]
     pub event: ::core::option::Option<event::Event>,
 }
 /// Nested message and enum types in `Event`.
@@ -157,6 +157,8 @@ pub mod event {
         Instance(super::Instance),
         #[prost(message, tag = "2")]
         Resource(super::Resource),
+        #[prost(message, tag = "3")]
+        Task(super::Task),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -176,6 +178,12 @@ pub struct Resource {
     pub resource_kind: i32,
     #[prost(uint64, tag = "3")]
     pub quantity: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Task {
+    #[prost(message, repeated, tag = "1")]
+    pub arguments: ::prost::alloc::vec::Vec<Atom>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

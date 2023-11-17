@@ -214,7 +214,7 @@ async fn async_read_socket(
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
 
                             //let updates = post_process_state(temps_state, StateVariableType::Static, &mut global);
-                            let updates = post_process_state_2(temps_state, StateVariableType::Static, &mut global_2);
+                            let updates = post_process_state(temps_state, StateVariableType::Static, &mut global_2);
                             for update in updates {
                                 if state_update_sender.send(update).is_err()
                                 {
@@ -226,7 +226,7 @@ async fn async_read_socket(
                         GodotMessageType::DynamicState => {
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
                             //let updates = post_process_state(temps_state, StateVariableType::Dynamic, &mut global);
-                            let updates = post_process_state_2(temps_state, StateVariableType::Dynamic, &mut global_2);
+                            let updates = post_process_state(temps_state, StateVariableType::Dynamic, &mut global_2);
                             for update in updates {
                                 if state_update_sender.send(update).is_err()
                                 {
@@ -349,7 +349,7 @@ struct Global2 {
 
 const TRAVEL_TIME: &str = "travel-time";
 
-fn post_process_state_2(
+fn post_process_state(
     state: PartialState,
     r#type: StateVariableType,
     global: &mut Global2,
@@ -451,6 +451,25 @@ fn post_process_state_2(
                         let tile = find_median_tile(tiles);
                         global.locations.insert(obj_label, tile);
                     }
+                    // if f.value.to_string() == "package" {
+                    //     let task = Task {
+                    //         arguments: vec![
+                    //             "t_process_package".to_string().into(),
+                    //             parameters[0].clone(),
+                    //         ],
+                    //     };
+                    //     updates.push(task.into())
+                    //     //updates.push(PlatformUpdate {})
+                    // }
+                    // if f.value.to_string() == "robot" {
+                    //     let task = Task {
+                    //         arguments: vec![
+                    //             "t_check_battery".to_string().into(),
+                    //             parameters[0].clone(),
+                    //         ],
+                    //     };
+                    //     updates.push(task.into())
+                    // }
                 }
 
                 state_variables.push(StateVariable {

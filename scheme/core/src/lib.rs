@@ -5,7 +5,6 @@ use crate::structs::{
     BeginFrame, CoreOperatorFrame, DefineFrame, DoFrame, EvalStack, IfFrame, Interruptibility,
     LDebug, ProcedureFrame, Results, ScopeCollection, StackFrame, StackKind, Unstack,
 };
-use crate::Interruptibility::Unininterruptible;
 use anyhow::anyhow;
 use aries_planning::parsing::sexpr::SExpr;
 use async_recursion::async_recursion;
@@ -365,15 +364,7 @@ pub async fn expand(x: &LValue, top_level: bool, env: &mut LEnv) -> LResult {
                             expanded.push(expand(&list[1], top_level, env).await?);
                             Ok(expanded.into())
                         }
-                    } /*LCoreOperator::QuasiInterruptible => {
-                    return if list.len() != 2 {
-                    Err(wrong_n_args!("expand", list, 2))
-                    } else {
-                    let mut expanded = vec![LCoreOperator::QuasiInterruptible.into()];
-                    expanded.push(expand(&list[1], top_level, env).await?);
-                    Ok(expanded.into())
                     }
-                    }*/
                     LPrimitive::Race => {
                         return if list.len() != 3 {
                             Err(wrong_n_args!("expand", list, 3)
@@ -588,8 +579,6 @@ pub async fn eval(
                 }
             }
             continue;
-        } else if interrupted && current.interruptibily == Unininterruptible {
-            //println!("interrupt avoided");
         }
 
         match current.kind {
@@ -1031,6 +1020,7 @@ pub async fn eval(
                         df.results.push(result.clone());
                         if matches!(result, LValue::Err(_)) {
                             results.push(result);
+                            debug.log_last_result(&results);
                             scopes.revert_scope();
                         } else {
                             let next = df.rest.remove(0);

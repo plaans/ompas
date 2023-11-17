@@ -1,7 +1,12 @@
 (begin
+
+    (read (concatenate (get-env-var "OMPAS_PATH") "/ompas-gobot-sim/domain/om.lisp"))
+
+
     (def-lambda 
         remaining-time (lambda (?p)
             (eval (cons '+ (cadr (unzip (package.processes_list ?p)))))))
+
     
     (def-task t_process_on_machine (:params (?p package) (?m machine) (?d int)))
     (def-method m_process_on_machine
@@ -20,4 +25,16 @@
                 (t_process ?m ?p ?d)
                 (wait-for `(!= (package.location ,?p) ,?m))
                 )))
+
+        (def-task t_output_package (:params (?p package)))
+        (def-method m_output_package
+            (:task t_output_package)
+            (:params (?p package))
+            (:body
+                (do
+                     (define h_r (acquire-in-list (instances robot)))
+                     (define ?r (first h_r))
+                     (define om (find_output_machine))
+                     (t_carry_to_machine ?r ?p om)
+                     (release (second h_r)))))
 )

@@ -2,7 +2,7 @@ use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_core::OMPAS_LOG;
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::FileDescriptor;
-use ompas_middleware::Master;
+use ompas_middleware::{LogLevel, Master};
 use sompas_modules::ModExtendedStd;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::fs;
@@ -30,6 +30,7 @@ async fn main() {
 
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
+    //Master::set_log_level(LogLevel::Trace).await;
     lisp_interpreter(&opt).await;
 }
 

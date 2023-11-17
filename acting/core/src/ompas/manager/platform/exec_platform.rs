@@ -14,14 +14,14 @@ use crate::ompas::manager::state::StateType;
 use async_trait::async_trait;
 use ompas_interface::platform_interface::command_request::Request;
 use ompas_interface::platform_interface::command_response::Response;
-use ompas_interface::platform_interface::event;
 use ompas_interface::platform_interface::platform_interface_client::PlatformInterfaceClient;
 use ompas_interface::platform_interface::platform_update::Update;
 use ompas_interface::platform_interface::ResourceKind;
 use ompas_interface::platform_interface::StateVariableType;
+use ompas_interface::platform_interface::{event, Atom};
 use ompas_interface::platform_interface::{
-    CommandCancelRequest, CommandExecutionRequest, CommandRequest, CommandResponse, Expression,
-    InitGetUpdate, PlatformUpdate,
+    CommandCancelRequest, CommandExecutionRequest, CommandRequest, CommandResponse, InitGetUpdate,
+    PlatformUpdate,
 };
 use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
@@ -51,9 +51,6 @@ impl ExecPlatform {
         log: LogClient,
         config: Arc<RwLock<PlatformConfig>>,
     ) -> Self {
-        //Master::set_child_process(PROCESS_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS).await;
-        //Master::set_child_process(PROCESS_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS).await;
-
         Self {
             inner,
             acting_manager,
@@ -64,7 +61,7 @@ impl ExecPlatform {
     }
 
     pub async fn exec_command(&self, command: &[LValue], command_id: usize) {
-        let mut arguments: Vec<Expression> = vec![];
+        let mut arguments: Vec<Atom> = vec![];
         for arg in command {
             arguments.push(LValueS::try_from(arg).unwrap().try_into().unwrap())
         }
@@ -198,6 +195,9 @@ impl ExecPlatform {
                                             }
                                             Some(event::Event::Instance(instance)) => {
                                                 acting_manager.state_manager.add_instance(&instance.object, &instance.r#type).await;
+                                            }
+                                            Some(event::Event::Task(_)) => {
+                                                todo!()
                                             }
                                         }
                                     }

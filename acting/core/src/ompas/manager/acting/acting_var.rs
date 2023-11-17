@@ -97,8 +97,6 @@ impl ActingVar {
                 assert_eq!(v, val)
             }
         }
-
-        //self.value = ActingVal::Execution(val)
     }
 
     pub fn get_acting_val(&self) -> &ActingVal {

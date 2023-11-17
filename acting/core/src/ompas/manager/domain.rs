@@ -1,4 +1,5 @@
 use crate::model::acting_domain::command::Command;
+use crate::model::acting_domain::event::Event;
 use crate::model::acting_domain::method::Method;
 use crate::model::acting_domain::model::{ActingModel, ModelKind};
 use crate::model::acting_domain::state_function::StateFunction;
@@ -10,6 +11,7 @@ use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -145,6 +147,22 @@ impl DomainManager {
 
     pub async fn add_init(&self, body: LValue) {
         self.acting_domain.write().await.add_init(body)
+    }
+
+    pub async fn add_event(&self, label: String, value: Event) {
+        self.acting_domain.write().await.events.insert(label, value);
+    }
+
+    pub async fn get_event(&self, label: &str) -> Option<Event> {
+        self.acting_domain.read().await.events.get(label).cloned()
+    }
+
+    pub async fn get_events(&self) -> HashMap<String, Event> {
+        self.acting_domain.read().await.events.clone()
+    }
+
+    pub async fn remove_event(&self, label: &str) {
+        self.acting_domain.write().await.events.remove(label);
     }
 
     pub async fn get_command(&self, label: &str) -> Option<Command> {

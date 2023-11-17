@@ -1,5 +1,6 @@
 use crate::model::acting_domain::acting_model_collection::ActingModelCollection;
 use crate::model::acting_domain::command::Command;
+use crate::model::acting_domain::event::Event;
 use crate::model::acting_domain::method::Method;
 use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::parameters::{ParameterType, Parameters};
@@ -11,7 +12,6 @@ use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::OMPAS_PRE_COMPUTE_MODELS;
-use im::HashMap;
 use ompas_language::exec::resource::{MAX_Q, MAX_QUANTITY, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE};
@@ -20,11 +20,13 @@ use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
 pub mod acting_model_collection;
 pub mod command;
+pub mod event;
 pub mod method;
 pub mod model;
 pub mod parameters;
@@ -41,6 +43,7 @@ pub struct OMPASDomain {
     pub map_symbol_type: HashMap<String, String>,
     pub env: LEnvSymbols,
     pub init: LValue,
+    pub events: HashMap<String, Event>,
     pub acting_model_collection: Option<ActingModelCollection>,
 }
 

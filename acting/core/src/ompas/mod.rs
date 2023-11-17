@@ -104,6 +104,9 @@ pub async fn rae(
                                 pr = id;
                                 new_env.update_context(mod_context);
                             }
+                            JobType::Event => {
+                                todo!()
+                            }
                         }
 
                         //info!("LValue to be evaluated: {}", job_lvalue);
@@ -168,6 +171,9 @@ pub async fn rae(
                             }
                             JobType::Debug | JobType::Init => {
                                 Response::Handle(async_handle)
+                            }
+                            JobType::Event => {
+                                todo!()
                             }
                         };
 

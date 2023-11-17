@@ -11,7 +11,7 @@ use crate::ompas::manager::acting::process::task::RefinementTrace;
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
-use crate::ompas::manager::monitor::MonitorManager;
+use crate::ompas::manager::event::EventManager;
 use crate::ompas::manager::planning::plan_update::ActingTreeUpdate;
 use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
 use crate::ompas::manager::planning::problem_update::ExecutionProblem;
@@ -99,7 +99,7 @@ impl PlannerReactivity {
 pub struct ActingManager {
     pub st: RefSymTable,
     pub resource_manager: ResourceManager,
-    pub monitor_manager: MonitorManager,
+    pub monitor_manager: EventManager,
     pub domain_manager: DomainManager,
     pub state_manager: StateManager,
     pub inner: RefInnerActingManager,
@@ -124,7 +124,7 @@ impl ActingManager {
         Self {
             st: st.clone(),
             resource_manager: resource_manager.clone(),
-            monitor_manager: MonitorManager::from(clock_manager.clone()),
+            monitor_manager: EventManager::from(clock_manager.clone()),
             domain_manager: domain_manager.clone(),
             state_manager: StateManager::new(clock_manager.clone(), st.clone()),
             inner: Arc::new(RwLock::new(InnerActingManager::new(

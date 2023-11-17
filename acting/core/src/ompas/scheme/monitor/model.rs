@@ -128,6 +128,7 @@ impl From<ModModel> for LModule {
         module.add_async_fn(ADD_RESOURCE, add_resource, DOC_ADD_RESOURCE, false);
         module.add_async_fn(ADD_RESOURCES, add_resources, DOC_ADD_RESOURCES, false);
         module.add_async_fn(ADD_INIT, add_init, DOC_ADD_INIT, false);
+        module.add_async_fn(ADD_EVENT, add_event, DOC_ADD_EVENT, false);
         // Remove functions
         module.add_async_fn(REMOVE_COMMAND, remove_command, DOC_REMOVE_COMMAND, false);
         module.add_async_fn(
@@ -139,6 +140,7 @@ impl From<ModModel> for LModule {
         module.add_async_fn(REMOVE_METHOD, remove_method, DOC_REMOVE_METHOD, false);
         module.add_async_fn(REMOVE_TASK, remove_task, DOC_REMOVE_TASK, false);
         module.add_async_fn(REMOVE_OBJECT, remove_object, DOC_REMOVE_OBJECT, false);
+        module.add_async_fn(REMOVE_EVENT, remove_event, DOC_REMOVE_EVENT, false);
 
         //Macros
         module.add_macro(
@@ -178,6 +180,12 @@ impl From<ModModel> for LModule {
             DEF_INIT,
             MACRO_DEF_INIT,
             (DOC_DEF_INIT, DOC_DEF_INIT_VERBOSE),
+        );
+
+        module.add_macro(
+            DEF_EVENT,
+            MACRO_DEF_EVENT,
+            (DOC_DEF_EVENT, DOC_DEF_EVENT_VERBOSE),
         );
 
         module.add_macro(OM_MODEL, MACRO_OM_MODEL, DOC_OM_MODEL);
@@ -390,6 +398,7 @@ pub async fn add_function(
         .await?;
     Ok(())
 }
+use crate::model::acting_domain::event::Event;
 use ompas_language::exec::state::DURATIVE;
 
 #[function_name::named]
@@ -994,6 +1003,20 @@ pub async fn add_init(env: &LEnv, body: LValue) -> Result<(), LRuntimeError> {
 }
 
 #[async_scheme_fn]
+pub async fn add_event(
+    env: &LEnv,
+    label: String,
+    trigger: LValue,
+    body: LValue,
+) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
+    ctx.domain
+        .add_event(label, Event::new(trigger.try_into()?, body))
+        .await;
+    Ok(())
+}
+
+#[async_scheme_fn]
 pub async fn remove_command(env: &LEnv, label: String) {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
     ctx.domain.remove_command(&label).await;
@@ -1020,8 +1043,12 @@ pub async fn remove_task(env: &LEnv, label: String) {
 #[async_scheme_fn]
 pub async fn remove_object(env: &LEnv, label: String) {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
-
     ctx.state_manager.remove_instance(&label).await;
+}
+#[async_scheme_fn]
+pub async fn remove_event(env: &LEnv, label: String) {
+    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
+    ctx.domain.remove_event(&label).await;
 }
 
 #[cfg(test)]

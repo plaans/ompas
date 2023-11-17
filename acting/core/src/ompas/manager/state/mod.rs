@@ -78,6 +78,12 @@ impl StateManager {
 
     pub async fn add_instance(&self, instance: &str, r#type: &str) {
         self.instance.write().await.add_instance(instance, r#type);
+        self.trigger_state_update(vec![LValueS::List(vec![
+            "new-instance".into(),
+            r#type.into(),
+            instance.into(),
+        ])])
+        .await
     }
 
     pub async fn remove_instance(&self, instance: &str) {

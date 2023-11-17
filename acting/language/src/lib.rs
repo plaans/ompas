@@ -604,6 +604,11 @@ pub mod monitor {
         pub const DOC_ADD_INIT: &str =
             "Defines a program that should be executed at the launch of ompas.";
 
+        pub const ADD_EVENT: &str = "add-event";
+        pub const DOC_ADD_EVENT: &str = "Defines programs to execute if a trigger is true.";
+
+        pub const EVENT_NEW_INSTANCE: &str = "new-instance";
+
         pub const REMOVE_COMMAND: &str = "remove-command";
         pub const DOC_REMOVE_COMMAND: &str = "Removes command from the domain definition.";
 
@@ -619,6 +624,9 @@ pub mod monitor {
 
         pub const REMOVE_OBJECT: &str = "remove-object";
         pub const DOC_REMOVE_OBJECT: &str = "Removes an object from the instance collection.";
+
+        pub const REMOVE_EVENT: &str = "remove-event";
+        pub const DOC_REMOVE_EVENT: &str = "Removes an event from the domain of OMPAS.";
 
         //Macros
 
@@ -739,6 +747,12 @@ pub mod monitor {
         pub const DOC_DEF_INIT_VERBOSE: &str = "Example: (def-init (sleep 1))";
         pub const MACRO_DEF_INIT: &str = "(lambda (body)
             `(add-init ',body ))";
+
+        pub const DEF_EVENT: &str = "def-event";
+        pub const DOC_DEF_EVENT: &str = "Wrapper around add-event";
+        pub const DOC_DEF_EVENT_VERBOSE: &str= "Example: (def-event on_new_package (new-instance (?p package)) (lambda (?p) (t_process_package ?p)))";
+        pub const MACRO_DEF_EVENT: &str = "(lambda (label trigger body)\
+        `(add-event ',label ',trigger ',body))";
 
         pub const OM_MODEL: &str = "om-model";
         pub const DOC_OM_MODEL: &str =

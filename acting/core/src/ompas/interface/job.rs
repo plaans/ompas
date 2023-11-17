@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 pub enum JobType {
     Task,
     Command,
+    Event,
     Debug,
     Init,
 }
@@ -70,8 +71,21 @@ impl Job {
             r#type: JobType::Command,
         }
     }
+    pub fn new_event(
+        sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>,
+        value: LValue,
+    ) -> Self {
+        Self {
+            sender,
+            expr: value.to_string(),
+            r#type: JobType::Event,
+        }
+    }
 
-    pub fn new_init(sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>, value: LValue) -> Self {
+    pub fn new_init(
+        sender: mpsc::UnboundedSender<Result<Response, LRuntimeError>>,
+        value: LValue,
+    ) -> Self {
         Self {
             sender,
             expr: value.to_string(),

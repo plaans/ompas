@@ -5,7 +5,7 @@ use crate::ompas::interface::trigger_collection::{JobCollection, JobHandle, Pend
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::{ActingManager, MAX_REACTIVITY};
-use crate::ompas::manager::monitor::task_check_wait_for;
+use crate::ompas::manager::event::task_check_wait_for;
 use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::platform_config::PlatformConfig;
 use crate::ompas::manager::platform::PlatformManager;
@@ -248,8 +248,9 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
         .await;
     let env_clone = env.clone();
     let monitors = acting_manager.monitor_manager.clone();
+    let events = acting_manager.domain_manager.get_events().await;
     tokio::spawn(async move {
-        task_check_wait_for(receiver_event_update_state, monitors, env_clone).await
+        task_check_wait_for(receiver_event_update_state, monitors, tx, events, env_clone).await
     });
 
     tokio::spawn(async move {
@@ -473,7 +474,7 @@ pub async fn exec_command(env: &LEnv, args: &[LValue]) -> Result<usize, LRuntime
             .await),
         Some(sender) => {
             let (tx, mut rx) = mpsc::unbounded_channel();
-            let job = Job::new_command(tx, args.into());
+            let job = Job::new_event(tx, args.into());
 
             tokio::spawn(async move {
                 sender.send(job.into()).expect("could not send job to rae");

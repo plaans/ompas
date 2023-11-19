@@ -751,8 +751,19 @@ pub mod monitor {
         pub const DEF_EVENT: &str = "def-event";
         pub const DOC_DEF_EVENT: &str = "Wrapper around add-event";
         pub const DOC_DEF_EVENT_VERBOSE: &str= "Example: (def-event on_new_package (new-instance (?p package)) (lambda (?p) (t_process_package ?p)))";
-        pub const MACRO_DEF_EVENT: &str = "(lambda (label trigger body)\
-        `(add-event ',label ',trigger ',body))";
+        pub const MACRO_DEF_EVENT: &str = "(lambda attributes
+        (let ((label (car attributes))
+                (attributes (cdr attributes)))
+
+        (begin
+            (define __l__ (lambda (l)
+                (if (null? l)
+                nil
+                 (cons 
+                        (cons (caar l) (list (cdar l)))
+                        (__l__ (cdr l))))))
+            `(add-event (map 
+                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
 
         pub const OM_MODEL: &str = "om-model";
         pub const DOC_OM_MODEL: &str =
@@ -853,6 +864,7 @@ pub mod monitor {
         pub const TASK: &str = ":task";
         pub const PARAMETERS: &str = ":params";
         pub const PRE_CONDITIONS: &str = ":pre-conditions";
+        pub const TRIGGER: &str = ":trigger";
         pub const BODY: &str = ":body";
         pub const MODEL: &str = ":model";
         pub const PLANT_MODEL: &str = ":plant-model";
@@ -863,6 +875,9 @@ pub mod monitor {
         pub const RESULT: &str = ":result";
         pub const SCORE: &str = ":score";
         pub const COST: &str = ":cost";
+
+        pub const ONCE: &str = "once";
+        pub const WHENEVER: &str = "whenever";
     }
 
     pub mod log {
@@ -947,6 +962,13 @@ pub mod monitor {
         pub const GET_PLANNER_REACTIVITY: &str = "get-planner-reactivity";
         pub const DOC_GET_PLANNER_REACTIVITY: &str = "Returns the reactivity of the planner.";
 
+        pub const SET_PRE_COMPUTE_MODELS: &str = "set-pre-compute-models";
+        pub const DOC_SET_PRE_COMPUTE_MODELS: &str =
+            "Set the value to pre compute acting models used during planning at the init of OMPAS";
+
+        pub const GET_PRE_COMPUTE_MODELS: &str = "get-pre-compute-models";
+        pub const DOC_GET_PRE_COMPUTE_MODELS: &str =
+            "Return the value of the option of \"pre_compute_models\"";
         pub const GET_SELECT: &str = "get-select";
         pub const DOC_GET_SELECT: &str = "Return the select algorithm used.";
 

@@ -9,6 +9,16 @@ pub struct OMPASManager {
 }
 
 impl OMPASManager {
+    pub async fn set_pre_compute_models(&self, pre_compute_models: bool) {
+        self.inner
+            .write()
+            .await
+            .set_pre_compute_models(pre_compute_models)
+    }
+
+    pub async fn get_pre_compute_models(&self) -> bool {
+        self.inner.read().await.get_pre_compute_models()
+    }
     pub async fn get_select_mode(&self) -> SelectMode {
         *self.inner.read().await.get_select_mode()
     }

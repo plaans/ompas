@@ -346,6 +346,14 @@ impl OMPASDomain {
         str
     }
 
+    pub fn print_events(&self) -> String {
+        let mut str = "*EVENTS:\n".to_string();
+        for (label, value) in &self.events {
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
+        }
+        str
+    }
+
     pub fn get_exec_env(&self) -> LEnvSymbols {
         let mut env = self.env.clone();
 
@@ -425,6 +433,7 @@ impl Display for OMPASDomain {
         str.push_str(format!("\n{}", self.print_state_functions()).as_str());
         str.push_str(format!("\n{}", self.print_commands()).as_str());
         str.push_str(format!("\n{}", self.print_lambdas()).as_str());
+        str.push_str(format!("\n{}", self.print_events()).as_str());
 
         write!(f, "{}", str)
     }

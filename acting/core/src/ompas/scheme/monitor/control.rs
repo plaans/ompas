@@ -5,7 +5,7 @@ use crate::ompas::interface::trigger_collection::{JobCollection, JobHandle, Pend
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::{ActingManager, MAX_REACTIVITY};
-use crate::ompas::manager::event::task_check_wait_for;
+use crate::ompas::manager::event::run_event_manager;
 use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::platform_config::PlatformConfig;
 use crate::ompas::manager::platform::PlatformManager;
@@ -158,6 +158,19 @@ impl From<ModControl> for LModule {
             DOC_GET_PLANNER_REACTIVITY,
             false,
         );
+        module.add_async_fn(
+            SET_PRE_COMPUTE_MODELS,
+            set_pre_compute_models,
+            DOC_SET_PRE_COMPUTE_MODELS,
+            false,
+        );
+        module.add_async_fn(
+            GET_PRE_COMPUTE_MODELS,
+            get_pre_compute_models,
+            DOC_GET_PRE_COMPUTE_MODELS,
+            false,
+        );
+
         module.add_async_fn(GET_DOMAIN, get_domain, DOC_GET_SELECT, false);
         module.add_async_fn(GET_STATE, get_state, DOC_GET_STATE, false);
         module.add_async_fn(
@@ -233,10 +246,6 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
 
     let (tx, rx) = mpsc::unbounded_channel();
 
-    *ctx.task_stream.write().await = Some(tx.clone());
-
-    let start_result: String = ctx.platform.start(Default::default()).await?;
-
     let env = ctx.get_exec_env().await;
     let log = ctx.log.clone();
     let log_2 = log.clone();
@@ -247,15 +256,19 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
         .new_subscriber(StateRule::All)
         .await;
     let env_clone = env.clone();
-    let monitors = acting_manager.monitor_manager.clone();
+    let monitors = acting_manager.event_manager.clone();
     let events = acting_manager.domain_manager.get_events().await;
+    *ctx.task_stream.write().await = Some(tx.clone());
+
     tokio::spawn(async move {
-        task_check_wait_for(receiver_event_update_state, monitors, tx, events, env_clone).await
+        run_event_manager(receiver_event_update_state, monitors, tx, events, env_clone).await
     });
 
     tokio::spawn(async move {
         rae(acting_manager_2, log_2, env, rx).await;
     });
+
+    let start_result: String = ctx.platform.start(Default::default()).await?;
 
     log.info(format!(
         "Started OMPAS with config {}",
@@ -299,6 +312,10 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
             .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
             .await;
     }
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    sender.send(OMPASJob::StartHandlingEvent(tx)).unwrap();
+    let _ = rx.await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
     for PendingJob { id, r#type, lvalue } in pendings {
         log.info(format!("Sending pending job {}", lvalue));
@@ -606,6 +623,18 @@ pub async fn get_planner_reactivity(env: &LEnv) -> Result<LValue, LRuntimeError>
     }
 }
 
+#[async_scheme_fn]
+pub async fn set_pre_compute_models(env: &LEnv, value: bool) {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    ctx.options.set_pre_compute_models(value).await;
+}
+
+#[async_scheme_fn]
+pub async fn get_pre_compute_models(env: &LEnv) -> bool {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    ctx.options.get_pre_compute_models().await
+}
+
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
 #[async_scheme_fn]
 pub async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
@@ -690,7 +719,7 @@ pub async fn get_resources(env: &LEnv) -> LResult {
 #[async_scheme_fn]
 pub async fn get_monitors(env: &LEnv) -> LResult {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    Ok(ctx.acting_manager.monitor_manager.get_debug().await.into())
+    Ok(ctx.acting_manager.event_manager.get_debug().await.into())
 }
 
 ///Get the list of actions in the environment

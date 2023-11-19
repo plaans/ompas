@@ -25,24 +25,26 @@ use sompas_structs::{lruntimeerror, wrong_type};
 use std::time::Duration;
 
 pub struct ModState {
-    pub state: StateManager,
-    pub monitors: EventManager,
+    pub state_manager: StateManager,
+    pub event_manager: EventManager,
     pub domain: DomainManager,
 }
 
 impl ModState {
     pub fn new(exec: &ModExec) -> Self {
         Self {
-            state: exec.acting_manager.state_manager.clone(),
-            monitors: exec.acting_manager.monitor_manager.clone(),
+            state_manager: exec.acting_manager.state_manager.clone(),
+            event_manager: exec.acting_manager.event_manager.clone(),
             domain: exec.acting_manager.domain_manager.clone(),
         }
     }
 
     pub fn new_from_snapshot(state: WorldStateSnapshot) -> Self {
+        let state_manager: StateManager = state.into();
+        let event_manager = EventManager::new(state_manager.clone(), ClockManager::default());
         Self {
-            state: state.into(),
-            monitors: EventManager::from(ClockManager::default()),
+            state_manager,
+            event_manager,
             domain: DomainManager::default(),
         }
     }
@@ -102,7 +104,7 @@ async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     };
     let value = args.last().unwrap();
     state
-        .state
+        .state_manager
         .add_value_with_date(key.try_into()?, value.try_into()?)
         .await;
     Ok(())
@@ -125,7 +127,7 @@ async fn effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
     };
     let value = args.last().unwrap();
     state
-        .state
+        .state_manager
         .add_value_with_date(key.try_into()?, value.try_into()?)
         .await;
     Ok(())
@@ -153,18 +155,23 @@ async fn durative_effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErro
     };
 
     let intermediate_result = match state.domain.get_state_function(&first).await {
-        Some(sf) => LValueS::from(state.state.get_unk_of_type(sf.result_debug.as_str()).await),
+        Some(sf) => LValueS::from(
+            state
+                .state_manager
+                .get_unk_of_type(sf.result_debug.as_str())
+                .await,
+        ),
         None => LValueS::from(UNKNOWN),
     };
 
     let value: LValueS = args.last().unwrap().try_into()?;
 
     state
-        .state
+        .state_manager
         .add_value_with_date(key.clone(), intermediate_result)
         .await;
     tokio::time::sleep(Duration::from_micros((duration * 1_000_000.0) as u64)).await;
-    state.state.add_value_with_date(key, value).await;
+    state.state_manager.add_value_with_date(key, value).await;
     Ok(())
 }
 
@@ -173,7 +180,7 @@ async fn durative_effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErro
 async fn retract(env: &LEnv, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
     let state = env.get_context::<ModState>(MOD_STATE)?;
 
-    state.state.retract_fact(key, value).await
+    state.state_manager.retract_fact(key, value).await
 }
 
 #[async_scheme_fn]
@@ -195,7 +202,7 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
     let key: LValueS = key.try_into()?;
 
     let ctx = env.get_context::<ModState>(MOD_STATE)?;
-    let state = ctx.state.get_state(None).await;
+    let state = ctx.state_manager.get_state(None).await;
 
     let result: LValue = match state.get(&key) {
         None => LValue::Nil,
@@ -226,7 +233,7 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
 
     let ctx = env.get_context::<ModState>(MOD_STATE)?;
 
-    let state = ctx.state.get_state(Some(StateType::Static)).await;
+    let state = ctx.state_manager.get_state(Some(StateType::Static)).await;
 
     let result: LValue = match state.get(&key) {
         None => LValue::Nil,
@@ -238,14 +245,14 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
 ///2 args: check if an instance is of a certain type
 #[async_scheme_fn]
 pub async fn instance(env: &LEnv, object: String, r#type: String) -> LResult {
-    let state = &env.get_context::<ModState>(MOD_STATE)?.state;
+    let state = &env.get_context::<ModState>(MOD_STATE)?.state_manager;
 
     Ok(state.instance(&object, &r#type).await)
 }
 
 #[async_scheme_fn]
 pub async fn instances(env: &LEnv, r#type: String) -> LResult {
-    let state = &env.get_context::<ModState>(MOD_STATE)?.state;
+    let state = &env.get_context::<ModState>(MOD_STATE)?.state_manager;
     Ok(state.instances(&r#type).await)
 }
 
@@ -292,7 +299,7 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
         _ => return Err(LRuntimeError::wrong_number_of_args(GET_STATE, args, 0..1)),
     };
 
-    let state = ctx.state.get_state(_type).await.into_map();
+    let state = ctx.state_manager.get_state(_type).await.into_map();
     Ok(state)
 }
 
@@ -300,7 +307,7 @@ async fn get_state(env: &LEnv, args: &[LValue]) -> LResult {
 async fn __wait_for__(env: &LEnv, lv: LValue) -> Result<LAsyncHandle, LRuntimeError> {
     let (tx, mut rx) = new_interruption_handler();
     let ctx = env.get_context::<ModState>(MOD_STATE)?;
-    let monitors = ctx.monitors.clone();
+    let monitors = ctx.event_manager.clone();
 
     let mut env = env.clone();
     let f: LFuture = (Box::pin(async move {

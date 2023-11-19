@@ -278,6 +278,10 @@ impl InnerActingManager {
         self.processes[*id].debug()
     }
 
+    pub fn get_parent(&self, id: &ActingProcessId) -> ActingProcessId {
+        self.processes[*id].parent()
+    }
+
     fn get_am_id(&self, id: &ActingProcessId) -> AMId {
         self.processes[*id].am_id()
     }
@@ -1379,22 +1383,11 @@ impl InnerActingManager {
                                 let lv_om = annotate(p_eval_lv);
 
                                 let mut ch = Chronicle::new(debug, ChronicleKind::Task, st.clone());
-                                let task_name =
+                                let task_name: Vec<_> =
                                     task_name.drain(..).map(|cst| st.new_cst(cst)).collect();
-                                let mut name = vec![];
-                                if let LValue::List(list) = &lv {
-                                    let list: Vec<_> =
-                                        list.iter().map(|lv| lv.as_cst().unwrap()).collect();
-                                    for arg in list.as_slice() {
-                                        let id = st.new_cst(arg.clone());
-                                        ch.add_var(id);
-                                        name.push(id);
-                                    }
-                                } else {
-                                    panic!()
-                                };
-                                ch.set_task(task_name);
-                                ch.set_name(name);
+
+                                ch.set_task(task_name.clone());
+                                ch.set_name(task_name);
 
                                 let ch = Some(ch);
                                 let pp_lv = pre_processing(&lv_om, &p_env)?;

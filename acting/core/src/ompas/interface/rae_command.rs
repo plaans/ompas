@@ -1,10 +1,11 @@
 use crate::ompas::interface::job::Job;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum OMPASJob {
     Job(Job),
-    //Stop,
+    StartHandlingEvent(tokio::sync::oneshot::Sender<bool>),
+    Stop,
 }
 
 impl From<Job> for OMPASJob {

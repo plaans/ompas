@@ -86,7 +86,7 @@ impl From<ModRefinement> for LModule {
 pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     let task: LValue = args.into();
     let debug = task.to_string();
-    let mut args = args.iter().map(|lv| lv.as_cst()).collect();
+    let mut args: Vec<_> = args.iter().map(|lv| lv.as_cst()).collect();
     let ctx = env.get_context::<ModRefinement>(MOD_REFINEMENT)?;
     let acting_manager = &ctx.acting_manager;
 
@@ -96,7 +96,12 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         .process_ref;
     let task_id: ActingProcessId = match pr {
         ProcessRef::Id(id) => {
-            if acting_manager.get_kind(id).await == ActingProcessKind::Method {
+            if id == &0 {
+                let pr = acting_manager
+                    .new_high_level_task(debug, args.drain(..).map(|cst| cst.unwrap()).collect())
+                    .await;
+                acting_manager.get_id(pr).await.unwrap()
+            } else if acting_manager.get_kind(id).await == ActingProcessKind::Method {
                 acting_manager
                     .new_task(
                         Label::Task(acting_manager.get_number_subtask(*id).await),
@@ -128,7 +133,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
         },
     };
     //If the task is not high level, therefore the start value has not been set yet.
-    if !matches!(pr, ProcessRef::Relative(0, _)) {
+    if acting_manager.get_parent(&task_id).await != 0 {
         acting_manager.set_start(&task_id, None).await;
     }
     let log = ctx.log.clone();

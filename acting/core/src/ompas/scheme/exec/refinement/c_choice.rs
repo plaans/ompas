@@ -190,7 +190,7 @@ pub async fn increase_cost(env: &LEnv, cost: Cost) -> Result<(), LRuntimeError> 
 #[async_scheme_fn]
 pub async fn c_choice(env: &LEnv, task: &[LValue]) -> LResult {
     let state = env.get_context::<ModState>(MOD_STATE)?;
-    let state = state.state.get_snapshot().await;
+    let state = state.state_manager.get_snapshot().await;
     //let map: HashMap<LValue, u64> = Default::default();
     let mut method = LValue::Nil;
     let mut cost = None;

@@ -99,7 +99,7 @@ impl PlannerReactivity {
 pub struct ActingManager {
     pub st: RefSymTable,
     pub resource_manager: ResourceManager,
-    pub monitor_manager: EventManager,
+    pub event_manager: EventManager,
     pub domain_manager: DomainManager,
     pub state_manager: StateManager,
     pub inner: RefInnerActingManager,
@@ -121,12 +121,14 @@ impl ActingManager {
         let mut ompas_domain = OMPASDomain::default();
         ompas_domain.init(&st);
         let domain_manager: DomainManager = ompas_domain.into();
+        let state_manager = StateManager::new(clock_manager.clone(), st.clone());
+        let event_manager = EventManager::new(state_manager.clone(), clock_manager.clone());
         Self {
             st: st.clone(),
             resource_manager: resource_manager.clone(),
-            monitor_manager: EventManager::from(clock_manager.clone()),
+            event_manager,
             domain_manager: domain_manager.clone(),
-            state_manager: StateManager::new(clock_manager.clone(), st.clone()),
+            state_manager,
             inner: Arc::new(RwLock::new(InnerActingManager::new(
                 resource_manager,
                 clock_manager.clone(),
@@ -168,7 +170,7 @@ pub enum MethodModel {
 
 impl ActingManager {
     pub async fn clear(&self) {
-        self.monitor_manager.clear().await;
+        self.event_manager.clear().await;
         self.resource_manager.clear().await;
         self.inner.write().await.clear().await;
     }
@@ -211,6 +213,10 @@ impl ActingManager {
 
     pub async fn get_status(&self, id: &ActingProcessId) -> ProcessStatus {
         self.inner.read().await.get_status(id)
+    }
+
+    pub async fn get_parent(&self, id: &ActingProcessId) -> ActingProcessId {
+        self.inner.read().await.get_parent(id)
     }
 
     pub async fn get_origin(&self, id: &ActingProcessId) -> ProcessOrigin {

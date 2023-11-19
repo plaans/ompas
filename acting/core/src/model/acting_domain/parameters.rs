@@ -1,6 +1,5 @@
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
-use async_recursion::async_recursion;
 use function_name::named;
 use ompas_language::sym_table::TYPE_OBJECT;
 use sompas_structs::kindlvalue::KindLValue;
@@ -25,7 +24,7 @@ impl Parameters {
     }
 
     #[named]
-    pub async fn try_from_lvalue(lv: &LValue, st: &RefSymTable) -> Result<Self, LRuntimeError> {
+    pub fn try_from_lvalue(lv: &LValue, st: &RefSymTable) -> Result<Self, LRuntimeError> {
         let mut vec: Vec<(Arc<Sym>, ParameterType)> = vec![];
 
         if let LValue::List(list) = lv {
@@ -39,7 +38,6 @@ impl Parameters {
                                 ParameterType::new(
                                     description[1].clone(),
                                     try_domain_from_lvalue(st, &description[1])
-                                        .await
                                         .map_err(|e| e.chain(function_name!()))?,
                                 ),
                             ));
@@ -142,17 +140,13 @@ impl ParameterType {
 }
 
 #[named]
-#[async_recursion]
-pub async fn try_domain_from_lvalue(
-    st: &RefSymTable,
-    lv: &LValue,
-) -> Result<Domain, LRuntimeError> {
+pub fn try_domain_from_lvalue(st: &RefSymTable, lv: &LValue) -> Result<Domain, LRuntimeError> {
     let domain: Domain = match lv {
         LValue::List(list) => {
             let t = st.get_type_id(list[0].to_string()).unwrap();
             let mut composition = vec![];
             for t in &list[1..] {
-                composition.push(try_domain_from_lvalue(st, t).await?)
+                composition.push(try_domain_from_lvalue(st, t)?)
             }
             Domain::Composed(t, composition)
         }

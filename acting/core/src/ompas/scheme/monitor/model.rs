@@ -112,6 +112,7 @@ impl From<ModModel> for LModule {
         module.add_async_fn(ADD_TASK, add_task, DOC_ADD_TASK, false);
         module.add_async_fn(ADD_TASK_MODEL, add_task_model, DOC_ADD_TASK_MODEL, false);
         module.add_async_fn(ADD_METHOD, add_method, DOC_ADD_METHOD, false);
+        module.add_async_fn(ADD_EVENT, add_event, DOC_ADD_EVENT, false);
         module.add_async_fn(ADD_LAMBDA, add_lambda, DOC_ADD_LAMBDA, false);
         module.add_async_fn(ADD_ENV, add_env, DOC_ADD_ENV, false);
         module.add_async_fn(ADD_FACTS, add_facts, DOC_ADD_FACTS, false);
@@ -128,7 +129,7 @@ impl From<ModModel> for LModule {
         module.add_async_fn(ADD_RESOURCE, add_resource, DOC_ADD_RESOURCE, false);
         module.add_async_fn(ADD_RESOURCES, add_resources, DOC_ADD_RESOURCES, false);
         module.add_async_fn(ADD_INIT, add_init, DOC_ADD_INIT, false);
-        module.add_async_fn(ADD_EVENT, add_event, DOC_ADD_EVENT, false);
+
         // Remove functions
         module.add_async_fn(REMOVE_COMMAND, remove_command, DOC_REMOVE_COMMAND, false);
         module.add_async_fn(
@@ -312,8 +313,7 @@ pub async fn add_state_function(
     let params: Parameters = Parameters::try_from_lvalue(
         map.get(&PARAMETERS.into()).unwrap_or(&Default::default()),
         &st,
-    )
-    .await?;
+    )?;
     let result = car(
         env,
         &[map
@@ -324,7 +324,7 @@ pub async fn add_state_function(
             .clone()],
     )?;
 
-    let result: Domain = try_domain_from_lvalue(&st, &result).await?;
+    let result: Domain = try_domain_from_lvalue(&st, &result)?;
     let expr = format!(
         "(lambda {}
                 (read-state '{} {})))",
@@ -362,8 +362,7 @@ pub async fn add_function(
     let params: Parameters = Parameters::try_from_lvalue(
         map.get(&PARAMETERS.into()).unwrap_or(&Default::default()),
         &st,
-    )
-    .await?;
+    )?;
     let result = car(
         env,
         &[map
@@ -374,7 +373,7 @@ pub async fn add_function(
             .clone()],
     )?;
 
-    let result: Domain = try_domain_from_lvalue(&st, &result).await?;
+    let result: Domain = try_domain_from_lvalue(&st, &result)?;
     let expr = format!(
         "(lambda {}
                 (read-static-state '{} {})))",
@@ -398,7 +397,7 @@ pub async fn add_function(
         .await?;
     Ok(())
 }
-use crate::model::acting_domain::event::Event;
+use crate::model::acting_domain::event::{Event, Trigger, TriggerActivation};
 use ompas_language::exec::state::DURATIVE;
 
 #[function_name::named]
@@ -420,8 +419,7 @@ async fn generate_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResu
                     .get(&PARAMETERS.into())
                     .ok_or_else(|| LRuntimeError::new(function_name!(), "missing :params"))?,
                 &st,
-            )
-            .await?;
+            )?;
             let conds = model
                 .get(&PRE_CONDITIONS.into())
                 .ok_or_else(|| LRuntimeError::new(function_name!(), "missing :pre-conditions"))?;
@@ -475,8 +473,7 @@ async fn generate_model(env: &LEnv, model: im::HashMap<LValue, LValue>) -> LResu
                     .get(&PARAMETERS.into())
                     .ok_or_else(|| LRuntimeError::new("create_model", "missing :params"))?,
                 &st,
-            )
-            .await?;
+            )?;
             let body = car(
                 env,
                 &[model
@@ -522,10 +519,10 @@ pub async fn add_command(
     let mut env = ctx.get_empty_env();
     let mut command = Command::default();
     command.set_label(map.get(&NAME.into()).unwrap().to_string());
-    command.set_parameters(
-        Parameters::try_from_lvalue(map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil), &st)
-            .await?,
-    );
+    command.set_parameters(Parameters::try_from_lvalue(
+        map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil),
+        &st,
+    )?);
     let params = command.get_parameters().get_params_as_lvalue();
     let params_list = command.get_parameters().get_labels();
     let lv_exec: LValue = parse(
@@ -602,10 +599,10 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
 
     let mut task = Task::default();
     task.set_label(map.get(&NAME.into()).unwrap().to_string());
-    task.set_parameters(
-        Parameters::try_from_lvalue(map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil), &st)
-            .await?,
-    );
+    task.set_parameters(Parameters::try_from_lvalue(
+        map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil),
+        &st,
+    )?);
     let params = task.get_parameters().get_params_as_lvalue();
     let params_list = task.get_parameters().get_labels();
     let lv_exec: LValue = parse(
@@ -713,7 +710,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     let mut method = Method {
         label: label.to_string(),
         task_label,
-        parameters: Parameters::try_from_lvalue(&parameters, &st).await?,
+        parameters: Parameters::try_from_lvalue(&parameters, &st)?,
         ..Default::default()
     };
     let conds = match map.get(&PRE_CONDITIONS.into()) {
@@ -768,14 +765,6 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     };
     method.lambda_score = score;
 
-    /*let conds = cons(
-        &LEnv::default(),
-        &[
-            method.lambda_pre_conditions.clone(),
-            method.parameters.get_params_as_lvalue(),
-        ],
-    )?;*/
-
     let expr = format!(
         "(lambda {} (do {} {}))",
         method.parameters.get_params_as_lvalue(),
@@ -789,6 +778,95 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
 
     ctx.domain.add_method(method.label.clone(), method).await?;
 
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn add_event(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(), LRuntimeError> {
+    if map.is_empty() {
+        return Err(LRuntimeError::wrong_number_of_args(
+            ADD_EVENT,
+            &[map.into()],
+            1..usize::MAX,
+        ));
+    }
+    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
+    let mut new_env = ctx.get_empty_env();
+    let parameters = map.get(&PARAMETERS.into()).unwrap_or(&LValue::Nil);
+    let event_parameters: Parameters = Parameters::try_from_lvalue(parameters, &ctx.st)?;
+
+    let event_label = map
+        .get(&NAME.into())
+        .ok_or_else(|| {
+            LRuntimeError::new(
+                ADD_METHOD,
+                ":name is missing in the definition of the method.",
+            )
+        })?
+        .to_string();
+    //Definition of the method
+    let trigger = match map.get(&TRIGGER.into()) {
+        None => {
+            ctx.log
+                .warn(format!("{} is undefined for {}", TRIGGER, event_label));
+            let test = generate_test_type_expr(env, &[parameters.clone()]).await?;
+            let expr = format!(
+                "(lambda {} (do {}))",
+                event_parameters.get_params_as_lvalue(),
+                test
+            );
+            Trigger::new(
+                TriggerActivation::Whenever,
+                eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?,
+            )
+        }
+        Some(trigger) => {
+            let trigger = car(&new_env, &[trigger.clone()])?;
+            if let LValue::List(list) = trigger {
+                let activation: TriggerActivation = (&list[0]).try_into()?;
+                let conds = &list[1..];
+                let test = generate_test_type_expr(env, &[parameters.clone()]).await?;
+                let mut str_conds = "(do".to_string();
+
+                for cond in conds.iter() {
+                    str_conds.push_str(format!("(check {})", cond).as_str());
+                }
+                str_conds.push(')');
+
+                let expr = format!(
+                    "(lambda {} (do {} {}))",
+                    event_parameters.get_params_as_lvalue(),
+                    test,
+                    str_conds
+                );
+                let pre_conditions =
+                    eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
+                Trigger::new(activation, pre_conditions)
+            } else {
+                return Err(LRuntimeError::new(ADD_EVENT, format!("Wrong format for {TRIGGER}, expected expression of the form (:trigger ({{{ONCE},{WHENEVER}}} {{:*}}))",)));
+            }
+        }
+    };
+
+    let body = car(
+        &new_env,
+        &[map.get(&BODY.into()).unwrap_or(&LValue::Nil).clone()],
+    )?;
+
+    let expr = format!(
+        "(lambda {} {})",
+        event_parameters.get_params_as_lvalue(),
+        body
+    );
+
+    let lambda_body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
+
+    ctx.domain
+        .add_event(
+            event_label.clone(),
+            Event::new(event_label, event_parameters, trigger, lambda_body),
+        )
+        .await;
     Ok(())
 }
 
@@ -999,20 +1077,6 @@ pub async fn add_resources(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
 pub async fn add_init(env: &LEnv, body: LValue) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
     ctx.domain.add_init(body).await;
-    Ok(())
-}
-
-#[async_scheme_fn]
-pub async fn add_event(
-    env: &LEnv,
-    label: String,
-    trigger: LValue,
-    body: LValue,
-) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
-    ctx.domain
-        .add_event(label, Event::new(trigger.try_into()?, body))
-        .await;
     Ok(())
 }
 

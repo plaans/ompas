@@ -116,6 +116,10 @@ impl StateManager {
         }
     }
 
+    pub async fn get_instance_collection(&self) -> InstanceCollection {
+        self.instance.read().await.get_snapshot()
+    }
+
     pub async fn new_subscriber(&self, rule: StateRule) -> StateUpdateSubscriber {
         self.state_update_manager.write().await.new_subscriber(rule)
     }

@@ -13,6 +13,7 @@ use crate::ompas::manager::acting::{ActingManager, ActingProcessId, MethodModel}
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::ompas::OMPASManager;
+use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
@@ -158,12 +159,12 @@ async fn check_refinement_trace(
     let acting_manager = &ctx.acting_manager;
     let debug = acting_manager.get_debug(task_id).await.unwrap();
     let method_id = match &rt.selected {
-        Selected::Anticipated(refinement_id) => {
-            let method_debug = acting_manager.get_debug(refinement_id).await.unwrap();
+        Selected::Anticipated(id) => {
+            let method_debug = acting_manager.get_debug(id).await.unwrap();
             log.debug(format!(
-                "({task_id}) Chose planned refinement for {debug}: ({refinement_id}) {method_debug}"
+                "({task_id}) Chose planned refinement for {debug}: ({id}) {method_debug}"
             ));
-            *refinement_id
+            *id
         }
         Selected::Generated(method, _) => {
             if method == &LValue::Nil {
@@ -317,31 +318,72 @@ pub async fn select(
         task_id,
         LValue::from(&candidates),
     ));
+    let mut planning_interval = None;
 
-    let planned_refinement: Option<ActingProcessId> =
-        acting_manager.get_last_planned_refinement(&task_id).await;
+    let planned_refinement: Option<ActingProcessId> = match acting_manager
+        .get_last_planned_refinement(&task_id)
+        .await
+    {
+        Some(id) => {
+            let instant = mod_refinement.clock_manager.now();
+            planning_interval = Some(Interval::new(instant, Some(instant)));
+            Some(id)
+        }
+        None => {
+            if acting_manager.is_planner_activated().await {
+                let start = mod_refinement.clock_manager.now();
+                let watcher = acting_manager
+                    .subscribe_on_plan_update(FilterWatchedProcesses::Some(vec![task_id]))
+                    .await;
 
-    let mut selected = if let Some(refinement) = planned_refinement {
-        let lv: LValue = acting_manager.get_refinement_lv(&refinement).await;
+                if let Some(mut watcher) = watcher {
+                    log.info(format!("({}) Waiting on plan update.", task_id));
+
+                    let duration = acting_manager.get_planner_reactivity_duration();
+
+                    tokio::select! {
+                        _ = tokio::time::sleep(duration) => {
+                            log.info(format!("({}) Going to select without a plan.", task_id));
+                        }
+                        r = watcher.recv() => {
+                             let _ = r.unwrap_or_else(|| {
+                                 eprintln!("error on watcher");
+                                 vec![]
+                            });
+                            log.info(format!("({}) Plan available, going to select anticipated choice.", task_id));
+                        }
+                    }
+                }
+
+                let planned = acting_manager.get_last_planned_refinement(&task_id).await;
+                let end = mod_refinement.clock_manager.now();
+                planning_interval = Some(Interval::new(start, Some(end)));
+                planned
+            } else {
+                None
+            }
+        }
+    };
+
+    let mut selected = if let Some(id) = planned_refinement {
+        let lv: LValue = acting_manager.get_refinement_lv(&id).await;
         log.debug(format!(
-            "({task_id}) Select found planned refinement: ({refinement}) {};",
+            "({task_id}) Select found planned refinement: ({id}) {};",
             lv,
         ));
         if candidates.contains(&lv) {
-            log.debug(format!(
-                "({task_id}) Valid planned refinement ({refinement}) {lv}"
-            ));
+            log.debug(format!("({task_id}) Valid planned refinement ({id}) {lv}"));
             //let args = acting_manager.get_process_args(&refinement).await;
             let args: Vec<_> = if let LValue::List(list) = lv {
                 list.iter().map(|v| v.as_cst().unwrap()).collect()
             } else {
                 panic!()
             };
-            acting_manager.set_process_args(&refinement, args).await;
-            Some(Selected::Anticipated(refinement))
+            acting_manager.set_process_args(&id, args).await;
+            Some(Selected::Anticipated(id))
         } else {
             log.warn(format!(
-                "({task_id}) Unvalid planned refinement ({refinement}) {lv}"
+                "({task_id}) Unvalid planned refinement ({id}) {lv}"
             ));
             None
         }
@@ -393,6 +435,7 @@ pub async fn select(
         selected: selected.unwrap(),
         candidates,
         interval: duration,
+        planning_interval,
     };
 
     // println!(

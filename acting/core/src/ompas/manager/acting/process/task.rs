@@ -143,6 +143,7 @@ pub struct RefinementTrace {
     pub selected: Selected,
     pub candidates: Vec<LValue>,
     pub interval: Interval,
+    pub planning_interval: Option<Interval>,
 }
 
 #[derive(Clone, Debug)]
@@ -155,7 +156,7 @@ impl Display for Selected {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Selected::Anticipated(a) => {
-                write!(f, "Anticipated({a})")
+                write!(f, "Anticipated({})", a)
             }
             Selected::Generated(m, algo) => {
                 write!(f, "Generated(method = {}, algo = {})", m, algo)

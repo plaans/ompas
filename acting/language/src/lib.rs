@@ -148,6 +148,9 @@ pub mod exec {
         pub const ASSERT: &str = "assert";
         pub const DOC_ASSERT: &str = "Insert a fact in the inner world.";
 
+        pub const ASSERT_STATIC: &str = "assert-static";
+        pub const DOC_ASSERT_STATIC: &str = "Insert a fact in the inner static world.";
+
         pub const ASSERT_SHORT: &str = "+>";
         pub const DOC_ASSERT_SHORT: &str = "Short version of assert.";
 

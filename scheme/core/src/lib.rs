@@ -884,6 +884,10 @@ pub async fn eval(
                             queue.push(StackFrame::new(CoreOperatorFrame::Eval, interruptibility));
                             queue
                                 .push(StackFrame::new(CoreOperatorFrame::Expand, interruptibility));
+                            debug.push(
+                                current.interruptibily,
+                                format!("({} {})", LPrimitive::Expand, lv),
+                            );
                             results.push(lv.clone());
                         } else {
                             scopes.new_scope();

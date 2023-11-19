@@ -6,6 +6,7 @@ use crate::ompas::manager::state::state_update_manager::{
     StateRule, StateUpdate, StateUpdateManager, StateUpdateSubscriber, SubscriberId,
 };
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
+use im::hashmap::Entry;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
@@ -281,6 +282,19 @@ impl StateManager {
             .await
             .insert(key.clone(), Fact::new(value, Some(date)));
         self.trigger_state_update(vec![key]).await;
+    }
+
+    pub async fn add_static(&self, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {
+        match self.inner_static.write().await.inner.entry(key.clone()) {
+            Entry::Occupied(_) => Err(LRuntimeError::new(
+                "",
+                format!("{} is already defined in the static state", key),
+            )),
+            Entry::Vacant(v) => {
+                v.insert(Fact::new(value, None));
+                Ok(())
+            }
+        }
     }
 
     pub async fn retract_fact(&self, key: LValueS, value: LValueS) -> Result<(), LRuntimeError> {

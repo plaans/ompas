@@ -11,7 +11,6 @@ use crate::model::sym_domain::basic_type::{TYPE_ID_INT, TYPE_INT};
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
-use crate::OMPAS_PRE_COMPUTE_MODELS;
 use ompas_language::exec::resource::{MAX_Q, MAX_QUANTITY, QUANTITY};
 use ompas_language::exec::state::INSTANCE;
 use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE};
@@ -53,12 +52,14 @@ impl OMPASDomain {
         env: &LEnv,
         state: WorldStateSnapshot,
         st: &RefSymTable,
+        pre_compute_models: bool,
     ) {
         add_domain_symbols(&st, &self);
         let mut amc = ActingModelCollection::default();
-        if OMPAS_PRE_COMPUTE_MODELS.get() {
+        if pre_compute_models {
             amc.pre_compute_acting_models(&self, env, state, st).await;
         }
+
         self.acting_model_collection = Some(amc)
     }
 

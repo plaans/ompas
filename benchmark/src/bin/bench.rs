@@ -1,11 +1,13 @@
+use chrono::Local;
 use colored::Colorize;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use ompas_benchmark::config::job_config::{
     ContinuousPlanningConfig, HeuristicConfig, JobConfig, SelectConfig,
 };
 use ompas_benchmark::config::BenchConfig;
 use ompas_benchmark::{install_binary, send_email, BenchmarkData, RunData};
 use ompas_core::OMPAS_PATH;
+use ompas_language::monitor::control::SET_PRE_COMPUTE_MODELS;
 use ompas_middleware::OMPAS_WORKING_DIR;
 use std::convert::TryInto;
 use std::fmt::Debug;
@@ -29,7 +31,7 @@ pub struct Opt {
 pub fn benchmark_working_dir() -> PathBuf {
     let path: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
     let mut path = path.canonicalize().unwrap();
-    path.push("benchmark");
+    path.push("benchmarks");
     fs::create_dir_all(&path).unwrap();
     path
 }
@@ -54,8 +56,20 @@ async fn main() {
     let config: BenchConfig = serde_yaml::from_str(&str).expect("Could not parse yaml config");
 
     let mut benchmark_data = BenchmarkData::default();
-    let bar = ProgressBar::new(0);
-    bar.set_style(
+    let multi = MultiProgress::new();
+    let job_bar = multi.add(ProgressBar::new(0));
+    job_bar.enable_steady_tick(Duration::from_secs(1));
+    let run_bar = multi.add(ProgressBar::new(0));
+    run_bar.enable_steady_tick(Duration::from_secs(1));
+
+    job_bar.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )
+        .unwrap()
+        .progress_chars("##-"),
+    );
+    run_bar.set_style(
         ProgressStyle::with_template(
             "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
         )
@@ -63,17 +77,21 @@ async fn main() {
         .progress_chars("##-"),
     );
 
-    bar.println("ompas-benchmark");
+    job_bar.println("ompas-benchmark");
     {
-        bar.println("Installing OMPAS binary...");
+        job_bar.println("Installing OMPAS binary...");
         let mut path: PathBuf = OMPAS_PATH.get_ref().into();
         path.push("acting");
         path.push("apps");
         install_binary("ompas".to_string(), path);
-        bar.println("OMPAS installed !");
+        job_bar.println("OMPAS installed !");
     }
 
-    bar.println(format!("{} jobs to benchmark.", config.jobs.len()));
+    job_bar.println(format!("{} jobs to benchmark.", config.jobs.len()));
+    job_bar.set_length(config.jobs.len() as u64);
+    let mut benchmark_path = benchmark_working_dir();
+    let date = Local::now();
+    benchmark_path.push(format!("benchmark_{}", date.format("%Y-%m-%d_%H-%M-%S")));
     'loop_job: for JobConfig {
         domain,
         problem_config,
@@ -83,7 +101,7 @@ async fn main() {
         n_run,
     } in &config.jobs
     {
-        let mut job_dir = benchmark_working_dir();
+        let mut job_dir = benchmark_path.clone();
         job_dir.push(&domain.label);
 
         let mut benchmark_log_dir = job_dir.clone();
@@ -92,41 +110,41 @@ async fn main() {
         let domain_path = match domain.domain_path.canonicalize() {
             Ok(p) => p,
             Err(e) => {
-                bar.println(format!("Error with domain_path of {}: {}", domain.label, e));
-                bar.println(format!("Skipping job {}", domain.label));
+                job_bar.println(format!("Error with domain_path of {}: {}", domain.label, e));
+                job_bar.println(format!("Skipping job {}", domain.label));
                 continue 'loop_job;
             }
         };
 
-        bar.println(format!("Benchmarking {} ", domain.label));
+        job_bar.println(format!("Benchmarking {} ", domain.label));
         if let Some(binary) = &domain.binary {
-            bar.println("Specific ompas binary to install...");
+            run_bar.println("Specific ompas binary to install...");
             install_binary(&binary.label, binary.path.clone());
-            bar.println("Binary installed !");
+            run_bar.println("Binary installed !");
         }
 
         // Getting all the problem files
         let problem_dir_path = match problem_config.problem_dir_path.canonicalize() {
             Ok(p) => p,
             Err(e) => {
-                bar.println(format!(
+                run_bar.println(format!(
                     "Error with problem_dir_path of {}: {}",
                     domain.label, e
                 ));
-                bar.println(format!("Skipping job {}", domain.label));
+                run_bar.println(format!("Skipping job {}", domain.label));
                 continue 'loop_job;
             }
         };
 
-        bar.println("Searching for problem files...");
+        run_bar.println("Searching for problem files...");
         let mut problems = get_all_problems_files(&problem_dir_path);
         if let Some(specific_problems) = &problem_config.specific_problems {
-            bar.println("Getting specific problems");
+            run_bar.println("Getting specific problems");
             let mut filtered = vec![];
             for problem in specific_problems {
                 match problems.iter().find(|p| &p.label == problem) {
                     Some(p) => filtered.push(p.clone()),
-                    None => bar.println(format!("Could not find problem {}", problem)),
+                    None => run_bar.println(format!("Could not find problem {}", problem)),
                 }
             }
             problems = filtered
@@ -135,14 +153,14 @@ async fn main() {
         if problems.is_empty() {
             continue 'loop_job;
         } else {
-            bar.println(format!("Found following problems for job {}", domain.label));
+            run_bar.println(format!("Found following problems for job {}", domain.label));
             for p in &problems {
-                bar.println(format!("- {}", p.path.display()));
+                run_bar.println(format!("- {}", p.path.display()));
             }
         }
 
         //Generate lisp code for all possible configs
-        bar.println("Generating files for heuristics...");
+        run_bar.println("Generating files for heuristics...");
         let mut configs: Vec<RunConfig> = vec![];
         let mut run_config_path = job_dir.clone();
         run_config_path.push("run_config");
@@ -167,13 +185,12 @@ async fn main() {
                 path: config_path,
             })
         }
-        bar.println("Done!");
+        run_bar.println("Done!");
 
         let n_problem = configs.len() * problems.len() * (*n_run as usize);
-        bar.println(format!("{} run to do...", n_problem));
-        bar.enable_steady_tick(Duration::from_micros(1));
-        bar.reset();
-        bar.set_length(n_problem.try_into().unwrap());
+        run_bar.println(format!("{} run to do...", n_problem));
+        run_bar.reset();
+        run_bar.set_length(n_problem.try_into().unwrap());
 
         let mut first = true;
         let mut i = 1;
@@ -203,7 +220,7 @@ async fn main() {
     {}
     (sleep {})
     (wait-end-all {})
-    (export-report {})
+    (export-report {}.yml)
     (stop)
     (exit 0))",
                     config_path,
@@ -229,7 +246,7 @@ async fn main() {
                     command.args(["-d", config_path]);
                     command.env("OMPAS_WORKING_DIR", job_dir.to_str().unwrap());
 
-                    bar.println(format!("command: {:?}", command));
+                    run_bar.println(format!("command: {:?}", command));
 
                     let mut benchmark_log_file = benchmark_log_dir.clone();
                     benchmark_log_file.push(format!("benchmark_{}.log", i));
@@ -243,7 +260,7 @@ async fn main() {
                         .stderr(unsafe { Stdio::from_raw_fd(f2.into_raw_fd()) });
 
                     if let Ok(mut c) = command.spawn() {
-                        bar.println(format!(
+                        run_bar.println(format!(
                             "[{} {}]: problem = {}, config = {}",
                             "run".bold().green(),
                             i,
@@ -253,7 +270,7 @@ async fn main() {
                         tokio::select! {
                             _ = tokio::time::sleep(Duration::from_secs((timeout+10) as u64)) => {
                                 let _ = c.kill().await;
-                                bar.println("command killed!")
+                                run_bar.println("command killed!")
                             }
                             _ = c.wait() => {
                                 //bar.println!("command ok!")
@@ -267,17 +284,23 @@ async fn main() {
                         duration: start.elapsed().unwrap(),
                     };
                     benchmark_data.runs.push(run);
-                    bar.inc(1);
+                    run_bar.inc(1);
                     i += 1;
                 }
             }
         }
+        job_bar.inc_length(1);
     }
 
-    bar.finish();
+    job_bar.finish();
+    run_bar.finish();
 
     if let Some(email) = &config.mail {
-        send_email(email, benchmark_data.format_data("ompas-bench".to_string()))
+        send_email(
+            email,
+            benchmark_data.format_data("ompas-bench".to_string()),
+            benchmark_path,
+        )
     }
 }
 
@@ -299,15 +322,25 @@ fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, Strin
             config_name.push_str("_satisfactory");
 
             format!(
-                "(set-planner-reactivity {})\n\t(start-with-planner false)",
-                r
+                "{}(set-planner-reactivity {})\n\t(start-with-planner false)",
+                if let Some(b) = heuristic.pre_compute_models {
+                    format!("\n\t({} {})", SET_PRE_COMPUTE_MODELS, b)
+                } else {
+                    "".to_string()
+                },
+                r,
             )
         }
         ContinuousPlanningConfig::Optimality(r) => {
             config_name.push_str("_optimality");
             format!(
-                "(set-planner-reactivity {})\n\t(start-with-planner true)",
-                r
+                "{}(set-planner-reactivity {})\n\t(start-with-planner true)",
+                if let Some(b) = heuristic.pre_compute_models {
+                    format!("\n\t({} {})", SET_PRE_COMPUTE_MODELS, b)
+                } else {
+                    "".to_string()
+                },
+                r,
             )
         }
     };

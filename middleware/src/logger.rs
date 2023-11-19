@@ -1,6 +1,6 @@
 use crate::{LogLevel, LOG_TOPIC_ROOT, MASTER, MASTER_LABEL, TOKIO_CHANNEL_SIZE, TOPIC_ALL_ID};
 use crate::{LOGS_DIR, OMPAS_WORKING_DIR};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use log::Level;
 use ompas_utils::other::get_and_update_id_counter;
 use std::collections::HashMap;
@@ -44,7 +44,7 @@ pub type LogTopicId = usize;
 pub struct Logger {
     collection: LogTopicCollection,
     #[allow(unused)]
-    absolute_start: DateTime<Utc>,
+    absolute_start: DateTime<Local>,
     system_start: SystemTime,
     logs_dir: PathBuf,
     max_log_level: Arc<RwLock<Level>>,
@@ -53,7 +53,7 @@ pub struct Logger {
 }
 
 impl Logger {
-    pub fn new(date: DateTime<Utc>, mut run_dir: PathBuf) -> (Self, mpsc::Sender<EndSignal>) {
+    pub fn new(date: DateTime<Local>, mut run_dir: PathBuf) -> (Self, mpsc::Sender<EndSignal>) {
         run_dir.push(LOGS_DIR);
 
         let (tx, rx) = mpsc::unbounded_channel();

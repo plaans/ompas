@@ -10,15 +10,20 @@ default-run = "bench"
 [dependencies]
 ompas-middleware = {path = "../middleware"}
 ompas-core= {path = "../acting/core"}
+ompas-language= {path = "../acting/language"}
 
 structopt = { workspace = true}
 serde_yaml = {workspace = true}
 serde = { workspace = true }
 tokio = {workspace = true }
+chrono = {workspace = true}
 
 lettre = "0.11.1"
+lettre_email = "0.9.4"
+mime = "0.3.17"
 indicatif = "0.17.7"
 colored = "2.0.4"
+zip_archive = "1.2.2"
 
 [[bin]]
 name = "bench"

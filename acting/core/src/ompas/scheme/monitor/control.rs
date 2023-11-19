@@ -302,12 +302,14 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
                 &plan_env,
                 acting_manager.state_manager.get_snapshot().await,
                 &acting_manager.st,
+                ctx.options.get_pre_compute_models().await,
             )
             .await;
         log.info(format!(
             "Pre generation of acting models took {:.3} ms",
             start.elapsed().unwrap().as_secs_f64() * 1000.0
         ));
+
         acting_manager
             .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
             .await;
@@ -871,7 +873,7 @@ pub async fn export_stats(env: &LEnv, args: &[LValue]) -> LResult {
 
     path.push(match file_name {
         Some(f) => f.to_string(),
-        None => format!("{}_{}.csv", OMPAS_STATS, Master::get_string_date()),
+        None => format!("{}_{}.{}", OMPAS_STATS, Master::get_string_date(), format),
     });
 
     let stat = ctx.acting_manager.get_run_stat().await;
@@ -936,13 +938,51 @@ pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
     run_dir.push("report");
     fs::create_dir_all(run_dir.clone()).unwrap();
 
+    let mut format = JSON_FORMAT;
     let mut file_name = None;
-    if args.len() == 1 {
-        let arg: String = (&args[0])
-            .try_into()
-            .map_err(|e: LRuntimeError| e.chain("Expected a file_name"))?;
-
-        file_name = Some(arg.replace("(", "").replace(")", "").replace(" ", "."));
+    match args.len() {
+        0 => {}
+        1 => {
+            let arg: String = (&args[0]).try_into().map_err(|e: LRuntimeError| {
+                e.chain("Expected either a format or a file name, e.g. \"stat.yml\"")
+            })?;
+            match arg.as_str() {
+                YAML_FORMAT => {
+                    format = YAML_FORMAT;
+                }
+                JSON_FORMAT => {
+                    format = JSON_FORMAT;
+                }
+                str => {
+                    if str.contains(YAML_FORMAT) {
+                        format = YAML_FORMAT;
+                        file_name = Some(
+                            arg.replace("(", "")
+                                .replace(")", "")
+                                .replace(" ", ".")
+                                .replace(&format!(".{}", YAML_FORMAT), ""),
+                        );
+                    } else if str.contains(JSON_FORMAT) {
+                        format = JSON_FORMAT;
+                        file_name = Some(
+                            arg.replace("(", "")
+                                .replace(")", "")
+                                .replace(" ", ".")
+                                .replace(&format!(".{}", JSON_FORMAT), ""),
+                        );
+                    } else {
+                        let name = arg.replace("(", "").replace(")", "").replace(" ", ".");
+                        file_name = Some(name);
+                    }
+                }
+            }
+        }
+        _ => {
+            return Err(LRuntimeError::new(
+                EXPORT_STATS,
+                format!("expected only one argument, got {}", LValue::from(args)),
+            ))
+        }
     }
 
     let state = acting_manager.state_manager.get_state(None).await;
@@ -989,11 +1029,12 @@ pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
 
     let mut stats_file_path = run_dir.clone();
     stats_file_path.push(format!(
-        "{}.json",
+        "{}.{}",
         match &file_name {
             Some(f) => f.as_str(),
             None => "stats",
-        }
+        },
+        format
     ));
     let mut stats_file = OpenOptions::new()
         .truncate(true)
@@ -1002,7 +1043,14 @@ pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
         .open(stats_file_path)
         .unwrap();
     stats_file
-        .write_all(serde_json::to_string(&stats).unwrap().as_bytes())
+        .write_all(
+            match format {
+                YAML_FORMAT => serde_yaml::to_string(&stats).unwrap(),
+                JSON_FORMAT => serde_json::to_string(&stats).unwrap(),
+                _ => unreachable!(),
+            }
+            .as_bytes(),
+        )
         .unwrap();
 
     Ok(())

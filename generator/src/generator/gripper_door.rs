@@ -117,22 +117,21 @@ impl Problem for GripperDoorProblem {
             .contains
             .push(Robby);
 
+        let mut possible_tasks = vec![];
+
         // Declaration of the balls
-        for i in 0..n_ball {
-            pb.graph
-                .node_weights_mut()
-                .choose(rg)
-                .unwrap()
-                .contains
-                .push(Ball(i));
+        for b in 0..n_ball {
+            let room = pb.graph.node_weights_mut().choose(rg).unwrap();
+            room.contains.push(Ball(b));
+            possible_tasks.push(Place(
+                b,
+                (0..n_room).filter(|i| i != &room.id).choose(rg).unwrap(),
+            ));
         }
 
-        let mut available: Vec<_> = (0..n_ball)
-            .map(|id| Place(id, (0..n_room).choose(rg).unwrap()))
-            .collect();
-        available.shuffle(rg);
-        let _ = available.split_off(n_task as usize);
-        pb.tasks = available;
+        possible_tasks.shuffle(rg);
+        let _ = possible_tasks.split_off(n_task as usize);
+        pb.tasks = possible_tasks;
         Ok(pb)
     }
 

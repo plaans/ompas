@@ -26,18 +26,18 @@
         (:pre-conditions (!= (pos ?o) ?r) (!= (pos ?o) robby))
         (:body
             (do
+                (define ?g (arbitrary (instances gripper)))
+                (define res_g (acquire ?g))
                 (define rh (acquire 'robby))
                 (define ?a (pos ?o))
                 (go2 ?a)
-                (define ?g (arbitrary (instances gripper)))
-                (define res_g (acquire ?g))
                 (pick ?o ?a ?g)
                 (release rh)
-                (define rh (acquire 'robby))
+                (define rh2 (acquire 'robby))
                 (go2 ?r)
                 (drop ?o ?r ?g)
-                (release rh)
-                (release ?g)
+                (release rh2)
+                (release res_g)
             )))
 
 

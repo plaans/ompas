@@ -161,6 +161,9 @@ impl ActingManager {
             )
             .unwrap();
     }
+    pub async fn is_planner_activated(&self) -> bool {
+        self.inner.read().await.is_planner_activated()
+    }
 }
 
 pub enum MethodModel {

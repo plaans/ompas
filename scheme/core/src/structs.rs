@@ -355,8 +355,8 @@ impl LDebug {
         ))
     }
 
-    pub fn pop(&mut self) {
-        self.inner.pop();
+    pub fn pop(&mut self) -> Option<String> {
+        self.inner.pop()
     }
 
     pub fn log_last_result(&mut self, results: &Results) {

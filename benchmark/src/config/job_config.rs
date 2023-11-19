@@ -43,6 +43,7 @@ pub struct ProblemConfig {
 pub struct HeuristicConfig {
     pub select: SelectConfig,
     pub continuous_planning: ContinuousPlanningConfig,
+    pub pre_compute_models: Option<bool>,
     pub specific_domain: Option<SpecificDomain>,
 }
 

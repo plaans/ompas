@@ -18,6 +18,20 @@ impl Timepoint {
     pub const MICROS_FACTOR: u64 = 1_000_000;
     pub const MILLIS_FACTOR: u64 = 1_000;
 
+    fn normalize(t1: &Self, t2: &Self) -> (Self, Self) {
+        let d = t1.denom.lcm(&t2.denom);
+        (
+            Self {
+                denom: d,
+                instant: t1.instant * ((d / t1.denom) as u128),
+            },
+            Self {
+                denom: d,
+                instant: t2.instant * ((d / t2.denom) as u128),
+            },
+        )
+    }
+
     pub fn as_secs(&self) -> f64 {
         self.instant as f64 / self.denom as f64
     }
@@ -63,19 +77,47 @@ impl Sub for Timepoint {
 
 impl PartialEq for Timepoint {
     fn eq(&self, other: &Self) -> bool {
-        let lcm = self.denom.lcm(&other.denom);
-
-        (self.instant * (lcm / self.denom) as u128) == other.instant * ((lcm / other.denom) as u128)
+        let (t1, t2) = Self::normalize(self, other);
+        t1.instant == t2.instant
     }
 }
 
+impl Eq for Timepoint {}
+
 impl PartialOrd for Timepoint {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let lcm = self.denom.lcm(&other.denom);
-        let a = self.instant * ((lcm / self.denom) as u128);
-        let b = other.instant * ((lcm / other.denom) as u128);
+        Some(self.cmp(other))
+    }
+}
 
-        a.partial_cmp(&b)
+impl Ord for Timepoint {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let (t1, t2) = Self::normalize(self, other);
+        t1.instant.cmp(&t2.instant)
+    }
+
+    fn max(self, other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        let (t1, t2) = Self::normalize(&self, &other);
+        if t1.instant > t2.instant {
+            self
+        } else {
+            other
+        }
+    }
+
+    fn min(self, other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        let (t1, t2) = Self::normalize(&self, &other);
+        if t1.instant < t2.instant {
+            self
+        } else {
+            other
+        }
     }
 }
 
@@ -159,7 +201,88 @@ pub enum Duration {
     Inf,
 }
 
+impl Eq for Duration {}
+
+impl PartialEq<Self> for Duration {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Duration::Inf, Duration::Inf) => true,
+            (Duration::Finite { num: n1, denom: d1 }, Duration::Finite { num: n2, denom: d2 }) => {
+                let d = d1.lcm(d2);
+                n1 * ((d / d1) as u128) == n2 * ((d / d2) as u128)
+            }
+            _ => false,
+        }
+    }
+}
+
+impl PartialOrd<Self> for Duration {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Duration {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::Inf, Self::Inf) => Ordering::Equal,
+            (Self::Inf, Self::Finite { .. }) => Ordering::Greater,
+            (Self::Finite { .. }, Self::Inf) => Ordering::Less,
+            (d1, d2) => {
+                let (Self::Finite { num: n1, .. }, Self::Finite { num: n2, .. }) =
+                    Self::normalize(d1, d2)
+                else {
+                    unreachable!()
+                };
+
+                n1.cmp(&n2)
+            }
+        }
+    }
+    fn max(self, other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        let (d1, d2) = Self::normalize(&self, &other);
+        if d1 > d2 {
+            self
+        } else {
+            other
+        }
+    }
+    fn min(self, other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        let (d1, d2) = Self::normalize(&self, &other);
+        if d1 < d2 {
+            self
+        } else {
+            other
+        }
+    }
+}
+
 impl Duration {
+    pub fn normalize(d1: &Self, d2: &Self) -> (Self, Self) {
+        match (d1, d2) {
+            (Self::Finite { num: n1, denom: d1 }, Self::Finite { num: n2, denom: d2 }) => {
+                let denom = d1.lcm(d2);
+                (
+                    Self::Finite {
+                        num: n1 * ((denom / d1) as u128),
+                        denom,
+                    },
+                    Self::Finite {
+                        num: n2 * ((denom / d2) as u128),
+                        denom,
+                    },
+                )
+            }
+            _ => (*d1, *d2),
+        }
+    }
+
     pub fn zero() -> Self {
         Self::Finite { num: 0, denom: 1 }
     }
@@ -180,6 +303,38 @@ impl Duration {
 
     pub fn is_finite(&self) -> bool {
         matches!(self, Self::Finite { .. })
+    }
+
+    pub fn min_of(durations: &[Duration]) -> Duration {
+        let mut min = Self::Inf;
+        for d in durations {
+            if d < &min {
+                min = *d
+            }
+        }
+        min
+    }
+
+    pub fn max_of(durations: &[Duration]) -> Duration {
+        let mut max = Self::zero();
+        for d in durations {
+            if d > &max {
+                max = *d
+            }
+        }
+        max
+    }
+
+    pub fn mean_of(durations: &[Duration]) -> Duration {
+        let mut duration = Self::total_of(durations);
+        if let Duration::Finite { num: _, denom } = &mut duration {
+            *denom *= durations.len() as u64
+        }
+        duration
+    }
+
+    pub fn total_of(durations: &[Duration]) -> Duration {
+        durations.iter().fold(Duration::zero(), |sum, d2| sum + *d2)
     }
 }
 

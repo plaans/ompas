@@ -2,7 +2,7 @@ use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_core::OMPAS_LOG;
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::FileDescriptor;
-use ompas_middleware::{LogLevel, Master};
+use ompas_middleware::Master;
 use sompas_modules::ModExtendedStd;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
 use std::fs;
@@ -48,8 +48,6 @@ async fn lisp_interpreter(opt: &Opt) {
     let mut li = LispInterpreter::new().await;
 
     let mut mod_extended_std = ModExtendedStd::default();
-
-    mod_extended_std.set_time_zone(2);
     //Insert the doc for the different contexts.
 
     //Add the sender of the channel.

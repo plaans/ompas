@@ -133,10 +133,10 @@ pub async fn __plan(
     goals: Vec<Goal>,
     events: Vec<Event>,
 ) -> Result<(), LRuntimeError> {
-    let acting_manager = env
-        .get_context::<ModControl>(MOD_CONTROL)?
-        .acting_manager
-        .clone();
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
+    let pre_compute_models = ctx.options.get_pre_compute_models().await;
+
+    let acting_manager = ctx.acting_manager.clone();
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let mut env: LEnv = ctx.get_plan_env().await;
     let state: WorldStateSnapshot = ctx.get_plan_state().await;
@@ -146,7 +146,7 @@ pub async fn __plan(
     let st = acting_manager.st.clone();
     acting_manager
         .domain_manager
-        .init_planning_domain(&env, state, &st)
+        .init_planning_domain(&env, state, &st, pre_compute_models)
         .await;
 
     let domain: OMPASDomain = acting_manager.domain_manager.get_inner().await;

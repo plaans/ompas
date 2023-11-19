@@ -18,7 +18,7 @@ use crate::ompas::manager::acting::interval::{Duration, Interval, Timepoint};
 use crate::ompas::manager::acting::process::acquire::AcquireProcess;
 use crate::ompas::manager::acting::process::arbitrary::ArbitraryProcess;
 use crate::ompas::manager::acting::process::command::CommandProcess;
-use crate::ompas::manager::acting::process::process_stat::ActingProcessStat;
+use crate::ompas::manager::acting::process::process_stat::{ActingProcessStat, TimeStat};
 use crate::ompas::manager::acting::process::refinement::RefinementProcess;
 use crate::ompas::manager::acting::process::root_task::RootProcess;
 use crate::ompas::manager::acting::process::task::{RefinementTrace, TaskProcess};
@@ -2108,6 +2108,7 @@ impl InnerActingManager {
             start: self.get_acting_var_val(&process.start).unwrap(),
             duration: self.get_execution_time(id),
             deliberation_time: self.get_deliberation_time(id),
+            planning_waiting_time: self.get_planning_time(id),
             n_refinement: self.get_number_refinement(id),
             n_failure: self.get_number_failures(id),
             n_retry: self.get_number_retry(id),
@@ -2124,9 +2125,9 @@ impl InnerActingManager {
         .duration()
     }
 
-    pub fn get_deliberation_time(&self, id: &ActingProcessId) -> Duration {
-        let mut total_duration = Duration::zero();
+    pub fn get_deliberation_time(&self, id: &ActingProcessId) -> TimeStat {
         let mut queue = vec![*id];
+        let mut durations: Vec<Duration> = vec![];
 
         while let Some(id) = queue.pop() {
             match &self.processes[id].inner {
@@ -2134,8 +2135,7 @@ impl InnerActingManager {
                 ActingProcessInner::Task(t) => {
                     for r in &t.refinements {
                         if let Some(trace) = &r.refinement_trace {
-                            let duration = trace.interval.duration();
-                            total_duration += duration;
+                            durations.push(trace.interval.duration())
                         }
                         if let Some(executed) = r.get_executed() {
                             queue.push(*executed)
@@ -2147,7 +2147,44 @@ impl InnerActingManager {
             }
         }
 
-        total_duration
+        TimeStat {
+            instance: durations.len(),
+            mean: Duration::mean_of(&durations),
+            min: Duration::min_of(&durations),
+            max: Duration::max_of(&durations),
+        }
+    }
+
+    pub fn get_planning_time(&self, id: &ActingProcessId) -> TimeStat {
+        let mut queue = vec![*id];
+        let mut durations: Vec<Duration> = vec![];
+
+        while let Some(id) = queue.pop() {
+            match &self.processes[id].inner {
+                ActingProcessInner::RootTask(_) => {}
+                ActingProcessInner::Task(t) => {
+                    for r in &t.refinements {
+                        if let Some(trace) = &r.refinement_trace {
+                            if let Some(interval) = &trace.planning_interval {
+                                durations.push(interval.duration())
+                            }
+                        }
+                        if let Some(executed) = r.get_executed() {
+                            queue.push(*executed)
+                        }
+                    }
+                }
+                ActingProcessInner::Method(m) => m.childs.values().for_each(|&id| queue.push(id)),
+                _ => {}
+            }
+        }
+
+        TimeStat {
+            instance: durations.len(),
+            mean: Duration::mean_of(&durations),
+            min: Duration::min_of(&durations),
+            max: Duration::max_of(&durations),
+        }
     }
 
     pub fn get_number_subprocesses(

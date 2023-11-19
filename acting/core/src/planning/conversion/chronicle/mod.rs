@@ -22,6 +22,7 @@ use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::conversion::ConvertParameters;
 use crate::{ResourceEncoding, OMPAS_RESOURCE_ENCODING};
 use function_name::named;
+use itertools::Itertools;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
 use ompas_language::sym_table::{COND, EPSILON};
 use sompas_structs::lenv::LEnv;
@@ -131,7 +132,11 @@ pub fn convert_graph(
         };
         let mut awaits = handle.awaits.clone();
         awaits.insert(t_drop);
-        let awaits: Vec<VarId> = awaits.drain().map(|v| ch.st.get_var_parent(v)).collect();
+        let awaits: Vec<VarId> = awaits
+            .drain()
+            .map(|v| ch.st.get_var_parent(v))
+            .unique()
+            .collect();
         let lit: Option<Lit> = match awaits.len() {
             0 => None,
             1 => Some(awaits.first().unwrap().into()),
@@ -161,7 +166,11 @@ pub fn convert_graph(
         };
         let mut releases = handle.releases.clone();
         releases.insert(t_drop);
-        let releases: Vec<VarId> = releases.drain().map(|v| ch.st.get_var_parent(v)).collect();
+        let releases: Vec<VarId> = releases
+            .drain()
+            .map(|v| ch.st.get_var_parent(v))
+            .unique()
+            .collect();
         let lit: Option<Lit> = match releases.len() {
             0 => None,
             1 => Some(releases.first().unwrap().into()),

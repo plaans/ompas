@@ -61,6 +61,7 @@ impl From<ModState> for LModule {
         let mut module = LModule::new(m, MOD_STATE, DOC_MOD_STATE);
         module.add_async_fn(ASSERT, assert, DOC_ASSERT, false);
         module.add_async_fn(ASSERT_SHORT, assert, DOC_ASSERT_SHORT, false);
+        module.add_async_fn(ASSERT_STATIC, assert_static, DOC_ASSERT_STATIC, false);
         module.add_async_fn(EFFECT, effect, DOC_EFFECT, false);
         module.add_async_fn(DURATIVE_EFFECT, durative_effect, DOC_DURATIVE_EFFECT, false);
         module.add_async_fn(RETRACT, retract, DOC_RETRACT, false);
@@ -108,6 +109,28 @@ async fn assert(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
         .add_value_with_date(key.try_into()?, value.try_into()?)
         .await;
     Ok(())
+}
+
+#[async_scheme_fn]
+async fn assert_static(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    if args.len() < 2 {
+        Err(LRuntimeError::wrong_number_of_args(
+            ASSERT,
+            args,
+            2..usize::MAX,
+        ))?
+    }
+    let state = env.get_context::<ModState>(MOD_STATE)?;
+    let key: LValue = if args.len() > 2 {
+        args[0..args.len() - 1].into()
+    } else {
+        args[0].clone()
+    };
+    let value = args.last().unwrap();
+    state
+        .state_manager
+        .add_static(key.try_into()?, value.try_into()?)
+        .await
 }
 
 #[async_scheme_fn]

@@ -17,7 +17,14 @@ pub struct PlanningInstanceStat {
     pub id: u64,
     pub duration: Duration,
     pub status: PlanningStatus,
-    pub seeking_optimal: bool,
+    pub n_solution: usize,
+    pub planner_mode: PlannerMode,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PlannerMode {
+    Satisfactory,
+    Optimality,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,5 +32,5 @@ pub enum PlanningStatus {
     Timeout,
     Interrupted,
     Unsat,
-    Sat(bool),
+    Sat,
 }

@@ -13,9 +13,18 @@ pub struct ActingProcessStat {
     pub status: ProcessStatus,
     pub start: Timepoint,
     pub duration: Duration,
-    pub deliberation_time: Duration,
+    pub deliberation_time: TimeStat,
+    pub planning_waiting_time: TimeStat,
     pub n_refinement: u32,
     pub n_failure: u32,
     pub n_retry: u32,
     pub number_subprocesses: HashMap<ActingProcessKind, u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeStat {
+    pub instance: usize,
+    pub mean: Duration,
+    pub min: Duration,
+    pub max: Duration,
 }

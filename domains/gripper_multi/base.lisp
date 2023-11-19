@@ -1,4 +1,16 @@
 (begin
+
+    (def-init
+        (do
+            (mapf (lambda (?r)
+                    (new-resource ?r)
+                    (mapf (lambda (?g)
+                        (define g (concatenate ?r "_" ?g))
+                        (new-resource g)
+                        (assert-static 'gripper_of ?r ?g g))
+                    (instances gripper)))
+                (instances robot))))
+
     (define gripper-multi-path
         (concatenate (get-env-var "OMPAS_PATH") "/domains/gripper_multi"))
     (set-current-dir gripper-multi-path)
@@ -20,7 +32,7 @@
             (connects ?from ?d ?to)
             (opened ?d))
         (:effects
-            (durative 1 'at-rob ?r ?to)))
+            (durative 5 'at-rob ?r ?to)))
 
     (def-command pick (:params (?ro robot) (?o carriable) (?r room) (?g gripper)))
     (def-command-pddl-model pick
@@ -30,7 +42,7 @@
         (= (at-rob ?ro) ?r)
         (= (carry ?ro ?g) empty))
       (:effects
-            ('carry ?ro ?g ?o)
+            (durative 5 'carry ?ro ?g ?o)
             ('pos ?o ?ro)))
 
     (def-command drop (:params (?ro robot) (?o carriable) (?r room) (?g gripper)))
@@ -40,7 +52,7 @@
         (= (carry ?ro ?g) ?o)
         (= (at-rob ?ro) ?r))
      (:effects
-        ('carry ?ro ?g empty)
+        (durative 5 'carry ?ro ?g empty)
         ('pos ?o ?r)))
 
 

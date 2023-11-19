@@ -23,7 +23,7 @@
             (connects ?from ?d ?to)
             (opened ?d))
         (:effects
-            ('at-robby ?to)
+            (durative 5 'at-robby ?to)
         ))
 
     (def-lambda is_door_of (lambda (?d ?r)

@@ -38,8 +38,8 @@
                 (check_pos (torso_of ?t))
                 (define new_pos
                     (lambda (?o) (effect 'pos ?o 'ether)))
+                (durative-effect 5 'pos ?t r_pos)
                 (effect 'built ?t true)
-                (effect 'pos ?t r_pos)
                 (new_pos (right_arm_of ?t))
                 (new_pos (left_arm_of ?t))
                 (new_pos (right_leg_of ?t))
@@ -58,7 +58,7 @@
                     (define new_pos
                         (lambda (?o) (effect 'pos ?o r_pos)))
                     (effect 'built ?t false)
-                    (effect 'pos ?t 'ether)
+                    (durative-effect 5 'pos ?t 'ether)
                     (new_pos (right_arm_of ?t))
                     (new_pos (left_arm_of ?t))
                     (new_pos (right_leg_of ?t))

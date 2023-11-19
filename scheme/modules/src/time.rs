@@ -1,4 +1,4 @@
-use chrono::{Datelike, Timelike, Utc};
+use chrono::{Datelike, Local, Timelike};
 use futures::FutureExt;
 use im::HashMap;
 use sompas_language::time::*;
@@ -12,21 +12,18 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
-use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 pub struct ModTime {
     start: Arc<RwLock<Instant>>,
-    diff: Arc<AtomicI64>,
 }
 
 impl ModTime {
-    pub fn new(time_zone: i64) -> Self {
+    pub fn new() -> Self {
         Self {
             start: Arc::new(RwLock::new(Instant::now())),
-            diff: Arc::new(AtomicI64::new(time_zone)),
         }
     }
 
@@ -95,10 +92,8 @@ const YEAR: &str = "year";
 
 ///Return the absolute time in function of the defined timezone.
 #[async_scheme_fn]
-pub async fn time(env: &LEnv) -> LResult {
-    let ctx = env.get_context::<ModTime>(MOD_TIME)?;
-    let diff = ctx.diff.load(Ordering::Relaxed);
-    let time = Utc::now() + chrono::Duration::hours(diff);
+pub async fn time() -> LResult {
+    let time = Local::now();
     let mut map: HashMap<LValue, LValue> = Default::default();
     map.insert(SECOND.into(), time.second().into());
     map.insert(MINUTE.into(), time.minute().into());

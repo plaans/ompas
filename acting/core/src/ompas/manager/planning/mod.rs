@@ -18,7 +18,7 @@ use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::plan_update::*;
 use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
 use crate::ompas::manager::planning::planner_stat::{
-    PlannerStat, PlanningInstanceStat, PlanningStatus,
+    PlannerMode, PlannerStat, PlanningInstanceStat, PlanningStatus,
 };
 use crate::ompas::manager::planning::problem_update::{ExecutionProblem, PlannerUpdate, VarUpdate};
 use crate::ompas::manager::resource::{ResourceManager, WaiterPriority};
@@ -392,7 +392,12 @@ impl PlannerInstance {
             id: config.id,
             duration: OMPASDuration::zero(),
             status: PlanningStatus::Unsat,
-            seeking_optimal: false,
+            n_solution: 0,
+            planner_mode: if config.config.opt.is_some() {
+                PlannerMode::Optimality
+            } else {
+                PlannerMode::Satisfactory
+            },
         };
 
         let PlannerInstanceConfig {
@@ -422,7 +427,8 @@ impl PlannerInstance {
             let update = if let Ok(solver_result) = result {
                 match solver_result {
                     SolverResult::Sol(pr) => {
-                        stat.status = PlanningStatus::Sat(stat.seeking_optimal);
+                        stat.status = PlanningStatus::Sat;
+                        stat.n_solution += 1;
 
                         let choices = extract_choices(&pr);
                         let PlanResult { pp, .. } = &pr;

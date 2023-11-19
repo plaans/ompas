@@ -52,10 +52,13 @@ impl InstanceSet {
 
 impl InstanceCollection {
     pub fn new(st: RefSymTable) -> Self {
-        Self {
-            st,
-            inner: Default::default(),
-        }
+        let mut inner: HashMap<_, _> = Default::default();
+        inner.insert(
+            TYPE_OBJECT.to_string(),
+            InstanceSet::new(Self::format_unk_type(TYPE_OBJECT)),
+        );
+
+        Self { st, inner }
     }
 
     pub fn clear(&mut self) {

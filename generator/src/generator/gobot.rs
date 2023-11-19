@@ -443,8 +443,7 @@ impl Problem for GobotProblem {
          --path gobot-sim-path
         --scenario {}
         --robot_controller {}
-        --time_scale {})
-    (exec-task t_jobshop))",
+        --time_scale {}))",
             match &scenario.path {
                 None => "(concatenate gobot-sim-path \"/scenarios/new_scenario_multirobots.json\")"
                     .to_string(),

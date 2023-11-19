@@ -1,12 +1,16 @@
-pub mod config;
-
 use crate::config::mail_config::MailConfig;
+use lettre::message::header::ContentType;
+use lettre::message::{Attachment, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 use std::fmt::Display;
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
+use zip_archive::Archiver;
+
+pub mod config;
 
 #[derive(Default)]
 pub struct BenchmarkData {
@@ -50,14 +54,54 @@ pub struct RunData {
     pub duration: Duration,
 }
 
-pub fn send_email(config: &MailConfig, message: String) {
+pub fn send_email(config: &MailConfig, message: String, benchmark_path: PathBuf) {
     println!("sending email");
 
-    let email = Message::builder()
+    let mut archiver = Archiver::new();
+    let benchmark_label = benchmark_path
+        .iter()
+        .last()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    archiver.push(benchmark_path);
+    let mut dest: PathBuf = "/tmp".into();
+    archiver.set_destination(dest.clone());
+    dest.push(format!("{}.zip", benchmark_label));
+
+    let num_thread = std::thread::available_parallelism().unwrap().get();
+    archiver.set_thread_count(num_thread as u32);
+
+    match archiver.archive() {
+        Ok(_) => (),
+        Err(e) => println!("Cannot archive the directory! {}", e),
+    };
+
+    // let email: Email = Email::builder()
+    //     .from(config.from.parse().unwrap())
+    //     .to(config.to.parse().unwrap())
+    //     .subject("Ompas Benchmark")
+    //     .body(message)
+    //      .attachment_from_file(&dest, None, )
+    //     .unwrap()
+    //     .build()
+    //     .unwrap();
+
+    let attachement = Attachment::new(benchmark_label).body(
+        fs::read(dest).unwrap(),
+        ContentType::parse("application/zip").unwrap(),
+    );
+
+    let message: Message = Message::builder()
         .from(config.from.parse().unwrap())
         .to(config.to.parse().unwrap())
         .subject("Ompas Benchmark")
-        .body(message)
+        .multipart(
+            MultiPart::mixed()
+                .singlepart(attachement)
+                .singlepart(SinglePart::plain(message)),
+        )
         .unwrap();
 
     let creds = Credentials::new(config.from.to_string(), config.password.to_string());
@@ -69,7 +113,7 @@ pub fn send_email(config: &MailConfig, message: String) {
         .build();
 
     // Send the email
-    match mailer.send(&email) {
+    match mailer.send(&message) {
         Ok(_) => println!("Email sent successfully!"),
         Err(e) => panic!("Could not send email: {:?}", e),
     }

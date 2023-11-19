@@ -1,8 +1,8 @@
 (begin
 
-    (def-init 
-        (begin
-            (mapf (lambda (?r) (new-resource ?r)) (instances robot))))
+
+
+    (def-function gripper_of (:params (?r robot) (?g gripper)) (:result object))
 
     (def-task go2 (:params (?ro robot) (?r room)))
     (def-method go2_noop
@@ -48,18 +48,21 @@
 
     (def-method pick_and_drop
         (:task place)
-        (:params (?o carriable) (?r room) (?ro robot) (?g gripper))
+        (:params (?o carriable) (?r room))
         (:pre-conditions
             (!= (pos ?o) ?r)
-            (instance (pos ?o) room)
-            (= (carry ?ro ?g) empty)
-            )
+            (instance (pos ?o) room))
         (:body
             (do
+                (define ?ro (arbitrary (instances robot)))
+                (define ?g (arbitrary (instances gripper)))
+                (define rg (acquire (gripper_of ?ro ?g)))
                 (define rh (acquire ?ro))
                 (define ?a (pos ?o))
                 (go2 ?ro ?a)
                 (pick ?ro ?o ?a ?g)
+                (release rh)
+                (define rh (acquire ?ro))
                 (go2 ?ro ?r)
                 (drop ?ro ?o ?r ?g))))
 

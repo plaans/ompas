@@ -26,11 +26,12 @@ impl DomainManager {
         env: &LEnv,
         state: WorldStateSnapshot,
         st: &RefSymTable,
+        pre_compute_models: bool,
     ) {
         self.acting_domain
             .write()
             .await
-            .init_acting_model_collection(env, state, st)
+            .init_acting_model_collection(env, state, st, pre_compute_models)
             .await;
     }
 }

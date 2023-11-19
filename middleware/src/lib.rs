@@ -3,7 +3,7 @@ extern crate core;
 use crate::logger::{
     EndSignal, FileDescriptor, LogClient, LogMessage, LogTopicId, Logger, END_SIGNAL,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local};
 use env_param::EnvParam;
 use lazy_static::lazy_static;
 use log::Level;
@@ -49,7 +49,7 @@ pub struct Master {
     next_process_id: Arc<AtomicUsize>,
     end_receiver: Arc<broadcast::Receiver<EndSignal>>,
     logger: Logger,
-    date: DateTime<Utc>,
+    date: DateTime<Local>,
     run_dir: PathBuf,
 }
 
@@ -84,7 +84,7 @@ impl Master {
         let (tx, rx) = mpsc::unbounded_channel();
         let (tx_death, rx_death) = mpsc::unbounded_channel();
         let (tx_end, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
-        let date = Utc::now() + chrono::Duration::hours(2);
+        let date = Local::now();
 
         let mut run_dir: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
         run_dir.push(RUNS_DIR);
@@ -381,12 +381,6 @@ impl Master {
         );
 
         self.subscribe_to_topic(id, process_topic.to_string()).await;
-        /*let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
-        log.debug(format!(
-            "Creating process {} of topic {}",
-            label, process_topic
-        ))
-        .await;*/
         ProcessInterface {
             label: label.to_string(),
             id,

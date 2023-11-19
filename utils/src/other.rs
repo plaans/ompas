@@ -1,7 +1,6 @@
 use async_recursion::async_recursion;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::select;
 
 pub fn get_and_update_id_counter(aau: Arc<AtomicUsize>) -> usize {
     loop {
@@ -33,7 +32,7 @@ pub async fn generic_race<T: std::marker::Send, F: std::marker::Send>(
             let branch_a = generic_race(vec, f);
             let branch_b = generic_race(vec_b, f);
             let r;
-            select! {
+            tokio::select! {
                 a = branch_a => {
                     r=a;
                 },

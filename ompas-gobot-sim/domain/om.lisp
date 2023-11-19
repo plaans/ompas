@@ -45,6 +45,9 @@
                         (place ?r)))))
 
     (def-task t_check_battery (:params (?r robot)))
+    (def-task-om-model t_check_battery
+            (:params (?r robot))
+            (:body nil))
     (def-method m_check_battery
          (:task t_check_battery)
           (:params (?r robot))
@@ -53,11 +56,20 @@
           (:body
                  (do
                      (wait-for `(< (robot.battery ,?r) 0.4))
-                     (define h (acquire ?r '(:priority 1000)))
-                     (go_charge ?r)
-                     (wait-for `(> (robot.battery ,?r) 0.9))
-                     (release h)
+                     (charge_robot ?r)
                      (t_check_battery ?r))))
+
+    (def-task charge_robot (:params (?r robot)))
+    (def-method m_charge_robot
+        (:task charge_robot)
+        (:params (?r robot))
+        (:body
+            (do
+                (define h (acquire ?r '(:priority 1000)))
+                (go_charge ?r)
+                (wait-for `(> (robot.battery ,?r) 0.9))
+                (release h)
+            )))
 
     (def-task t_check_rob_bat)
     (def-task-om-model t_check_rob_bat
@@ -85,6 +97,7 @@
         (:score 0)
         (:body
             (do
+
                 (define list_packages (instances package))
                 (define list-h (mapf (lambda (?p) (async (t_process_package ?p))) list_packages))
                 (mapf await list-h)
@@ -129,19 +142,31 @@
                 (process ?m ?p)
                 (wait-for `(!= (package.location ,?p) ,?m)))))
 
+    (def-event on_new_package
+        (:params (?p package))
+        (:trigger (once))
+        (:body
+            (do
+                (wait-for `(instance  (package.location ,?p) belt))
+                (t_process_package ?p))))
+
+    (def-event on_battery_low
+        (:params (?r robot))
+        (:trigger (whenever (< (robot.battery ?r) 0.4)))
+        (:body (charge_robot ?r)))
 
 
-   (def-task t_jobshop)
-   (def-method m1
-      (:task t_jobshop)
-      (:score 0)
-      (:body
-          (do
-              (define f2 (async (t_check_rob_bat)))
-               (define tasks
-                  (mapf (lambda (?p)
-                        `(t_process_package ,?p))
-                      (instances package)))
-              (define h (apply par tasks))
-              )))
+;    (def-task t_jobshop)
+;    (def-method m1
+;       (:task t_jobshop)
+;       (:score 0)
+;       (:body
+;           (do
+;               (define f2 (async (t_check_rob_bat)))
+;                (define tasks
+;                   (mapf (lambda (?p)
+;                         `(t_process_package ,?p))
+;                       (instances package)))
+;               (define h (apply par tasks))
+;               )))
 )

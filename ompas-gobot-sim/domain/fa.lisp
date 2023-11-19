@@ -20,10 +20,10 @@
         (:params (?p package))
         (:body
             (do
-                 (define h_r (acquire-in-list (instances robot)))
-                 (define ?r (first h_r))
-                 (define om (find_output_machine))
-                 (t_carry_to_machine ?r ?p om)
-                 (release (second h_r)))))
+                (define h_r (acquire-in-list (instances robot)))
+                (define ?r (first h_r))
+                (define om (find_output_machine))
+                (t_carry_to_machine ?r ?p om)
+                (release (second h_r)))))
 
 )

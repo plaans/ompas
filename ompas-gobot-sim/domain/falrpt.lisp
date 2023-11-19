@@ -22,9 +22,7 @@
                 (define ?r (first h_r))
                 (t_carry_to_machine ?r ?p ?m)
                 (release (second h_r))
-                (t_process ?m ?p ?d)
-                (wait-for `(!= (package.location ,?p) ,?m))
-                )))
+                (t_process ?m ?p ?d))))
 
         (def-task t_output_package (:params (?p package)))
         (def-method m_output_package
@@ -32,9 +30,9 @@
             (:params (?p package))
             (:body
                 (do
-                     (define h_r (acquire-in-list (instances robot)))
-                     (define ?r (first h_r))
-                     (define om (find_output_machine))
-                     (t_carry_to_machine ?r ?p om)
-                     (release (second h_r)))))
+                    (define h_r (acquire-in-list (instances robot)))
+                    (define ?r (first h_r))
+                    (define om (find_output_machine))
+                    (t_carry_to_machine ?r ?p om)
+                    (release (second h_r)))))
 )

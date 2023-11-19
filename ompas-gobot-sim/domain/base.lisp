@@ -1,6 +1,6 @@
 (begin
 
-    (def-init (sleep 1))
+    ;(def-init (sleep 1))
     ;types declaration
     ;(def-types machine robot package belt (parking_area interact_area area) tile)
     (def-types machine package (robot parking_area belt location) interact_area)

@@ -8,7 +8,7 @@
         (:pre-conditions true)
         (:score 0)
         (:body
-            (begin
+            (do
                 (define ?r (arbitrary (instances robot) rand-element))
                 (define h1 (acquire ?m))
                 (define h2 (acquire ?r))
@@ -22,9 +22,11 @@
         (:params (?p package))
         (:body
             (do
-                 (define ?r (arbitrary (instances robot)))
-                 (define h_r (acquire ?r))
-                 (define om (find_output_machine))
-                 (t_carry_to_machine ?r ?p om)
-                 (release h_r))))
+                (define ?r (arbitrary (instances robot)))
+                (define h_r (acquire ?r))
+                (define om (find_output_machine))
+                (t_carry_to_machine ?r ?p om)
+                (release h_r))))
+
+
 )

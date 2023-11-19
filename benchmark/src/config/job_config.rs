@@ -7,6 +7,7 @@ pub struct JobConfig {
     pub problem_config: ProblemConfig,
     pub heuristics: Vec<HeuristicConfig>,
     pub timeout: u32,
+    pub min_time: Option<u32>,
     pub n_run: u32,
 }
 

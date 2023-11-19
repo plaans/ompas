@@ -79,6 +79,7 @@ async fn main() {
         problem_config,
         heuristics,
         timeout,
+        min_time,
         n_run,
     } in &config.jobs
     {
@@ -200,11 +201,17 @@ async fn main() {
     (read \"{}\")
     (read \"{}\")
     {}
+    (sleep {})
     (wait-end-all {})
     (export-report {})
     (stop)
     (exit 0))",
-                    config_path, problem_path, config.start, timeout, problem_config_name,
+                    config_path,
+                    problem_path,
+                    config.start,
+                    min_time.unwrap_or(0),
+                    timeout - min_time.unwrap_or(0),
+                    problem_config_name,
                 );
                 file.write_all(content.as_bytes()).unwrap();
 

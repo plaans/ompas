@@ -1,0 +1,1 @@
+cargo run --release --bin statos -- -c config.yml

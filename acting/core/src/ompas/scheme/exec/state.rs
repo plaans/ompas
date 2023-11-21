@@ -3,9 +3,11 @@ use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::event::EventManager;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::manager::state::{StateManager, StateType};
+use crate::ompas::scheme::exec::mode::RAEMode;
 use crate::ompas::scheme::exec::resource::resources;
 use crate::ompas::scheme::exec::ModExec;
 use futures::FutureExt;
+use ompas_language::exec::mode::CTX_RAE_MODE;
 use ompas_language::exec::resource::LOCKED;
 use ompas_language::exec::state::*;
 use sompas_core::eval;
@@ -177,23 +179,26 @@ async fn durative_effect(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErro
         (args[1].clone().try_into()?, args[1].to_string())
     };
 
-    let intermediate_result = match state.domain.get_state_function(&first).await {
-        Some(sf) => LValueS::from(
-            state
-                .state_manager
-                .get_unk_of_type(sf.result_debug.as_str())
-                .await,
-        ),
-        None => LValueS::from(UNKNOWN),
-    };
-
+    let mode = *env.get_context::<RAEMode>(CTX_RAE_MODE)?;
     let value: LValueS = args.last().unwrap().try_into()?;
 
-    state
-        .state_manager
-        .add_value_with_date(key.clone(), intermediate_result)
-        .await;
-    tokio::time::sleep(Duration::from_micros((duration * 1_000_000.0) as u64)).await;
+    if mode == RAEMode::Exec {
+        let intermediate_result = match state.domain.get_state_function(&first).await {
+            Some(sf) => LValueS::from(
+                state
+                    .state_manager
+                    .get_unk_of_type(sf.result_debug.as_str())
+                    .await,
+            ),
+            None => LValueS::from(UNKNOWN),
+        };
+
+        state
+            .state_manager
+            .add_value_with_date(key.clone(), intermediate_result)
+            .await;
+        tokio::time::sleep(Duration::from_micros((duration * 1_000_000.0) as u64)).await;
+    }
     state.state_manager.add_value_with_date(key, value).await;
     Ok(())
 }

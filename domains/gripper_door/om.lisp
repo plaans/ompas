@@ -50,8 +50,6 @@
         (:body
             (do
                 (define ?g (arbitrary (instances gripper)))
-                (define rhg (acquire ?g))
-                (define rhr (acquire 'robby))
                 (define ?o (carry ?g))
                 (drop ?o ?r ?g)
                 (open ?d ?r ?g)

@@ -1,4 +1,5 @@
 use ompas_core::ompas::interface::stat::OMPASRunStat;
+use ompas_language::output::{JSON_FORMAT, YAML_FORMAT};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fs;
@@ -7,8 +8,13 @@ use std::time::SystemTime;
 
 pub mod config;
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct FileName {
+    inner: Vec<String>,
+}
+
 pub struct OMPASStatCollection {
-    inner: HashMap<String, Vec<OMPASRunStat>>,
+    inner: HashMap<FileName, Vec<OMPASRunStat>>,
 }
 
 impl OMPASStatCollection {
@@ -18,54 +24,68 @@ impl OMPASStatCollection {
             inner: Default::default(),
         };
 
-        let json_files = Self::get_all_json_files_in_dir(path);
-
+        let json_files = Self::get_all_files_in_dir(path, JSON_FORMAT);
         println!("Found {} json files...", json_files.len());
 
-        let mut n_files = 0;
+        let yaml_files = Self::get_all_files_in_dir(path, YAML_FORMAT);
+        println!("Found {} yaml files...", yaml_files.len());
 
-        'loop_file: for file in json_files {
-            let name = file.file_name().unwrap().to_str().unwrap().to_string();
+        for file in json_files {
+            collection.read_file(&file, JSON_FORMAT)
+        }
 
-            let content = match fs::read_to_string(&file) {
-                Ok(s) => s,
-                Err(e) => {
-                    println!(
-                        "WARNING! Could not read content of file {}: {}",
-                        file.display(),
-                        e
-                    );
-                    continue 'loop_file;
-                }
-            };
-            let stat: OMPASRunStat = match serde_json::from_str(&content) {
-                Ok(s) => s,
-                Err(e) => {
-                    println!(
-                        "WARNING! Could not extract state from file {}: {}",
-                        file.display(),
-                        e
-                    );
-                    continue 'loop_file;
-                }
-            };
-
-            //println!("Adding state of file {}", file.display());
-            n_files += 1;
-            collection.add_stat(name, stat);
+        for file in yaml_files {
+            collection.read_file(&file, YAML_FORMAT)
         }
 
         println!(
             "Loaded {} stat file in {:.3} ms",
-            n_files,
+            collection.get_number_of_stat(),
             now.elapsed().unwrap().as_secs_f64() * 1000.0
         );
 
         collection
     }
 
-    fn get_all_json_files_in_dir(path: &Path) -> Vec<PathBuf> {
-        let mut json_files = vec![];
+    fn read_file(&mut self, file: &Path, format: &str) {
+        let file_name = FileName {
+            inner: file
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .split("_")
+                .map(|s| s.to_string())
+                .collect(),
+        };
+        let content = match fs::read_to_string(&file) {
+            Ok(s) => s,
+            Err(_) => {
+                return;
+            }
+        };
+        let stat: OMPASRunStat = match format {
+            YAML_FORMAT => match serde_yaml::from_str(&content) {
+                Ok(s) => s,
+                Err(_) => {
+                    return;
+                }
+            },
+            JSON_FORMAT => match serde_json::from_str(&content) {
+                Ok(s) => s,
+                Err(_) => {
+                    return;
+                }
+            },
+            _ => unreachable!(),
+        };
+
+        println!("Adding stat of file {}", file.display());
+        self.add_stat(file_name, stat);
+    }
+
+    fn get_all_files_in_dir(path: &Path, pat: &str) -> Vec<PathBuf> {
+        let mut files = vec![];
 
         let mut queue = vec![path.to_path_buf()];
 
@@ -80,17 +100,17 @@ impl OMPASStatCollection {
                 let str = path.display().to_string();
                 if path.is_dir() {
                     queue.push(path);
-                } else if str.contains(".json") && path.is_file() {
-                    json_files.push(path);
+                } else if str.contains(pat) && path.is_file() {
+                    files.push(path);
                 }
             }
         }
 
-        json_files
+        files
     }
 
-    pub fn add_stat(&mut self, name: String, stat: OMPASRunStat) {
-        let entry = self.inner.entry(name);
+    pub fn add_stat(&mut self, file_name: FileName, stat: OMPASRunStat) {
+        let entry = self.inner.entry(file_name);
         match entry {
             Entry::Occupied(o) => {
                 o.into_mut().push(stat);
@@ -99,5 +119,9 @@ impl OMPASStatCollection {
                 v.insert(vec![stat]);
             }
         }
+    }
+
+    pub fn get_number_of_stat(&self) -> usize {
+        self.inner.iter().fold(0, |d, (_, vec)| d + vec.len())
     }
 }

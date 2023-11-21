@@ -7,11 +7,11 @@ use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
 use crate::ompas::manager::platform::PlatformManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
-use crate::ompas::scheme::exec::mode::{CtxMode, RAEMode};
+use crate::ompas::scheme::exec::mode::RAEMode;
 use crate::ompas::scheme::exec::ModExec;
 use futures::FutureExt;
 use ompas_language::exec::acting_context::*;
-use ompas_language::exec::mode::CTX_MODE;
+use ompas_language::exec::mode::CTX_RAE_MODE;
 use ompas_language::exec::platform::*;
 use ompas_middleware::logger::LogClient;
 use sompas_macros::{async_scheme_fn, scheme_fn};
@@ -133,7 +133,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
             LValue::from(command_slice)
         ));
 
-        let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
+        let mode = env.get_context::<RAEMode>(CTX_RAE_MODE)?;
 
         match mode {
             RAEMode::Exec => {
@@ -227,7 +227,7 @@ pub async fn exec_command(env: &LEnv, command: &[LValue]) -> LAsyncHandle {
 #[async_scheme_fn]
 pub async fn cancel_command(env: &LEnv, command_id: usize) -> LResult {
     let mod_platform = env.get_context::<ModPlatform>(MOD_PLATFORM)?;
-    let mode = env.get_context::<CtxMode>(CTX_MODE)?.mode;
+    let mode = env.get_context::<RAEMode>(CTX_RAE_MODE)?;
     match mode {
         RAEMode::Exec => {
             mod_platform.platform.cancel_command(command_id).await;

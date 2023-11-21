@@ -88,7 +88,6 @@
             (is_door_of ?d ?r))
         (:body
             (do
-                ;(define rh (acquire ?ro))
                 (go2 ?ro ?r)
                 (open ?ro ?d ?r ?g))))
 

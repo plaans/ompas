@@ -246,7 +246,7 @@ async fn main() {
                     command.args(["-d", config_path]);
                     command.env("OMPAS_WORKING_DIR", job_dir.to_str().unwrap());
 
-                    run_bar.println(format!("command: {:?}", command));
+                    //run_bar.println(format!("command: {:?}", command));
 
                     let mut benchmark_log_file = benchmark_log_dir.clone();
                     benchmark_log_file.push(format!("benchmark_{}.log", i));
@@ -261,11 +261,11 @@ async fn main() {
 
                     if let Ok(mut c) = command.spawn() {
                         run_bar.println(format!(
-                            "[{} {}]: problem = {}, config = {}",
+                            "[{} {}]: ", //problem = {}, config = {}",
                             "run".bold().green(),
                             i,
-                            problem_path,
-                            config_path,
+                            //problem_path,
+                            //config_path,
                         ));
                         tokio::select! {
                             _ = tokio::time::sleep(Duration::from_secs((timeout+10) as u64)) => {

@@ -26,5 +26,5 @@ pub fn main() {
 
     println!("config: {:?}", config);
 
-    let _ = OMPASStatCollection::new(&config.file_path);
+    let _ = OMPASStatCollection::new(&config.dir);
 }

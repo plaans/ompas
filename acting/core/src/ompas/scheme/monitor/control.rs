@@ -5,7 +5,7 @@ use crate::ompas::interface::trigger_collection::{JobCollection, JobHandle, Pend
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::{ActingManager, MAX_REACTIVITY};
-use crate::ompas::manager::event::run_event_manager;
+use crate::ompas::manager::event::{run_event_checker, run_fluent_checker};
 use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::platform_config::PlatformConfig;
 use crate::ompas::manager::platform::PlatformManager;
@@ -255,13 +255,30 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
         .state_manager
         .new_subscriber(StateRule::All)
         .await;
-    let env_clone = env.clone();
-    let monitors = acting_manager.event_manager.clone();
-    let events = acting_manager.domain_manager.get_events().await;
+    let event_manager = acting_manager.event_manager.clone();
+
     *ctx.task_stream.write().await = Some(tx.clone());
 
+    tokio::spawn(
+        async move { run_fluent_checker(receiver_event_update_state, event_manager).await },
+    );
+
+    let event_manager = acting_manager.event_manager.clone();
+    let receiver_event_update_state = acting_manager
+        .state_manager
+        .new_subscriber(StateRule::All)
+        .await;
+    let env_clone = env.clone();
+    let events = acting_manager.domain_manager.get_events().await;
     tokio::spawn(async move {
-        run_event_manager(receiver_event_update_state, monitors, tx, events, env_clone).await
+        run_event_checker(
+            receiver_event_update_state,
+            event_manager,
+            tx,
+            events,
+            env_clone,
+        )
+        .await
     });
 
     tokio::spawn(async move {
@@ -565,7 +582,7 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
         GREEDY => SelectMode::Greedy,
         PLANNING | ARIES => SelectMode::Planning(Planner::Aries(false)),
         ARIES_OPT => SelectMode::Planning(Planner::Aries(true)),
-        UPOM => SelectMode::Planning(Planner::UPOM),
+        UPOM => SelectMode::Planning(Planner::UPOM(Default::default())),
         RAE_PLAN => SelectMode::Planning(Planner::RAEPlan(Default::default())),
         C_CHOICE => SelectMode::Planning(Planner::CChoice(Default::default())),
         HEURISTIC => SelectMode::Heuristic,

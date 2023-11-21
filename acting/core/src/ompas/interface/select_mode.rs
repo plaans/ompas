@@ -1,6 +1,11 @@
 use ompas_language::select::*;
 use std::fmt::{Display, Formatter};
 
+pub const UPOM_D_MAX_DEFAULT: u64 = 10;
+pub const UPOM_N_RO_DEFAULT: u64 = 10;
+pub const UPOM_TIMEOUT_DEFAULT: f64 = 1.0;
+pub const UPOM_C_DEFAULT: f64 = 0.5;
+
 #[derive(Debug, Copy, Clone)]
 pub enum SelectMode {
     Greedy,
@@ -14,9 +19,61 @@ pub enum SelectMode {
 #[derive(Debug, Copy, Clone)]
 pub enum Planner {
     Aries(bool),
-    UPOM,
+    UPOM(UPOMConfig),
     CChoice(CChoiceConfig),
     RAEPlan(RAEPlanConfig),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct UPOMConfig {
+    ///Number of methods to compare.
+    d_max: u64,
+    ///Number of simulation for commands.
+    nro: u64,
+    timeout: f64,
+    mode: UPOMMode,
+    c: f64,
+}
+
+impl Default for UPOMConfig {
+    fn default() -> Self {
+        Self {
+            d_max: UPOM_D_MAX_DEFAULT,
+            nro: UPOM_N_RO_DEFAULT,
+            timeout: UPOM_TIMEOUT_DEFAULT,
+            mode: Default::default(),
+            c: UPOM_C_DEFAULT,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+pub enum UPOMMode {
+    #[default]
+    Efficiency,
+    Robustness,
+}
+
+impl UPOMConfig {
+    pub fn get_d(&self) -> u64 {
+        self.d_max
+    }
+
+    pub fn get_nro(&self) -> u64 {
+        self.nro
+    }
+
+    pub fn get_timeout(&self) -> f64 {
+        self.timeout
+    }
+
+    pub fn get_mode(&self) -> UPOMMode {
+        self.mode
+    }
+
+    pub fn get_c(&self) -> f64 {
+        self.c
+    }
 }
 
 #[derive(Copy, Clone, Default, Debug)]
@@ -73,7 +130,7 @@ impl Display for Planner {
             match self {
                 Planner::Aries(true) => ARIES_OPT.to_string(),
                 Planner::Aries(false) => ARIES.to_string(),
-                Planner::UPOM => UPOM.to_string(),
+                Planner::UPOM(config) => format!("{}; config = {:?}", UPOM, config),
                 Planner::RAEPlan(config) => format!("{} ; config = {:?}", RAE_PLAN, config),
                 Planner::CChoice(config) => format!("{} ; config = {:?}", C_CHOICE, config),
             }

@@ -8,6 +8,7 @@ use crate::ompas::manager::resource::{
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::StateManager;
 use crate::ompas::scheme::exec::acting_context::{def_label, ModActingContext};
+use crate::ompas::scheme::exec::mode::RAEMode;
 use crate::ompas::scheme::exec::ModExec;
 use futures::FutureExt;
 use macro_rules_attribute::macro_rules_attribute;
@@ -21,6 +22,7 @@ use ompas_utils::other::generic_race;
 use rand::{thread_rng, Rng};
 use sompas_core::modules::map::get_map;
 use sompas_macros::async_scheme_fn;
+use sompas_structs::contextcollection::Context;
 use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lfuture::{FutureResult, LFuture};
@@ -39,6 +41,12 @@ pub struct ModResource {
     log: LogClient,
 }
 
+impl From<ModResource> for Context {
+    fn from(value: ModResource) -> Self {
+        Context::new(value, MOD_RESOURCE)
+    }
+}
+
 impl ModResource {
     pub fn new(exec: &ModExec) -> Self {
         Self {
@@ -46,6 +54,15 @@ impl ModResource {
             state_manager: exec.acting_manager.state_manager.clone(),
             acting_manager: exec.acting_manager.clone(),
             log: exec.log.clone(),
+        }
+    }
+
+    pub fn new_for_sim(resource_manager: ResourceManager, state_manager: StateManager) -> Self {
+        Self {
+            resource_manager,
+            state_manager,
+            acting_manager: Default::default(),
+            log: Default::default(),
         }
     }
 }
@@ -104,47 +121,15 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
 #[async_scheme_fn]
 pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LRuntimeError> {
     let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
-    let pr = &env
-        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
-        .process_ref;
-    let acting_manager = ctx.acting_manager.clone();
-    let label: String = args
-        .get(0)
-        .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
-        .try_into()?;
-    let id: ActingProcessId = match pr {
-        ProcessRef::Id(id) => {
-            if acting_manager.get_kind(id).await == ActingProcessKind::Method {
-                acting_manager
-                    .new_acquire(
-                        Label::ResourceAcquisition(acting_manager.get_number_acquire(*id).await),
-                        id,
-                        ProcessOrigin::Execution,
-                    )
-                    .await
-            } else {
-                panic!()
-            }
-        }
-        ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
-            Some(id) => id,
-            None => match labels[0] {
-                Label::ResourceAcquisition(s) => {
-                    acting_manager
-                        .new_acquire(Label::ResourceAcquisition(s), id, ProcessOrigin::Execution)
-                        .await
-                }
-                _ => panic!(),
-            },
-        },
-    };
-
-    let log = ctx.log.clone();
 
     let resources = ctx.resource_manager.clone();
 
     let (tx, mut rx) = new_interruption_handler();
 
+    let label: String = args
+        .get(0)
+        .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
+        .try_into()?;
     //init of capacity and
     let (quantity, priority): (Quantity, WaiterPriority) = match args.len() {
         1 => (Quantity::All, WaiterPriority::Execution(0)),
@@ -179,6 +164,80 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
             panic!()
         }
     };
+
+    let mode = *env.get_context::<RAEMode>(CTX_RAE_MODE)?;
+    if mode == RAEMode::Simu {
+        let f: LFuture = (Box::pin(async move {
+            let mut wait = resources.acquire(&label, quantity, priority).await?;
+
+            let rh: ResourceHandler = tokio::select! {
+                _ = rx.recv() => {
+                    resources.remove_waiter(wait).await;
+                    return Ok(LValue::Err(LValue::Nil.into()))
+                }
+                rh = wait.recv() => {
+                    rh
+                }
+            };
+
+            let rc = resources.clone();
+            let (tx, mut rx) = new_interruption_handler();
+
+            let f: LFuture = (Box::pin(async move {
+                rx.recv().await;
+                let r = rc.release(rh).await.map(|_| LValue::Nil);
+                r
+            }) as FutureResult)
+                .shared();
+
+            let f2 = f.clone();
+
+            tokio::spawn(f);
+
+            Ok(LAsyncHandle::new(f2, tx).into())
+        }) as FutureResult)
+            .shared();
+
+        let f2 = f.clone();
+
+        tokio::spawn(f);
+
+        return Ok(LAsyncHandle::new(f2, tx));
+    };
+
+    let pr = &env
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
+        .process_ref;
+    let acting_manager = ctx.acting_manager.clone();
+
+    let id: ActingProcessId = match pr {
+        ProcessRef::Id(id) => {
+            if acting_manager.get_kind(id).await == ActingProcessKind::Method {
+                acting_manager
+                    .new_acquire(
+                        Label::ResourceAcquisition(acting_manager.get_number_acquire(*id).await),
+                        id,
+                        ProcessOrigin::Execution,
+                    )
+                    .await
+            } else {
+                panic!()
+            }
+        }
+        ProcessRef::Relative(id, labels) => match acting_manager.get_id(pr.clone()).await {
+            Some(id) => id,
+            None => match labels[0] {
+                Label::ResourceAcquisition(s) => {
+                    acting_manager
+                        .new_acquire(Label::ResourceAcquisition(s), id, ProcessOrigin::Execution)
+                        .await
+                }
+                _ => panic!(),
+            },
+        },
+    };
+
+    let log = ctx.log.clone();
 
     let f: LFuture = (Box::pin(async move {
         acting_manager.set_start(&id, None).await;

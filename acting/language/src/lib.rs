@@ -32,6 +32,18 @@ pub mod exec {
         pub const INF: &str = "inf";
     }
 
+    pub mod upom {
+        pub const MOD_UPOM: &str = "mod-upom";
+        pub const DOC_MOD_UPOM: &str =
+            "Collection of selection to use the UPOM algorithm to refine a task.";
+
+        pub const UPOM_TASK: &str = "upom-task";
+        pub const DOC_UPOM_TASK: &str = "todo";
+
+        pub const UPOM_COMMAND: &str = "upom-command";
+        pub const DOC_UPOM_COMMAND: &str = "todo";
+    }
+
     pub mod aries {
         pub const CTX_ARIES: &str = "aries";
         pub const SELECT_ARIES: &str = "select_aries";
@@ -42,6 +54,9 @@ pub mod exec {
 
     pub const ARBITRARY: &str = "arbitrary";
     pub const DOC_ARBITRARY: &str = "Takes a list of element and arbitrarily return one of them, either a random, using an optional function or using the acting engine.";
+
+    pub const RAE___SLEEP__: &str = "__sleep__";
+    pub const DOC_RAE___SLEEP__: &str = "todo";
 
     pub mod platform {
         pub const MOD_PLATFORM: &str = "platform";
@@ -72,8 +87,8 @@ pub mod exec {
     }
 
     pub mod mode {
-        pub const CTX_MODE: &str = "ContextMode";
-        pub const DOC_CTX_MODE: &str =
+        pub const CTX_RAE_MODE: &str = "ctx-rae-mode";
+        pub const DOC_CTX_RAE_MODE: &str =
             "Context that contains the mode of OMPAS, either simu of exec.";
 
         //keywords
@@ -1095,7 +1110,8 @@ pub mod process {
     pub const OMPAS: &str = "OMPAS";
 
     pub const PROCESS_STOP_OMPAS: &str = "__PROCESS_STOP_OMPAS__";
-    pub const PROCESS_CHECK_WAIT_FOR: &str = "__PROCESS_CHECK_WAIT_FOR__";
+    pub const PROCESS_CHECK_FLUENT: &str = "__PROCESS_CHECK_FLUENT__";
+    pub const PROCESS_CHECK_EVENT: &str = "__PROCESS_CHECK_EVENT__";
 }
 
 pub mod interface {

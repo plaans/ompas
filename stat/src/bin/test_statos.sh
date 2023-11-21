@@ -1,1 +1,0 @@
-cargo run --release --bin statos -- -c config/statos_config.yml

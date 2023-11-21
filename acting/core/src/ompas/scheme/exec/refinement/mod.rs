@@ -1,6 +1,7 @@
 pub mod aries;
-pub mod c_choice;
-pub mod rae_plan;
+
+mod sampling;
+
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::error::RaeExecError;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
@@ -18,8 +19,9 @@ use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
 use crate::ompas::scheme::exec::refinement::aries::aries_select;
-use crate::ompas::scheme::exec::refinement::c_choice::c_choice_select;
-use crate::ompas::scheme::exec::refinement::rae_plan::rae_plan_select;
+use crate::ompas::scheme::exec::refinement::sampling::c_choice::c_choice_select;
+use crate::ompas::scheme::exec::refinement::sampling::rae_plan::rae_plan_select;
+use crate::ompas::scheme::exec::refinement::sampling::upom::upom_select;
 use crate::ompas::scheme::exec::state::{instances, ModState};
 use crate::ompas::scheme::exec::ModExec;
 use ::aries::collections::seq::Seq;
@@ -412,16 +414,19 @@ pub async fn select(
                 SelectMode::Planning(Planner::CChoice(config)) => {
                     c_choice_select(&candidates, &state, env, config)
                         .await
-                        .map_err(|e| e.chain("planning_select"))?
+                        .map_err(|e| e.chain("c_choice_select"))?
                 }
                 SelectMode::Planning(Planner::RAEPlan(config)) => {
                     rae_plan_select(&candidates, &state, env, config)
                         .await
-                        .map_err(|e| e.chain("planning_select"))?
+                        .map_err(|e| e.chain("rae_plan_select"))?
                 }
-                SelectMode::Heuristic
-                | SelectMode::Learning
-                | SelectMode::Planning(Planner::UPOM) => {
+                SelectMode::Planning(Planner::UPOM(config)) => {
+                    upom_select(&task, &candidates, &state, env, config)
+                        .await
+                        .map_err(|e| e.chain("UPOM"))?
+                }
+                SelectMode::Heuristic | SelectMode::Learning => {
                     todo!()
                 }
             },

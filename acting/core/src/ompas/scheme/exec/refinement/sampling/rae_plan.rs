@@ -4,8 +4,10 @@ use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::select_mode::RAEPlanConfig;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
-use crate::ompas::scheme::exec::refinement::c_choice::Cost;
 use crate::ompas::scheme::exec::refinement::greedy_select;
+use crate::ompas::scheme::exec::refinement::sampling::cost::Cost;
+use crate::ompas::scheme::exec::refinement::sampling::efficiency::Efficiency;
+use crate::ompas::scheme::exec::refinement::sampling::Utility;
 use crate::ompas::scheme::exec::ModExec;
 use ompas_language::exec::rae_plan::*;
 use sompas_core::{eval, parse};
@@ -23,111 +25,6 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub const DEFAULT_DEPTH: usize = 10;
-
-#[derive(Copy, Clone, Debug)]
-pub enum Efficiency {
-    Inf,
-    Some(f64),
-}
-
-impl Default for Efficiency {
-    fn default() -> Self {
-        Self::Inf
-    }
-}
-
-impl Display for Efficiency {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Efficiency::Inf => write!(f, "{}", INF),
-            Efficiency::Some(u) => write!(f, "{}", u),
-        }
-    }
-}
-
-impl PartialEq<Self> for Efficiency {
-    fn eq(&self, _: &Self) -> bool {
-        todo!()
-    }
-}
-
-impl PartialOrd for Efficiency {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Self::Inf, Self::Inf) => Some(cmp::Ordering::Equal),
-            (Self::Inf, Self::Some(_)) => Some(cmp::Ordering::Greater),
-            (Self::Some(_), Self::Inf) => Some(cmp::Ordering::Less),
-            (Self::Some(f1), Self::Some(f2)) => {
-                if f1 == f2 {
-                    Some(cmp::Ordering::Equal)
-                } else if f1 < f2 {
-                    Some(cmp::Ordering::Less)
-                } else {
-                    Some(cmp::Ordering::Greater)
-                }
-            }
-        }
-    }
-}
-
-impl Efficiency {
-    pub fn compose(a: Self, b: Self) -> Self {
-        match (a, b) {
-            (Self::Inf, Self::Inf) => Self::Inf,
-            (Self::Inf, Self::Some(u)) => Self::Some(u),
-            (Self::Some(u), Self::Inf) => Self::Some(u),
-            (Self::Some(u1), Self::Some(u2)) => Self::Some((u1 * u2) / (u1 + u2)),
-        }
-    }
-}
-
-impl From<Cost> for Efficiency {
-    fn from(c: Cost) -> Self {
-        match c {
-            Cost::Inf => Efficiency::Some(0.0),
-            Cost::Some(f) => {
-                if f == 0.0 {
-                    Efficiency::Inf
-                } else {
-                    Efficiency::Some(1.0 / f)
-                }
-            }
-        }
-    }
-}
-
-impl From<Efficiency> for Cost {
-    fn from(e: Efficiency) -> Self {
-        match e {
-            Efficiency::Inf => Cost::Some(0.0),
-            Efficiency::Some(f) => {
-                if f == 0.0 {
-                    Cost::Inf
-                } else {
-                    Cost::Some(1.0 / f)
-                }
-            }
-        }
-    }
-}
-
-impl TryFrom<&LValue> for Efficiency {
-    type Error = LRuntimeError;
-
-    fn try_from(value: &LValue) -> Result<Self, Self::Error> {
-        match value {
-            LValue::Number(n) => Ok(Efficiency::Some(n.into())),
-            LValue::Symbol(s) => {
-                if s.as_str() == INF {
-                    Ok(Efficiency::Inf)
-                } else {
-                    Err(Default::default())
-                }
-            }
-            _ => Err(Default::default()),
-        }
-    }
-}
 
 pub struct ModRaePlan {
     tried: Vec<LValue>,
@@ -166,7 +63,7 @@ impl ModRaePlan {
 
     pub async fn compose_efficiency(&self, e: Efficiency) {
         let o_e: Efficiency = *self.efficiency.read().await;
-        *self.efficiency.write().await = Efficiency::compose(o_e, e)
+        *self.efficiency.write().await = Efficiency::compose(&o_e, &e)
     }
 
     pub fn increase_level(&self) {

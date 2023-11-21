@@ -344,7 +344,7 @@ impl WaitForReceiver {
     }
 }
 
-pub async fn run_event_manager(
+pub async fn run_event_checker(
     mut update: StateUpdateSubscriber,
     event_manager: EventManager,
     tx_ompas: UnboundedSender<OMPASJob>,
@@ -352,7 +352,7 @@ pub async fn run_event_manager(
     env: LEnv,
 ) {
     let mut process: ProcessInterface =
-        ProcessInterface::new(PROCESS_CHECK_WAIT_FOR, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
+        ProcessInterface::new(PROCESS_CHECK_FLUENT, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
     process.log_info("check wait for launched");
     *event_manager.log.write().await = process.get_log_client();
     *event_manager.env.write().await = env;
@@ -360,11 +360,26 @@ pub async fn run_event_manager(
     loop {
         tokio::select! {
             Some(updated) = update.channel.recv() => {
+                event_manager.check_events(updated).await
+            }
+            _ = process.recv() => {
+                break;
+            }
+        }
+    }
+}
+
+pub async fn run_fluent_checker(mut update: StateUpdateSubscriber, event_manager: EventManager) {
+    let mut process: ProcessInterface =
+        ProcessInterface::new(PROCESS_CHECK_FLUENT, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
+    process.log_info("fluent checker launched");
+    loop {
+        tokio::select! {
+            Some(_) = update.channel.recv() => {
                 let n_wait_on = event_manager.fluent_collection.lock().await.map.len();
                 if n_wait_on != 0 {
                     event_manager.check_wait_for().await;
                 }
-                event_manager.check_events(updated).await
             }
             _ = process.recv() => {
                 break;

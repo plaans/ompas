@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::mem;
 use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{atomic, Arc};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::Mutex;
@@ -361,6 +362,42 @@ pub struct ResourceManager {
     inner: Arc<Mutex<HashMap<ResourceId, Resource>>>,
     id: Arc<AtomicUsize>,
     max_capacity: Arc<AtomicUsize>,
+}
+
+impl ResourceManager {
+    pub async fn new_from_current(&self) -> Self {
+        let labels = self.labels.lock().await.clone();
+        let inner: HashMap<ResourceId, Resource> = self
+            .inner
+            .lock()
+            .await
+            .iter()
+            .map(|(k, v)| {
+                (
+                    *k,
+                    Resource {
+                        label: v.label.to_string(),
+                        id: v.id,
+                        max_capacity: v.max_capacity,
+                        capacity: v.capacity,
+                        in_service: Default::default(),
+                        queue: vec![],
+                        clients: Default::default(),
+                        n_acquisition: v.n_acquisition,
+                    },
+                )
+            })
+            .collect();
+        let id = Arc::new(AtomicUsize::new(self.id.load(Relaxed)));
+        let max_capacity = Arc::new(AtomicUsize::new(self.max_capacity.load(Relaxed)));
+
+        Self {
+            labels: Arc::new(Mutex::new(labels)),
+            inner: Arc::new(Mutex::new(inner)),
+            id,
+            max_capacity,
+        }
+    }
 }
 
 pub enum AcquireResponse {

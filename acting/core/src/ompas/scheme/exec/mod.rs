@@ -6,26 +6,34 @@ use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::PlatformManager;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
-use crate::ompas::scheme::exec::mode::{CtxMode, RAEMode};
+use crate::ompas::scheme::exec::mode::RAEMode;
 use crate::ompas::scheme::exec::platform::ModPlatform;
 use crate::ompas::scheme::exec::refinement::ModRefinement;
 use crate::ompas::scheme::exec::resource::ModResource;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
+use futures::FutureExt;
 use ompas_language::exec::acting_context::MOD_ACTING_CONTEXT;
-use ompas_language::exec::mode::DOC_CTX_MODE;
-use ompas_language::exec::{ARBITRARY, DOC_ARBITRARY, DOC_MOD_EXEC, MOD_EXEC};
+use ompas_language::exec::mode::{CTX_RAE_MODE, DOC_CTX_RAE_MODE};
+use ompas_language::exec::{
+    ARBITRARY, DOC_ARBITRARY, DOC_MOD_EXEC, DOC_RAE___SLEEP__, MOD_EXEC, RAE___SLEEP__,
+};
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
 use sompas_core::eval;
 use sompas_core::modules::list::car;
 use sompas_macros::async_scheme_fn;
+use sompas_structs::interrupted;
+use sompas_structs::lasynchandler::LAsyncHandle;
 use sompas_structs::lenv::{ImportType, LEnv};
+use sompas_structs::lfuture::FutureResult;
 use sompas_structs::lmodule::LModule;
+use sompas_structs::lnumber::LNumber;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
-
+use std::time::Duration;
 pub mod acting_context;
 pub mod mode;
 pub mod platform;
@@ -67,24 +75,20 @@ impl From<ModExec> for LModule {
         let mod_refinement = ModRefinement::new(&m);
 
         let mut module = LModule::new(m, MOD_EXEC, DOC_MOD_EXEC);
-        module.add_subcontext(CtxMode::new(RAEMode::Exec), DOC_CTX_MODE);
+        module.add_subcontext(RAEMode::Exec, DOC_CTX_RAE_MODE);
         module.add_submodule(mod_platform, ImportType::WithoutPrefix);
         module.add_submodule(mod_resource, ImportType::WithoutPrefix);
         module.add_submodule(mod_state, ImportType::WithoutPrefix);
         module.add_submodule(ModActingContext::default(), ImportType::WithoutPrefix);
         module.add_submodule(mod_refinement, ImportType::WithoutPrefix);
         module.add_async_fn(ARBITRARY, arbitrary, DOC_ARBITRARY, false);
+        module.add_async_fn(RAE___SLEEP__, __sleep__, DOC_RAE___SLEEP__, false);
         module
     }
 }
 
 #[async_scheme_fn]
 pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
-    let pr = &env
-        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
-        .process_ref;
-    let supervisor = &env.get_context::<ModExec>(MOD_EXEC)?.acting_manager;
-
     let greedy = match args.len() {
         1 => car(env, &[args[0].clone()]),
         2 => {
@@ -101,6 +105,15 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
         }
         _ => Err(LRuntimeError::wrong_number_of_args(ARBITRARY, args, 1..2)),
     }?;
+
+    if RAEMode::Simu == *env.get_context::<RAEMode>(CTX_RAE_MODE).unwrap() {
+        return Ok(greedy);
+    }
+
+    let pr = &env
+        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
+        .process_ref;
+    let supervisor = &env.get_context::<ModExec>(MOD_EXEC)?.acting_manager;
 
     let set: Vec<LValue> = args[0].clone().try_into()?;
 
@@ -134,4 +147,31 @@ pub async fn arbitrary(env: &LEnv, args: &[LValue]) -> LResult {
     let value = supervisor.set_arbitrary_value(&id, set, greedy).await;
 
     Ok(value)
+}
+
+#[async_scheme_fn]
+pub async fn __sleep__(env: &LEnv, n: LNumber) -> LAsyncHandle {
+    let (tx, mut rx) = new_interruption_handler();
+    let mode = *env.get_context::<RAEMode>(CTX_RAE_MODE).unwrap();
+    let f: FutureResult = Box::pin(async move {
+        let duration = match mode {
+            RAEMode::Exec => Duration::from_micros((f64::from(&n) * 1_000_000.0) as u64),
+            RAEMode::Simu => Duration::default(),
+        };
+
+        tokio::select! {
+            _ = rx.recv() => {
+                Ok(interrupted!())
+            }
+            _ = tokio::time::sleep(duration) => {
+                Ok(LValue::Nil)
+            }
+        }
+    }) as FutureResult;
+    let f = f.shared();
+
+    let f2 = f.clone();
+    tokio::spawn(f2);
+
+    LAsyncHandle::new(f, tx)
 }

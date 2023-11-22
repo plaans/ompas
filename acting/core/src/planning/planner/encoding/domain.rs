@@ -722,8 +722,8 @@ pub fn read_chronicle(
 
         let effect = Effect {
             transition_start: start, // + FAtom::EPSILON,
-            persistence_start: end,  // + FAtom::EPSILON,
-            min_persistence_end: vec![],
+            transition_end: end,     // + FAtom::EPSILON,
+            min_mutex_end: vec![],
             state_var: sv,
             operation,
         };

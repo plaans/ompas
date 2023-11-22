@@ -1,7 +1,6 @@
 use crate::lruntimeerror;
 use crate::lruntimeerror::LRuntimeError;
 use anyhow::anyhow;
-use im::HashMap;
 use std::any::Any;
 use std::fmt::Display;
 use std::sync::Arc;
@@ -30,9 +29,7 @@ impl Context {
 /// Struct Wrapping contexts (modules) for each library.
 #[derive(Default, Clone, Debug)]
 pub struct ContextCollection {
-    inner: HashMap<String, Context>,
-    //map_label_usize: HashMap<String, usize>,
-    //reverse_map: HashMap<usize, String>,
+    inner: im::HashMap<String, Context>,
 }
 
 impl ContextCollection {

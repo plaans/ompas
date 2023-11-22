@@ -78,16 +78,6 @@ pub fn send_email(config: &MailConfig, message: String, benchmark_path: PathBuf)
         Err(e) => println!("Cannot archive the directory! {}", e),
     };
 
-    // let email: Email = Email::builder()
-    //     .from(config.from.parse().unwrap())
-    //     .to(config.to.parse().unwrap())
-    //     .subject("Ompas Benchmark")
-    //     .body(message)
-    //      .attachment_from_file(&dest, None, )
-    //     .unwrap()
-    //     .build()
-    //     .unwrap();
-
     let attachement = Attachment::new(benchmark_label).body(
         fs::read(dest).unwrap(),
         ContentType::parse("application/zip").unwrap(),

@@ -11,7 +11,7 @@
     (def-task t_carry_to_machine (:params (?r robot) (?p package) (?m machine)))
     (def-task-om-model t_carry_to_machine
         (:params (?r robot) (?p package) (?m machine))
-        (:body (sleep 1)))
+        (:body (sleep 10)))
 
     (def-method m_carry_to_machine
             (:task t_carry_to_machine)
@@ -60,6 +60,7 @@
                      (t_check_battery ?r))))
 
     (def-task charge_robot (:params (?r robot)))
+    (def-task-om-model charge_robot (:params (?r robot)) (:body nil))
     (def-method m_charge_robot
         (:task charge_robot)
         (:params (?r robot))
@@ -103,16 +104,6 @@
                 (mapf await list-h)
                 )))
 
-    (def-task t_process (:params (?m machine) (?p package) (?d int)))
-    (def-task-om-model t_process
-        (:params (?m machine) (?p package) (?d int))
-        (:body (sleep ?d)))
-
-    (def-method m_process
-        (:task t_process)
-        (:params (?m machine) (?p package) (?d int))
-        (:body (process ?m ?p)))
-
     (def-task t_process_package (:params (?p package)))
     (def-method m_process_package
         (:task t_process_package)
@@ -133,7 +124,10 @@
     (def-task t_process (:params (?m machine) (?p package) (?d int)))
     (def-task-om-model t_process
         (:params (?m machine) (?p package) (?d int))
-        (:body (sleep ?d)))
+        (:body
+            (sleep ?d)))
+;        (durative-effect ?d 'package.location ?p (machine.output_belt ?m))))
+
     (def-method m_process
         (:task t_process)
         (:params (?m machine) (?p package) (?d int))

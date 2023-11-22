@@ -103,7 +103,7 @@ impl EventCollection {
         self.events = events;
         self.init_watched_events(instances)
     }
-    fn init_watched_events(&mut self, instances: InstanceCollection) {
+    fn init_watched_events(&mut self, mut instances: InstanceCollection) {
         //Create
         for (label, event) in &self.events {
             let mut params_enum: Vec<_> = vec![];
@@ -145,7 +145,7 @@ impl EventCollection {
         &mut self,
         r#type: String,
         instance: String,
-        instances: &InstanceCollection,
+        instances: &mut InstanceCollection,
     ) {
         let managed_event = self.managed_events.get(&r#type).unwrap();
 
@@ -244,7 +244,7 @@ impl EventManager {
 
     pub async fn check_events(&self, updated: StateUpdate) {
         let mut env = self.env.read().await.clone();
-        let instances = self.state_manager.get_instance_collection().await;
+        let mut instances = self.state_manager.get_instance_collection().await;
         let log = self.log.read().await.clone();
         let mut event_collection = self.event_collection.lock().await;
         let new_instances: Vec<_> = updated
@@ -260,7 +260,7 @@ impl EventManager {
             .collect();
 
         for (t, instance) in new_instances {
-            event_collection.populate_events_for_new_instance(t, instance, &instances);
+            event_collection.populate_events_for_new_instance(t, instance, &mut instances);
         }
 
         let mut to_run: Vec<usize> = vec![];
@@ -353,7 +353,7 @@ pub async fn run_event_checker(
 ) {
     let mut process: ProcessInterface =
         ProcessInterface::new(PROCESS_CHECK_FLUENT, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
-    process.log_info("check wait for launched");
+    //process.log_debug("Event checker launched");
     *event_manager.log.write().await = process.get_log_client();
     *event_manager.env.write().await = env;
     event_manager.init_events(events, tx_ompas).await;
@@ -372,7 +372,7 @@ pub async fn run_event_checker(
 pub async fn run_fluent_checker(mut update: StateUpdateSubscriber, event_manager: EventManager) {
     let mut process: ProcessInterface =
         ProcessInterface::new(PROCESS_CHECK_FLUENT, PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS).await;
-    process.log_info("fluent checker launched");
+    //process.log_debug("Fluent checker launched");
     loop {
         tokio::select! {
             Some(_) = update.channel.recv() => {

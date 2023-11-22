@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
 use std::fmt::{Debug, Display, Formatter};
 #[derive(Default, Debug, Clone)]
 pub struct DocCollection {
-    inner: BTreeMap<String, Doc>,
+    inner: im::OrdMap<String, Doc>,
 }
 
 impl Display for DocCollection {
@@ -19,8 +18,10 @@ impl DocCollection {
         self.inner.insert(label.to_string(), doc.into());
     }
 
-    pub fn append(&mut self, mut other: Self) {
-        self.inner.append(&mut other.inner)
+    pub fn append(&mut self, other: Self) {
+        for (k, v) in other.inner {
+            self.inner.insert(k, v);
+        }
     }
 
     pub fn get_all(&self) -> String {

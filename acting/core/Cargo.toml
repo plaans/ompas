@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 sompas-structs = {path = "../../scheme/structs"}
 sompas-modules = {path = "../../scheme/modules"}
-sompas-core = {path = "../../scheme/core"}
+sompas-core = {path = "../../scheme/core", default-features = false}
 sompas-language = {path = "../../scheme/language"}
 sompas-macros = {path = "../../scheme/macros"}
 

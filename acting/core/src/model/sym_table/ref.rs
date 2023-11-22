@@ -329,7 +329,7 @@ impl RefSymTable {
     }
 
     pub fn get_lattice(&self) -> TypeLattice {
-        self.0.read().unwrap().get_lattice()
+        self.0.read().unwrap().get_lattice().clone()
     }
 
     pub fn export_lattice_dot(&self) -> Dot {

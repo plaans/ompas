@@ -1,3 +1,4 @@
+use crate::model::sym_domain::type_lattice::TypeLattice;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::state::partial_state::{Fact, PartialState};
 use crate::ompas::manager::state::StateType;
@@ -11,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 pub struct InstanceCollection {
     pub st: RefSymTable,
     pub inner: HashMap<String, InstanceSet>,
+    lattice: Option<TypeLattice>,
 }
 
 #[derive(Clone)]
@@ -58,7 +60,11 @@ impl InstanceCollection {
             InstanceSet::new(Self::format_unk_type(TYPE_OBJECT)),
         );
 
-        Self { st, inner }
+        Self {
+            st,
+            inner,
+            lattice: None,
+        }
     }
 
     pub fn clear(&mut self) {
@@ -143,8 +149,15 @@ impl InstanceCollection {
         }
     }
 
-    pub fn is_of_type(&self, i: &str, t: &str) -> bool {
-        let lattice = self.st.get_lattice();
+    pub fn is_of_type(&mut self, i: &str, t: &str) -> bool {
+        //let lattice = self.st.0.read().unwrap().get_lattice();
+        let lattice = if let Some(lattice) = &self.lattice {
+            lattice
+        } else {
+            self.lattice = Some(self.st.get_lattice());
+            self.lattice.as_ref().unwrap()
+        };
+        //println!("t(tl.clone) = {} µs", time.elapsed().unwrap().as_micros());
         let type_id = if let Some(id) = lattice.get_type_id(t) {
             id
         } else {
@@ -157,16 +170,22 @@ impl InstanceCollection {
             //println!("{name}?");
             if let Some(set) = self.inner.get(&name) {
                 if set.contains(i) {
-                    //println!("yup!");
+                    //println!("t(instance) = {} µs", time.elapsed().unwrap().as_micros());
                     return true;
                 }
             }
         }
+
         false
     }
 
-    pub fn get_instances(&self, t: &str) -> Vec<String> {
-        let lattice = self.st.get_lattice();
+    pub fn get_instances(&mut self, t: &str) -> Vec<String> {
+        let lattice = if let Some(lattice) = &self.lattice {
+            lattice
+        } else {
+            self.lattice = Some(self.st.get_lattice());
+            self.lattice.as_ref().unwrap()
+        };
         let type_id = if let Some(id) = lattice.get_type_id(t) {
             id
         } else {

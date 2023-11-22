@@ -9,6 +9,7 @@ use lazy_static::lazy_static;
 use log::Level;
 use map_macro::{hash_map, hash_set};
 use ompas_utils::other::get_and_update_id_counter;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
@@ -388,7 +389,7 @@ impl Master {
             receiver: rx,
             log: LogClient {
                 topic_id: self.logger.subscribe_to_topic(log_topic).await,
-                source: label.to_string(),
+                source: Arc::new(label.to_string()),
             },
             sender_death: self.sender_death.read().await.as_ref().unwrap().clone(),
         }
@@ -547,7 +548,7 @@ impl Drop for ProcessInterface {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LogLevel {
     Error = 1,
     Warn,

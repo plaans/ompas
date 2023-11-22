@@ -8,32 +8,52 @@ use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
-#[derive(Copy, Clone, Debug)]
-pub struct Efficiency(f64);
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Efficiency {
+    Inf,
+    Finite(f64),
+}
+
+impl Efficiency {
+    const MAX_EFFICIENCY: f64 = 10e12;
+}
 
 impl Default for Efficiency {
     fn default() -> Self {
-        Self(0.0)
+        Self::Inf
     }
 }
 
 impl Display for Efficiency {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl PartialEq<Self> for Efficiency {
-    fn eq(&self, _: &Self) -> bool {
-        todo!()
+        match self {
+            Self::Inf => write!(f, "inf"),
+            Self::Finite(e) => write!(f, "{}", e),
+        }
     }
 }
 
 impl PartialOrd for Efficiency {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
+        match (self, other) {
+            (Self::Inf, Self::Inf) => Some(Ordering::Equal),
+            (Self::Inf, Self::Finite(_)) => Some(Ordering::Greater),
+            (Self::Finite(_), Self::Inf) => Some(Ordering::Less),
+            (Self::Finite(f1), Self::Finite(f2)) => f1.partial_cmp(f2),
+        }
+    }
+}
+
+impl From<f64> for Efficiency {
+    fn from(value: f64) -> Self {
+        if value > Self::MAX_EFFICIENCY {
+            Self::Inf
+        } else {
+            Self::Finite(value)
+        }
     }
 }
 
@@ -42,15 +62,15 @@ impl Utility for Efficiency {
     async fn compute<'a>(env: &LEnv, sampled: SampledResult<'a>) -> Self {
         match sampled {
             SampledResult::Failure => Self::failure(),
-            SampledResult::Success(s) => {
+            SampledResult::Command(s) | SampledResult::Method(s) => {
                 let label = (&s[0]).to_string();
                 let model = env
                     .get_context::<ModUPOM<Efficiency>>(MOD_UPOM)
                     .unwrap()
-                    .actions
+                    .models
                     .get(&label)
                     .unwrap()
-                    .get_model(&ModelKind::CostModel)
+                    .get(&ModelKind::CostModel)
                     .unwrap();
                 let mut lv = vec![model];
                 for arg in &s[1..] {
@@ -69,37 +89,56 @@ impl Utility for Efficiency {
     }
 
     fn compose(u1: &Self, u2: &Self) -> Self {
-        Self((u1.0 * u2.0) / (u1.0 + u2.0))
+        match (u1, u2) {
+            (Self::Finite(f1), Self::Finite(f2)) => Self::Finite((f1 * f2) / (f1 + f2)),
+            (Self::Inf, Self::Finite(_)) => *u2,
+            (Self::Finite(_), Self::Inf) => *u1,
+            (Self::Inf, Self::Inf) => Self::Inf,
+        }
     }
 
     fn f64(&self) -> f64 {
-        self.0
+        match self {
+            Efficiency::Inf => Self::MAX_EFFICIENCY,
+            Efficiency::Finite(f) => *f,
+        }
     }
 
-    fn success() -> Self {
-        Self(1.0)
+    fn identity() -> Self {
+        Self::Inf
     }
 
     fn failure() -> Self {
-        Self(0.0)
+        Self::Finite(0.0)
     }
 }
 
 impl From<Cost> for Efficiency {
     fn from(c: Cost) -> Self {
         match c {
-            Cost::Inf => Efficiency(0.0),
-            Cost::Some(f) => Efficiency(1.0 / f),
+            Cost::Inf => Self::Finite(0.0),
+            Cost::Some(f) => {
+                if f == 0.0 {
+                    Self::Inf
+                } else {
+                    Self::Finite(1.0 / f)
+                }
+            }
         }
     }
 }
 
 impl From<Efficiency> for Cost {
     fn from(e: Efficiency) -> Self {
-        if e.0 == 0.0 {
-            Cost::Inf
-        } else {
-            Cost::Some(1.0 / e.0)
+        match e {
+            Efficiency::Inf => Cost::Some(0.0),
+            Efficiency::Finite(f) => {
+                if f < 1.0 / Cost::MAX_COST {
+                    Cost::Inf
+                } else {
+                    Cost::Some(1.0 / f)
+                }
+            }
         }
     }
 }
@@ -109,7 +148,7 @@ impl TryFrom<&LValue> for Efficiency {
 
     fn try_from(value: &LValue) -> Result<Self, Self::Error> {
         match value {
-            LValue::Number(n) => Ok(Efficiency(n.into())),
+            LValue::Number(n) => Ok(Efficiency::Finite(n.into())),
             _ => Err(Default::default()),
         }
     }

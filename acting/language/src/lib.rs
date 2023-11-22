@@ -42,6 +42,9 @@ pub mod exec {
 
         pub const UPOM_COMMAND: &str = "upom-command";
         pub const DOC_UPOM_COMMAND: &str = "todo";
+
+        pub const PROCESS_UPOM: &str = "__PROCESS_UPOM__";
+        pub const LOG_TOPIC_UPOM: &str = "__LOG_TOPIC_UPOM__";
     }
 
     pub mod aries {

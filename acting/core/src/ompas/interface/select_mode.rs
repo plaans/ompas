@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 pub const UPOM_D_MAX_DEFAULT: u64 = 10;
 pub const UPOM_N_RO_DEFAULT: u64 = 10;
 pub const UPOM_TIMEOUT_DEFAULT: f64 = 1.0;
-pub const UPOM_C_DEFAULT: f64 = 0.5;
+pub const UPOM_C_DEFAULT: f64 = 2.0;
 
 #[derive(Debug, Copy, Clone)]
 pub enum SelectMode {
@@ -33,6 +33,7 @@ pub struct UPOMConfig {
     timeout: f64,
     mode: UPOMMode,
     c: f64,
+    iterative_deepening: bool,
 }
 
 impl Default for UPOMConfig {
@@ -43,6 +44,7 @@ impl Default for UPOMConfig {
             timeout: UPOM_TIMEOUT_DEFAULT,
             mode: Default::default(),
             c: UPOM_C_DEFAULT,
+            iterative_deepening: false,
         }
     }
 }
@@ -55,8 +57,12 @@ pub enum UPOMMode {
 }
 
 impl UPOMConfig {
-    pub fn get_d(&self) -> u64 {
+    pub fn get_d_max(&self) -> u64 {
         self.d_max
+    }
+
+    pub fn get_iterative_deepening(&self) -> bool {
+        self.iterative_deepening
     }
 
     pub fn get_nro(&self) -> u64 {

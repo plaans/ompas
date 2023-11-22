@@ -5,6 +5,23 @@ use sompas_core::modules::map::union_map;
 use sompas_structs::lvalue::LValue;
 
 #[derive(Default, Clone)]
+pub struct WorldState {
+    pub r#static: PartialState,
+    pub dynamic: PartialState,
+    pub inner_static: PartialState,
+    pub inner_dynamic: PartialState,
+}
+
+impl WorldState {
+    pub fn clear(&mut self) {
+        self.r#static.inner.clear();
+        self.dynamic.inner.clear();
+        self.inner_static.inner.clear();
+        self.inner_dynamic.inner.clear();
+    }
+}
+
+#[derive(Default, Clone)]
 pub struct WorldStateSnapshot {
     pub r#static: PartialState,
     pub dynamic: PartialState,

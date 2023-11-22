@@ -10,6 +10,7 @@ use im::{hashmap, HashSet};
 use ompas_middleware::logger::LogClient;
 use std::any::Any;
 use std::fmt::{Display, Formatter};
+use std::mem;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -110,6 +111,12 @@ pub struct LEnv {
     pub log: LogClient,
 }
 
+//
+// pub enum LEnv {
+//     Root(Arc<RootLEnv>),
+//     Light(LEnvSymbols)
+// }
+
 impl LEnv {
     /*pub fn set_outer(&mut self, env: LEnv) {
         self.outer = Some(Arc::new(env))
@@ -130,8 +137,8 @@ impl LEnv {
         &self.pfc
     }
 
-    pub fn get_init(&self) -> &InitScheme {
-        &self.init
+    pub fn get_init(&mut self) -> InitScheme {
+        mem::take(&mut self.init)
     }
 }
 

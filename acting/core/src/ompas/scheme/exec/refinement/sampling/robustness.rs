@@ -5,7 +5,7 @@ use sompas_structs::lnumber::LNumber;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Robustness(bool);
 
 impl TryFrom<LValue> for Robustness {
@@ -14,7 +14,7 @@ impl TryFrom<LValue> for Robustness {
     fn try_from(value: LValue) -> Result<Self, Self::Error> {
         match value {
             LValue::Number(LNumber::Int(0)) => Ok(Self::failure()),
-            LValue::Number(LNumber::Int(1)) => Ok(Self::success()),
+            LValue::Number(LNumber::Int(1)) => Ok(Self::identity()),
             _ => Err(LRuntimeError::default()),
         }
     }
@@ -25,7 +25,7 @@ impl Utility for Robustness {
     async fn compute<'a>(_: &LEnv, sampled_result: SampledResult<'a>) -> Self {
         match sampled_result {
             SampledResult::Failure => Self::failure(),
-            SampledResult::Success(_) => Self::success(),
+            SampledResult::Command(_) | SampledResult::Method(_) => Self::identity(),
         }
     }
 
@@ -40,7 +40,7 @@ impl Utility for Robustness {
         }
     }
 
-    fn success() -> Self {
+    fn identity() -> Self {
         Self(true)
     }
 

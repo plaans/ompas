@@ -84,6 +84,10 @@
     (def-command navigate_to_cell (:params (?r robot) (?cx int) (?cy int)))
     (def-command navigate_to_area (:params (?r robot) (?area object)))
     (def-command go_charge (:params (?r robot)))
+    (def-command-om-model go_charge
+        (:params (?r robot))
+        (:body (sleep 15)))
+
     (def-command do_rotation (:params (?r robot) (?a float) (?w float)))   
     (def-command face_belt (:params (?r robot) (?b belt) (?w float)))
     (def-command rotate_to (:params (?r robot) (?a float) (?w float)))

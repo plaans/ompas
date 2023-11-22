@@ -1626,6 +1626,29 @@ impl InnerActingManager {
         self.planner_manager_interface.is_some()
     }
 
+    pub fn is_planable(&self, id: &ActingProcessId) -> bool {
+        let mut id = *id;
+        if self.is_planner_activated() {
+            loop {
+                let parent = self.processes[id].parent();
+                if parent == 0 {
+                    return true;
+                }
+                let task_parent = self.processes[parent].parent();
+                if self.processes[task_parent]
+                    .inner
+                    .get_abstract_model()
+                    .is_some()
+                {
+                    return false;
+                }
+                id = task_parent;
+            }
+        } else {
+            false
+        }
+    }
+
     pub fn notify_plan_update(&mut self, updated: FilterWatchedProcesses) {
         if let Some(planner) = &mut self.planner_manager_interface {
             planner.notify_update_tree(updated);

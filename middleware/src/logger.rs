@@ -377,14 +377,14 @@ pub struct LogMessage {
 #[derive(Debug, Clone)]
 pub struct LogClient {
     pub(crate) topic_id: LogTopicId,
-    pub(crate) source: String,
+    pub(crate) source: Arc<String>,
 }
 
 impl Default for LogClient {
     fn default() -> Self {
         Self {
             topic_id: TOPIC_ALL_ID,
-            source: MASTER_LABEL.to_string(),
+            source: Arc::new(MASTER_LABEL.to_string()),
         }
     }
 }
@@ -393,7 +393,10 @@ impl LogClient {
     pub async fn new(source: impl Display, topic: impl Display) -> Self {
         let topic_id = MASTER.logger.subscribe_to_topic(topic).await;
         let source = source.to_string();
-        Self { topic_id, source }
+        Self {
+            topic_id,
+            source: Arc::new(source),
+        }
     }
 
     pub fn log(&self, message: impl Display, level: LogLevel) {

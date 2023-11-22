@@ -232,6 +232,12 @@ impl From<&LValueS> for LValue {
     }
 }
 
+impl From<&LValueS> for LValueS {
+    fn from(lvs: &LValueS) -> Self {
+        lvs.clone()
+    }
+}
+
 impl<T: Into<LValueS>> From<Vec<T>> for LValueS {
     fn from(mut v: Vec<T>) -> Self {
         Self::List(v.drain(..).map(|a| a.into()).collect())

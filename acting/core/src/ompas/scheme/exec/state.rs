@@ -230,15 +230,12 @@ async fn read_state(env: &LEnv, args: &[LValue]) -> LResult {
     let key: LValueS = key.try_into()?;
 
     let ctx = env.get_context::<ModState>(MOD_STATE)?;
-    let state = ctx.state_manager.get_state(None).await;
-
-    let result: LValue = match state.get(&key) {
+    let result = match ctx.state_manager.get_fact(&key, None).await {
         None => LValue::Nil,
         Some(f) => f.value.clone().into(),
     };
+    //debug_f.println("read_state");
     Ok(result)
-
-    //Ok(map.get(&key).cloned().unwrap_or(UNKNOWN.into()))
 }
 
 #[async_scheme_fn]
@@ -261,12 +258,17 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
 
     let ctx = env.get_context::<ModState>(MOD_STATE)?;
 
-    let state = ctx.state_manager.get_state(Some(StateType::Static)).await;
-
-    let result: LValue = match state.get(&key) {
+    let result = match ctx
+        .state_manager
+        .get_fact(&key, Some(StateType::Static))
+        .await
+    {
         None => LValue::Nil,
         Some(f) => f.value.clone().into(),
     };
+
+    //debug_f.println("read_state_static");
+
     Ok(result)
 }
 
@@ -275,7 +277,8 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn instance(env: &LEnv, object: String, r#type: String) -> LResult {
     let state = &env.get_context::<ModState>(MOD_STATE)?.state_manager;
 
-    Ok(state.instance(&object, &r#type).await)
+    let r = Ok(state.instance(&object, &r#type).await);
+    r
 }
 
 #[async_scheme_fn]

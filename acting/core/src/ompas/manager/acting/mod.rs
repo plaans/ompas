@@ -164,6 +164,10 @@ impl ActingManager {
     pub async fn is_planner_activated(&self) -> bool {
         self.inner.read().await.is_planner_activated()
     }
+
+    pub async fn is_planable(&self, id: &ActingProcessId) -> bool {
+        self.inner.read().await.is_planable(id)
+    }
 }
 
 pub enum MethodModel {

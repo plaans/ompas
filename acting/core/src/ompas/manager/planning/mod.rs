@@ -303,49 +303,81 @@ impl PlannerManager {
 
             debug_date.print_msg("Creating new planning instance");
             let mut planner_instance = PlannerInstance::new(ep, config).await;
-
-            tokio::select! {
-                Some(PlannerResult {
-                    stat,
-                    update,
-                    debug_date
-                }) = planner_instance.wait_on_plan() => {
-                    stats.write().await.add_stat(stat);
-                    if let Some(update) = update {
-                        debug_date.print_msg("Updating Acting tree");
-                        acting_manager.write().await.update_acting_tree(update).await;
-                        debug_date.print_msg("Acting Tree Updated");
-                    }else {
-                        debug_date.print_msg("Planner did not find a solution");
-                        acting_manager.write().await.notify_plan_update(FilterWatchedProcesses::All)
-                    }
-                    debug_date.print_msg("Planning instance terminated");
-
-                }
-                _ = process.recv() => {
-                    //println!("killing process planner manager");
-                    if let Some(pr) = planner_instance.interrupt().await {
-                        let stat = pr.stat;
-                        stats.write().await.add_stat(stat);
-                    };
-                    break 'main;
-                }
-                new_updates = Self::wait_next_cycle(&mut update_config) => {
-
-                    last_updates = Some(new_updates);
-                    if let Some(pr) = planner_instance.interrupt().await
-                    {
-                        let stat = pr.stat;
-                        stats.write().await.add_stat(stat);
-                        if let Some(update) = pr.update {
-                            acting_manager
-                                .write()
-                                .await
-                                .update_acting_tree(update)
-                                .await;
+            'instance: loop {
+                tokio::select! {
+                    r = planner_instance.wait_on_plan() => {
+                        if let Some(pr) = r {
+                            match pr {
+                                PlannerResult::Update(PlanUpdate {
+                                    update,
+                                    debug_date
+                                }) =>  {
+                                    if let Some(update) = update {
+                                debug_date.print_msg("Updating Acting tree");
+                                acting_manager.write().await.update_acting_tree(update).await;
+                                debug_date.print_msg("Acting Tree Updated");
+                                    } else {
+                                        debug_date.print_msg("Planner did not find a solution");
+                                        acting_manager.write().await.notify_plan_update(FilterWatchedProcesses::All)
+                                    }
+                                }
+                                PlannerResult::Stat(stat) => {
+                                        debug_date.print_msg("Planning instance terminated");
+                                        stats.write().await.add_stat(stat);
+                                        break 'instance
+                                }
+                            }
+                        } else {
+                            break 'instance
                         }
-                    };
 
+                    }
+                    _ = process.recv() => {
+                        //println!("killing process planner manager");
+                        planner_instance.interrupt().await;
+                        while let Some(pr) = planner_instance.wait_on_plan().await {
+                            match pr {
+                                PlannerResult::Stat(stat) => {
+                                    stats.write().await.add_stat(stat);
+                                    break;
+                                }
+                                PlannerResult::Update(u) => {
+                                    if let Some(update) = u.update {
+                                        acting_manager
+                                            .write()
+                                            .await
+                                            .update_acting_tree(update)
+                                            .await;
+                                    }
+                                }
+                            }
+                        };
+                        break 'main;
+                    }
+                    new_updates = Self::wait_next_cycle(&mut update_config) => {
+
+                        last_updates = Some(new_updates);
+
+                        planner_instance.interrupt().await;
+                        while let Some(pr) = planner_instance.wait_on_plan().await {
+                            match pr {
+                                PlannerResult::Stat(stat) => {
+                                    stats.write().await.add_stat(stat);
+                                    break;
+                                }
+                                PlannerResult::Update(u) => {
+                                    if let Some(update) = u.update {
+                                        acting_manager
+                                            .write()
+                                            .await
+                                            .update_acting_tree(update)
+                                            .await;
+                                    }
+                                }
+                            }
+                        };
+                        break 'instance;
+                    }
                 }
             }
             instance += 1;
@@ -353,8 +385,12 @@ impl PlannerManager {
     }
 }
 
-pub struct PlannerResult {
-    stat: PlanningInstanceStat,
+pub enum PlannerResult {
+    Stat(PlanningInstanceStat),
+    Update(PlanUpdate),
+}
+
+pub struct PlanUpdate {
     update: Option<ActingTreeUpdate>,
     debug_date: DebugDate,
 }
@@ -375,12 +411,12 @@ pub struct PlannerInstance {
 }
 
 impl PlannerInstance {
-    pub async fn interrupt(&mut self) -> Option<PlannerResult> {
+    pub async fn interrupt(&mut self) {
         let debug_date = self.debug_date;
         debug_date.print_msg("Sending interruption signal");
         let _ = self.interrupter.send(true);
         debug_date.print_msg("Interruption signal sent");
-        self.wait_on_plan().await
+        //self.wait_on_plan().await
     }
 
     pub async fn wait_on_plan(&mut self) -> Option<PlannerResult> {
@@ -420,81 +456,93 @@ impl PlannerInstance {
         let exp = Arc::new(explanation);
         tokio::spawn(async move {
             let debug_date = config.debug_date;
-            let result =
-                ompas_lcp::run_planner(&execution_problem, &config, |_, _| {}, Some(interrupted))
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let ep = Arc::new(execution_problem);
+            let ep2 = ep.clone();
+            let _ = tokio::spawn(async move {
+                let r = ompas_lcp::run_planner(&ep2, &config, Some(interrupted), Some(tx.clone()))
                     .await;
+                let _ = tx.send(r);
+                ()
+            });
 
-            let update = if let Ok(solver_result) = result {
-                match solver_result {
-                    SolverResult::Sol(pr) => {
-                        stat.status = PlanningStatus::Sat;
-                        stat.n_solution += 1;
+            while let Some(r) = rx.recv().await {
+                let update = if let Ok(solver_result) = r {
+                    match solver_result {
+                        SolverResult::Sol(pr) => {
+                            stat.status = PlanningStatus::Sat;
+                            stat.n_solution += 1;
 
-                        let choices = extract_choices(&pr);
-                        let PlanResult { pp, .. } = &pr;
+                            let choices = extract_choices(&pr);
+                            let PlanResult { pp, .. } = &pr;
 
-                        if OMPAS_PLAN_OUTPUT.get() {
-                            debug_date.print_msg(format!("Successfully planned for:\n{}", exp));
+                            if OMPAS_PLAN_OUTPUT.get() {
+                                debug_date.print_msg(format!(
+                                    "Successfully planned for (sol n°{}):\n{}",
+                                    stat.n_solution, exp
+                                ));
 
-                            if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
-                                for (origin, chronicle) in pp
-                                    .instances
-                                    .iter()
-                                    .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
-                                {
-                                    println!("{:?}:\n{}", origin, chronicle)
+                                if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
+                                    for (origin, chronicle) in pp
+                                        .instances
+                                        .iter()
+                                        .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                                    {
+                                        println!("{:?}:\n{}", origin, chronicle)
+                                    }
+                                }
+                                for choice in &choices {
+                                    println!("{}:{}", choice.process_ref, choice.choice_inner)
                                 }
                             }
-                            for choice in &choices {
-                                println!("{}:{}", choice.process_ref, choice.choice_inner)
+                            let new_ams = extract_new_acting_models(&pr);
+
+                            //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
+                            Some(ActingTreeUpdate {
+                                acting_models: new_ams,
+                                choices,
+                            })
+                        }
+                        SolverResult::Unsat => {
+                            stat.status = PlanningStatus::Unsat;
+                            None
+                        }
+                        SolverResult::Interrupt(_) => {
+                            stat.status = PlanningStatus::Interrupted;
+                            None
+                        }
+                        SolverResult::Timeout(_) => {
+                            stat.status = PlanningStatus::Timeout;
+                            None
+                        }
+                    }
+                } else {
+                    if OMPAS_PLAN_OUTPUT.get() {
+                        debug_date.print_msg("No solution found by planner for");
+                        if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
+                            for (origin, chronicle) in ep
+                                .chronicles
+                                .iter()
+                                .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
+                            {
+                                println!("{:?}:\n{}", origin, chronicle)
                             }
                         }
-                        let new_ams = extract_new_acting_models(&pr);
+                    }
+                    None
+                };
 
-                        //We update the plan with new acting models and choices extracted from the instanciation of variables of the planner.
-                        Some(ActingTreeUpdate {
-                            acting_models: new_ams,
-                            choices,
-                        })
-                    }
-                    SolverResult::Unsat => {
-                        stat.status = PlanningStatus::Unsat;
-                        None
-                    }
-                    SolverResult::Interrupt(_) => {
-                        stat.status = PlanningStatus::Interrupted;
-                        None
-                    }
-                    SolverResult::Timeout(_) => {
-                        stat.status = PlanningStatus::Timeout;
-                        None
-                    }
+                match plan_sender.send(PlannerResult::Update(PlanUpdate { update, debug_date })) {
+                    Ok(_) => {}
+                    Err(e) => panic!("Error sending plan update: {}", e),
                 }
-            } else {
-                if OMPAS_PLAN_OUTPUT.get() {
-                    debug_date.print_msg("No solution found by planner for");
-                    if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
-                        for (origin, chronicle) in execution_problem
-                            .chronicles
-                            .iter()
-                            .map(|i| (i.origin.clone(), &i.instantiated_chronicle))
-                        {
-                            println!("{:?}:\n{}", origin, chronicle)
-                        }
-                    }
-                }
-                None
-            };
+            }
 
             let end = clock_manager.now();
             stat.duration =
                 crate::ompas::manager::acting::interval::Interval::new(start, Some(end)).duration();
-            //println!("sending update");
-            match plan_sender.send(PlannerResult {
-                stat,
-                update,
-                debug_date,
-            }) {
+
+            match plan_sender.send(PlannerResult::Stat(stat)) {
                 Ok(_) => {}
                 Err(e) => panic!("Error sending plan update: {}", e),
             }

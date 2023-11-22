@@ -9,7 +9,7 @@ use crate::planning::planner::result::PlanResult;
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG, OMPAS_PLANNER_OUTPUT, OMPAS_PLAN_OUTPUT};
 use anyhow::Result;
 use aries::core::{IntCst, INT_CST_MAX};
-use aries::model::extensions::{AssignmentExt, SavedAssignment};
+use aries::model::extensions::AssignmentExt;
 use aries::solver::parallel::signals::InputSignal;
 use aries::solver::parallel::Solution;
 use aries_planners::encode::EncodedProblem;
@@ -25,6 +25,8 @@ use sompas_structs::lenv::LEnv;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::runtime::Handle;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedSender;
 
 const MIN_DEPTH: u32 = 0;
 const MAX_DEPTH: u32 = u32::MAX;
@@ -69,8 +71,8 @@ fn is_fully_populated(instances: &[ChronicleInstance]) -> bool {
 pub async fn run_planner(
     execution_problem: &ExecutionProblem,
     config: &OMPASLCPConfig,
-    on_new_sol: impl Fn(&FiniteProblem, Arc<SavedAssignment>) + Clone + Send + 'static,
     interrupter: Option<PlannerInterrupter>,
+    intermediate_sender: Option<UnboundedSender<Result<SolverResult<PlanResult>>>>,
 ) -> Result<SolverResult<PlanResult>> {
     let OMPASLCPConfig {
         state_subscriber_id,
@@ -84,7 +86,7 @@ pub async fn run_planner(
     let handle = Handle::current();
     let mut best_cost = INT_CST_MAX + 1;
 
-    let mut pp = populate_problem(
+    let pp = populate_problem(
         FinitePlanningProblem::ExecutionProblem(execution_problem),
         domain,
         env,
@@ -92,6 +94,7 @@ pub async fn run_planner(
     )
     .await
     .unwrap();
+    let mut pp = Arc::new(pp);
 
     let min_depth = MIN_DEPTH;
     let max_depth = MAX_DEPTH;
@@ -208,90 +211,95 @@ pub async fn run_planner(
             SolverResult::Interrupt(None) => return Ok(SolverResult::Interrupt(None)),
             _ => unreachable!(),
         };
+        let new_pp = Arc::new(new_pp);
+        let table = Arc::new(table);
         let pb = Arc::new(pb);
-
-        let on_new_valid_assignment = {
-            let pb = pb.clone();
-            let on_new_sol = on_new_sol.clone();
-            move |ass: Arc<SavedAssignment>| on_new_sol(&pb, ass)
-        };
         if PRINT_PLANNER_OUTPUT.get() {
             debug_date.print_msg(" Populated");
         }
-        let result = solve_finite_problem(
-            debug_date,
-            pb.clone(),
-            &STRATEGIES,
-            *opt,
-            on_new_valid_assignment,
-            best_cost - 1,
-            interrupter.clone(),
-        )
-        .await;
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let pb2 = pb.clone();
+        let int_2 = interrupter.clone();
+        let opt2 = *opt;
+        let debug_date2 = debug_date.clone();
+        tokio::spawn(async move {
+            let r = solve_finite_problem(
+                debug_date2,
+                pb2,
+                &STRATEGIES,
+                opt2,
+                best_cost - 1,
+                int_2,
+                Some(tx.clone()),
+            )
+            .await;
+            tx.send((r, true))
+        });
         if PRINT_PLANNER_OUTPUT.get() {
             debug_date.print_msg(" Solved");
         }
 
-        let result = result.map(|assignment| (pb, assignment));
-        match result {
-            SolverResult::Unsat => {
-                if fully_populated {
-                    return Ok(SolverResult::Unsat);
+        'loop_result: while let Some(result) = rx.recv().await {
+            let last = result.1;
+            let result = result.0.map(|assignment| (pb.clone(), assignment));
+            let r = match result {
+                SolverResult::Unsat => {
+                    if fully_populated {
+                        debug_date.print_msg("No solution");
+                        return Ok(SolverResult::Unsat);
+                    }
+                    break 'loop_result;
+                    //println!("unsat")
                 }
-                //println!("unsat")
-            } // continue (increase depth)
-            SolverResult::Sol((_, (_, cost)))
-                if opt.is_some() && depth < max_depth && !fully_populated =>
-            {
-                //println!("get sol");
-                let cost = cost.expect("Not cost provided in optimization problem");
-                assert!(cost < best_cost);
-                best_cost = cost; // continue with new cost bound
-            }
-            other => {
-                return Ok(other.map(|(pb, (ass, _))| (pb, ass))).map(|r| match r {
-                    SolverResult::Sol((fp, ass)) => {
-                        if OMPAS_PLANNER_OUTPUT.get() {
-                            debug_date.print_msg("  Solution found");
-                            debug_date.print_msg(format!(
-                                "\n**** Decomposition ****\n\n\
+                SolverResult::Sol((fp, (ass, cost))) => {
+                    if let Some(cost) = cost {
+                        best_cost = cost
+                    }
+                    if OMPAS_PLANNER_OUTPUT.get() {
+                        debug_date.print_msg("  Solution found");
+                        debug_date.print_msg(format!(
+                            "\n**** Decomposition ****\n\n\
                     {}\n\n\
                     **** Plan ****\n\n\
                     {}",
-                                format_hddl_plan(&fp, &ass).unwrap(),
-                                format_pddl_plan(&fp, &ass).unwrap(),
-                            ));
-                        }
+                            format_hddl_plan(&fp, &ass).unwrap(),
+                            format_pddl_plan(&fp, &ass).unwrap(),
+                        ));
+                    }
 
-                        SolverResult::Sol(PlanResult {
-                            ass,
-                            fp,
-                            pp: Arc::new(new_pp),
-                            table: Arc::new(table),
-                        })
+                    SolverResult::Sol(PlanResult {
+                        ass,
+                        fp,
+                        pp: new_pp.clone(),
+                        table: table.clone(),
+                    })
+                }
+                SolverResult::Timeout(_) => {
+                    if OMPAS_PLANNER_OUTPUT.get() {
+                        debug_date.print_msg("Timeout");
                     }
-                    SolverResult::Unsat => {
-                        if OMPAS_PLANNER_OUTPUT.get() {
-                            debug_date.print_msg("No solution");
-                        }
-                        SolverResult::Unsat
+                    SolverResult::Timeout(None)
+                }
+                SolverResult::Interrupt(_) => {
+                    if OMPAS_PLAN_OUTPUT.get() {
+                        debug_date.print_msg("Interrupt")
                     }
-                    SolverResult::Timeout(_) => {
-                        if OMPAS_PLANNER_OUTPUT.get() {
-                            debug_date.print_msg("Timeout");
-                        }
-                        SolverResult::Timeout(None)
-                    }
-                    SolverResult::Interrupt(_) => {
-                        if OMPAS_PLAN_OUTPUT.get() {
-                            debug_date.print_msg("Interrupt")
-                        }
-                        SolverResult::Interrupt(None)
-                    }
-                })
+                    SolverResult::Interrupt(None)
+                } // continue (increase depth)
+            };
+
+            let r = Ok(r);
+            if last {
+                return r;
+            } else {
+                if let Some(sender) = intermediate_sender.as_ref() {
+                    let _ = sender.send(r);
+                }
             }
         }
-        pp = new_pp;
+
+        pp = new_pp.clone();
     }
 
     Ok(SolverResult::Unsat)
@@ -309,9 +317,11 @@ async fn solve_finite_problem(
     pb: Arc<FiniteProblem>,
     strategies: &[Strat],
     metric: Option<Metric>,
-    on_new_solution: impl Fn(Arc<SavedAssignment>) + Send + 'static,
     cost_upper_bound: IntCst,
     interrupter: Option<PlannerInterrupter>,
+    intermediate_sender: Option<
+        tokio::sync::mpsc::UnboundedSender<(SolverResult<(Solution, Option<IntCst>)>, bool)>,
+    >,
 ) -> SolverResult<(Solution, Option<IntCst>)> {
     let handle = Handle::current();
     if let Some(interrupter) = &interrupter {
@@ -373,6 +383,15 @@ async fn solve_finite_problem(
             }
         }
     });
+
+    let int = intermediate_sender.clone();
+
+    let on_new_solution = move |s: Solution| {
+        let cost = metric.map(|metric| s.domain_of(metric).0);
+        if let Some(sender) = int.as_ref() {
+            let _ = sender.send((SolverResult::Sol((s, cost)), false));
+        }
+    };
 
     let join = handle.spawn_blocking(move || {
         debug_date.print_msg("[Aries] Starting solver");

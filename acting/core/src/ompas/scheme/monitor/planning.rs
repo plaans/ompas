@@ -195,7 +195,7 @@ pub async fn __plan(
             env,
             debug_date: DebugDate::new(0),
         },
-        |_, _| {},
+        None,
         None,
     )
     .await;

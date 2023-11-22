@@ -763,7 +763,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
             eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
         }
     };
-    method.lambda_score = score;
+    method.model_collection.insert(score, ModelKind::CostModel);
 
     let expr = format!(
         "(lambda {} (do {} {}))",

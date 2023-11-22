@@ -11,6 +11,10 @@ pub enum Cost {
     Some(f64),
 }
 
+impl Cost {
+    pub const MAX_COST: f64 = 1e13;
+}
+
 impl Default for Cost {
     fn default() -> Self {
         Self::Some(0.0)

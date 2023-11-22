@@ -2,6 +2,7 @@ pub mod aries;
 
 mod sampling;
 
+use crate::model::acting_domain::model::ModelKind;
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::ompas::error::RaeExecError;
 use crate::ompas::interface::select_mode::{Planner, SelectMode};
@@ -141,7 +142,7 @@ pub async fn refine(env: &LEnv, args: &[LValue]) -> LResult {
     }
     let log = ctx.log.clone();
     let debug = acting_manager.get_debug(&task_id).await.unwrap();
-    log.debug(format!("({task_id}) Refine {debug} "));
+    log.info(format!("({task_id}) Refine {debug} "));
 
     let rt: RefinementTrace = select(task_id, env)
         .await
@@ -315,7 +316,7 @@ pub async fn select(
         now.elapsed().unwrap().as_micros()
     );*/
 
-    log.debug(format!(
+    log.info(format!(
         "({}) Candidates = {}",
         task_id,
         LValue::from(&candidates),
@@ -332,7 +333,7 @@ pub async fn select(
             Some(id)
         }
         None => {
-            if acting_manager.is_planner_activated().await {
+            if acting_manager.is_planable(&task_id).await {
                 let start = mod_refinement.clock_manager.now();
                 let watcher = acting_manager
                     .subscribe_on_plan_update(FilterWatchedProcesses::Some(vec![task_id]))
@@ -369,12 +370,12 @@ pub async fn select(
 
     let mut selected = if let Some(id) = planned_refinement {
         let lv: LValue = acting_manager.get_refinement_lv(&id).await;
-        log.debug(format!(
+        log.info(format!(
             "({task_id}) Select found planned refinement: ({id}) {};",
             lv,
         ));
         if candidates.contains(&lv) {
-            log.debug(format!("({task_id}) Valid planned refinement ({id}) {lv}"));
+            log.info(format!("({task_id}) Valid planned refinement ({id}) {lv}"));
             //let args = acting_manager.get_process_args(&refinement).await;
             let args: Vec<_> = if let LValue::List(list) = lv {
                 list.iter().map(|v| v.as_cst().unwrap()).collect()
@@ -449,7 +450,7 @@ pub async fn select(
     //     now.elapsed().unwrap().as_micros()
     // );
 
-    log.debug(format!("({task_id}) selected: {}", rt.selected));
+    log.info(format!("({task_id}) selected: {}", rt.selected));
 
     Ok(rt)
 }
@@ -499,7 +500,7 @@ pub async fn applicable(
         .unwrap()
         .get_methods()
         .clone();
-
+    let mut handles = Vec::with_capacity(256);
     for template in &method_templates {
         let method_template = domain.get_method(template).await.unwrap();
         let types: Vec<LValue> = method_template
@@ -522,21 +523,39 @@ pub async fn applicable(
         let iter = instances_template.drain(..);
 
         for i in iter {
-            let i_vec: Vec<LValue> = i.borrow().try_into()?;
-            let arg = cons(env, &[pre_conditions_lambda.clone(), i_vec[1..].into()])?;
-            let arg_debug = arg.to_string();
-            let lv: LValue = eval(
-                &list!(LPrimitive::Enr.into(), list!(LPrimitive::Quote.into(), arg)),
-                &mut env.clone(),
-                None,
-            )
-            .await
-            .map_err(|e: LRuntimeError| e.chain(format!("eval pre_conditions: {}", arg_debug)))?;
-            if !matches!(lv, LValue::Err(_)) {
-                applicable_methods.push(i);
-            }
+            let mut env = env.clone();
+            let lambda = pre_conditions_lambda.clone();
+            let handle = tokio::spawn(async move {
+                let i_vec: Vec<LValue> = i.borrow().try_into().unwrap();
+                let arg = cons(&env, &[lambda, i_vec[1..].into()]).unwrap();
+                let arg_debug = arg.to_string();
+                let lv_eval = list!(LPrimitive::Enr.into(), list!(LPrimitive::Quote.into(), arg));
+                (
+                    eval(&lv_eval, &mut env, None)
+                        .await
+                        .map_err(|e: LRuntimeError| {
+                            e.chain(format!("eval pre_conditions: {}", arg_debug))
+                        }),
+                    i,
+                )
+            });
+            handles.push(handle);
         }
     }
+
+    for handle in handles {
+        let (lv, m) = handle.await.unwrap();
+        let lv = lv?;
+        if !matches!(lv, LValue::Err(_)) {
+            applicable_methods.push(m);
+        }
+    }
+    // ctx.log.debug(format!(
+    //     "applicable({}): time = {} µs, n= {}",
+    //     debug_task,
+    //     time.elapsed().unwrap().as_micros(),
+    //     n
+    // ));
 
     Ok(applicable_methods)
 }
@@ -562,7 +581,9 @@ pub async fn score_select(
             .get_method(&list[0].to_string())
             .await
             .unwrap()
-            .lambda_score
+            .model_collection
+            .get(&ModelKind::CostModel)
+            .unwrap()
             .clone();
 
         let arg = cons(&env, &[score_lambda, list[1..].into()])?;

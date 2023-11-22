@@ -793,8 +793,8 @@ impl SymTable {
         self.lattice.export_dot()
     }
 
-    pub fn get_lattice(&self) -> TypeLattice {
-        self.lattice.clone()
+    pub fn get_lattice(&self) -> &TypeLattice {
+        &self.lattice
     }
 }
 

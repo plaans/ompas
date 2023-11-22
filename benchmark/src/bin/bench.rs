@@ -8,7 +8,7 @@ use ompas_benchmark::config::BenchConfig;
 use ompas_benchmark::{install_binary, send_email, BenchmarkData, RunData};
 use ompas_core::OMPAS_PATH;
 use ompas_language::monitor::control::SET_PRE_COMPUTE_MODELS;
-use ompas_middleware::OMPAS_WORKING_DIR;
+use ompas_middleware::{LogLevel, OMPAS_WORKING_DIR};
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::fs;
@@ -166,7 +166,7 @@ async fn main() {
         run_config_path.push("run_config");
         fs::create_dir_all(&run_config_path).unwrap();
         for heuristic in heuristics {
-            let (label, code, start) = generate_config(heuristic, &domain_path);
+            let (label, code, start) = generate_config(heuristic, &domain_path, config.log_level);
             //Store in file
             let mut config_path = run_config_path.clone();
             config_path.push(format!("{}.lisp", label));
@@ -304,7 +304,11 @@ async fn main() {
     }
 }
 
-fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, String, String) {
+fn generate_config(
+    heuristic: &HeuristicConfig,
+    domain: &Path,
+    log_level: LogLevel,
+) -> (String, String, String) {
     let select = match heuristic.select {
         SelectConfig::Greedy => "greedy",
         SelectConfig::Random => "random",
@@ -364,9 +368,9 @@ fn generate_config(heuristic: &HeuristicConfig, domain: &Path) -> (String, Strin
         format!(
             "(begin
     (read \"{}\") ; loading domain
-    (set-log-level info) ;setting log-level
+    (set-log-level {}) ;setting log-level
     (set-select {})) ; define the algorithm of select",
-            domain, select,
+            domain, log_level, select,
         ),
         start.to_string(),
     )

@@ -378,7 +378,7 @@ impl ResourceManager {
                     Resource {
                         label: v.label.to_string(),
                         id: v.id,
-                        max_capacity: v.max_capacity,
+                        max_capacity: v.capacity,
                         capacity: v.capacity,
                         in_service: Default::default(),
                         queue: vec![],

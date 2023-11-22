@@ -1,14 +1,13 @@
-use im::HashSet;
 use std::fmt::Display;
 
 #[derive(Default, Clone, Debug)]
 pub struct PureFonctionCollection {
-    inner: HashSet<String>,
+    inner: im::HashSet<String>,
 }
 
 impl From<Vec<&'static str>> for PureFonctionCollection {
     fn from(vec: Vec<&'static str>) -> Self {
-        let mut set = HashSet::default();
+        let mut set = im::HashSet::default();
         for e in vec {
             set.insert(e.to_string());
         }

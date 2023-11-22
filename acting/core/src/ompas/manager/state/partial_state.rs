@@ -40,7 +40,7 @@ impl From<LValueS> for Fact {
 
 #[derive(Clone, Default, Debug)]
 pub struct PartialState {
-    pub inner: HashMap<LValueS, Fact>,
+    pub inner: im::HashMap<LValueS, Fact>,
     pub _type: Option<StateType>,
 }
 

@@ -12,3 +12,5 @@ Cargo.lock
 gobot-bin
 ompas_config_local.bash
 playground.bash
+benchmark.bash
+draft.lisp

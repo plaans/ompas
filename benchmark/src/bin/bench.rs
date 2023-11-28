@@ -289,7 +289,7 @@ async fn main() {
                 }
             }
         }
-        job_bar.inc_length(1);
+        job_bar.inc(1);
     }
 
     job_bar.finish();

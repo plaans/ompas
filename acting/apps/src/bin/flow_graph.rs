@@ -103,10 +103,10 @@ pub async fn __convert(lv: LValue, mut p_env: PLEnv) -> Result<ActingModel, LRun
     //debug_println!("annotate =>\n{}", lv_om.format(0));
 
     let pp_lv = lambda_expansion(&lv_om, &p_env).await?;
-    let pp_lv = pre_processing(&pp_lv, &p_env).await?;
+    let pp_lv = pre_processing(&pp_lv, &p_env)?;
     //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
 
-    let chronicle = match _convert(None, &pp_lv, &mut p_env, st).await {
+    let chronicle = match _convert(None, &pp_lv, &mut p_env, st) {
         Ok(ch) => Some(ch),
         Err(e) => {
             println!("{}", e);

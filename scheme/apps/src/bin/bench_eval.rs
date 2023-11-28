@@ -7,8 +7,8 @@ use std::time::SystemTime;
 #[tokio::main]
 pub async fn main() {
     //let env = get_root_env().await;
-    test_fact(100).await;
-    test_lisp_integration().await;
+    let _ = test_fact(100).await;
+    let _ = test_lisp_integration().await;
 }
 
 fn create_list_test() -> Vec<(&'static str, LValue)> {
@@ -77,11 +77,11 @@ async fn test_fact(n: i64) -> lruntimeerror::Result<()> {
         &mut env,
     )
     .await?;
-    let r = eval(&lv, &mut env, None).await?;
+    let _ = eval(&lv, &mut env, None).await?;
     let time = SystemTime::now();
     let lv = parse(format!("(fact {n})").as_str(), &mut env).await?;
     let parse = time.elapsed().unwrap().as_secs_f64();
-    let r = eval(&lv, &mut env, None).await?;
+    let _ = eval(&lv, &mut env, None).await?;
     let end = time.elapsed().unwrap().as_secs_f64();
     println!(
         "eval({lv}) took {:.3} µs ({:.1} % to parse)",

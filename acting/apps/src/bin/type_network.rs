@@ -59,6 +59,7 @@ fn test_meet(tn: &TypeLattice, ta: DomainTest, tb: DomainTest) {
     println!("{} ^ {} = {}", ta, tb, r2)
 }
 
+#[allow(dead_code)]
 fn test_union(tn: &TypeLattice, ta: DomainTest, tb: DomainTest) {
     let r = tn.union(&ta.into_domain(tn), &tb.into_domain(tn));
     let r = DomainTest::from_domain(tn, &r);

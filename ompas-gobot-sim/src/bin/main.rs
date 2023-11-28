@@ -26,8 +26,8 @@ struct Opt {
     #[structopt(short = "d", long = "domain")]
     domain: Option<PathBuf>,
 
-    #[structopt(short = "h", long = "headless")]
-    headless: bool,
+    #[structopt(short = "v", long = "view")]
+    view: bool,
 }
 
 #[tokio::main]
@@ -63,7 +63,7 @@ async fn lisp_interpreter(opt: Opt) {
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(
             LispDomain::File(opt.domain.unwrap_or(default_gobot_sim_domain().into())),
-            opt.headless,
+            !opt.view,
             LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,
         ),
         opt.log.clone(),

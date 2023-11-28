@@ -23,7 +23,7 @@ pub static OMPAS_PLANNER_OUTPUT: EnvParam<bool> = EnvParam::new("OMPAS_PLANNER_O
 
 pub static OMPAS_PATH: EnvParam<String> = EnvParam::new("OMPAS_PATH", "~/ompas");
 pub static OMPAS_RESOURCE_ENCODING: EnvParam<ResourceEncoding> =
-    EnvParam::new("OMPAS_RESOURCE_ENCODING", "assignment");
+    EnvParam::new("OMPAS_RESOURCE_ENCODING", "addition");
 
 pub static OMPAS_PRE_COMPUTE_MODELS: EnvParam<bool> =
     EnvParam::new("OMPAS_PRE_COMPUTE_MODELS", "true");

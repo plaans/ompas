@@ -22,6 +22,9 @@ struct Opt {
 
     #[structopt(short = "d", long = "domain")]
     domain: PathBuf,
+
+    #[structopt(short = "v", long = "view")]
+    _view: bool,
 }
 
 #[tokio::main]

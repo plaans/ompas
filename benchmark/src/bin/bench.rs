@@ -161,7 +161,7 @@ async fn main() {
 
         //Generate lisp code for all possible configs
         run_bar.println("Generating files for heuristics...");
-        let mut configs: Vec<RunConfig> = vec![];
+        let mut run_configs: Vec<RunConfig> = vec![];
         let mut run_config_path = job_dir.clone();
         run_config_path.push("run_config");
         fs::create_dir_all(&run_config_path).unwrap();
@@ -179,7 +179,7 @@ async fn main() {
             file.write_all(code.as_bytes()).unwrap();
 
             //Store file name in run_configs
-            configs.push(RunConfig {
+            run_configs.push(RunConfig {
                 label,
                 start,
                 path: config_path,
@@ -187,7 +187,7 @@ async fn main() {
         }
         run_bar.println("Done!");
 
-        let n_problem = configs.len() * problems.len() * (*n_run as usize);
+        let n_problem = run_configs.len() * problems.len() * (*n_run as usize);
         run_bar.println(format!("{} run to do...", n_problem));
         run_bar.reset();
         run_bar.set_length(n_problem.try_into().unwrap());
@@ -200,12 +200,15 @@ async fn main() {
 
         for problem in &problems {
             let problem_path = problem.path.to_str().unwrap();
-            for config in &configs {
-                let config_path = config.path.to_str().unwrap();
+            for run_config in &run_configs {
+                let config_path = run_config.path.to_str().unwrap();
 
                 let mut problem_config_path: PathBuf = problems_path.clone();
-                let problem_config_name =
-                    format!("{}_{}", problem.label.replace(".lisp", ""), config.label);
+                let problem_config_name = format!(
+                    "{}_{}",
+                    problem.label.replace(".lisp", ""),
+                    run_config.label
+                );
                 problem_config_path.push(format!("{}.lisp", problem_config_name));
                 let mut file = OpenOptions::new()
                     .write(true)
@@ -225,7 +228,7 @@ async fn main() {
     (exit 0))",
                     config_path,
                     problem_path,
-                    config.start,
+                    run_config.start,
                     min_time.unwrap_or(0),
                     timeout - min_time.unwrap_or(0),
                     problem_config_name,
@@ -244,6 +247,9 @@ async fn main() {
 
                     let mut command = Command::new(domain.get_binary());
                     command.args(["-d", config_path]);
+                    if config.view {
+                        command.arg("-v");
+                    }
                     command.env("OMPAS_WORKING_DIR", job_dir.to_str().unwrap());
 
                     //run_bar.println(format!("command: {:?}", command));

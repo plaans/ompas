@@ -418,7 +418,7 @@ pub async fn select(
                         .map_err(|e| e.chain("c_choice_select"))?
                 }
                 SelectMode::Planning(Planner::RAEPlan(config)) => {
-                    rae_plan_select(&candidates, &state, env, config)
+                    rae_plan_select(&task, &candidates, &state, env, config)
                         .await
                         .map_err(|e| e.chain("rae_plan_select"))?
                 }

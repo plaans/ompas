@@ -4,19 +4,23 @@ use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::select_mode::RAEPlanConfig;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
-use crate::ompas::scheme::exec::refinement::greedy_select;
 use crate::ompas::scheme::exec::refinement::sampling::cost::Cost;
 use crate::ompas::scheme::exec::refinement::sampling::efficiency::Efficiency;
 use crate::ompas::scheme::exec::refinement::sampling::Utility;
+use crate::ompas::scheme::exec::refinement::{candidates, greedy_select};
+use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::exec::ModExec;
 use ompas_language::exec::rae_plan::*;
+use ompas_language::exec::state::MOD_STATE;
+use rand::prelude::SliceRandom;
 use sompas_core::{eval, parse};
 use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
+use sompas_structs::lenv::ImportType::WithoutPrefix;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror;
-use sompas_structs::lruntimeerror::LRuntimeError;
+use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use std::cmp;
 use std::fmt::{Display, Formatter};
@@ -106,78 +110,77 @@ pub async fn compose_efficiency(env: &LEnv, cost: Cost) -> Result<(), LRuntimeEr
     Ok(())
 }
 
-// #[async_scheme_fn]
-// pub async fn rae_plan(env: &LEnv, task: &[LValue]) -> LResult {
-//     let state = env.get_context::<ModState>(MOD_STATE)?;
-// let state = state.state.get_snapshot().await;
-// //let map: HashMap<LValue, u64> = Default::default();
-// let mut method = LValue::Nil;
-// let mut efficiency: Option<Efficiency> = None;
-//
-// let ctx = env.get_context::<ModRaePlan>(MOD_RAE_PLAN)?;
-// let level = ctx.level.load(Ordering::Relaxed);
-//
-// let mut methods: Vec<LValue> = greedy_select(candi&state,  task, env)
-//     .await?
-//     .possibilities;
-// if let Some(b) = ctx.config.get_b() {
-//     if b < methods.len() {
-//         async {
-//             let mut rng = rand::thread_rng();
-//             methods.shuffle(&mut rng);
-//             methods = methods[0..b].to_vec();
-//         }
-//         .await;
-//     }
-// }
-// for m in &methods {
-//     let mut new_env = env.clone();
-//     println!("Computing cost for {}({})", m, level);
-//     new_env.update_context(ctx.new_from_tried(vec![], level + 1));
-//     new_env.update_context(ModState::new_from_snapshot(state.clone()));
-//     eval(m, &mut new_env, None).await?;
-//     let new_efficiency = new_env
-//         .get_context::<ModRaePlan>(MOD_RAE_PLAN)
-//         .unwrap()
-//         .get_efficiency()
-//         .await;
-//     println!(
-//         "c_choice for {}({}): method = {} ; efficiency = {:?}",
-//         LValue::from(task),
-//         level,
-//         m,
-//         new_efficiency
-//     );
-//
-//     match &efficiency {
-//         None => {
-//             efficiency = Some(new_efficiency);
-//             method = m.clone();
-//         }
-//         Some(e) => {
-//             if *e < new_efficiency {
-//                 efficiency = Some(new_efficiency);
-//                 method = m.clone();
-//             }
-//         }
-//     }
-//     println!("End computing cost for {}({})", m, level);
-// }
-//
-// env.get_context::<ModRaePlan>(MOD_RAE_PLAN)
-//     .unwrap()
-//     .compose_efficiency(efficiency.unwrap_or(Efficiency::Inf))
-//     .await;
-//
-// println!(
-//     "c_choice for {}({}): selected method = {} ; efficiency = {:?}",
-//     LValue::from(task),
-//     level,
-//     method,
-//     efficiency
-// );
-//     greedy_select()
-// }
+#[async_scheme_fn]
+pub async fn rae_plan(env: &LEnv, task: &[LValue]) -> LResult {
+    let state = env.get_context::<ModState>(MOD_STATE)?;
+    let state = state.state_manager.get_snapshot().await;
+    //let map: HashMap<LValue, u64> = Default::default();
+    let mut method = LValue::Nil;
+    let mut efficiency: Option<Efficiency> = None;
+
+    let ctx = env.get_context::<ModRaePlan>(MOD_RAE_PLAN)?;
+    let level = ctx.level.load(Ordering::Relaxed);
+
+    let mut methods: Vec<LValue> = candidates(&state, &ctx.tried, task, env).await?;
+    if let Some(b) = ctx.config.get_b() {
+        if b < methods.len() {
+            async {
+                let mut rng = rand::thread_rng();
+                methods.shuffle(&mut rng);
+                methods = methods[0..b].to_vec();
+            }
+            .await;
+        }
+    }
+    for m in &methods {
+        let mut new_env = env.clone();
+        println!("Computing cost for {}({})", m, level);
+        new_env.update_context(ctx.new_from_tried(vec![], level + 1));
+        new_env.update_context(ModState::new_from_snapshot(state.clone()));
+        eval(m, &mut new_env, None).await?;
+        let new_efficiency = new_env
+            .get_context::<ModRaePlan>(MOD_RAE_PLAN)
+            .unwrap()
+            .get_efficiency()
+            .await;
+        println!(
+            "rae_plan for {}({}): method = {} ; efficiency = {:?}",
+            LValue::from(task),
+            level,
+            m,
+            new_efficiency
+        );
+
+        match &efficiency {
+            None => {
+                efficiency = Some(new_efficiency);
+                method = m.clone();
+            }
+            Some(e) => {
+                if *e < new_efficiency {
+                    efficiency = Some(new_efficiency);
+                    method = m.clone();
+                }
+            }
+        }
+        println!("End computing cost for {}({})", m, level);
+    }
+
+    env.get_context::<ModRaePlan>(MOD_RAE_PLAN)
+        .unwrap()
+        .compose_efficiency(efficiency.unwrap_or(Efficiency::Inf))
+        .await;
+
+    println!(
+        "rae_plan for {}({}): selected method = {} ; efficiency = {:?}",
+        LValue::from(task),
+        level,
+        method,
+        efficiency
+    );
+
+    Ok(method)
+}
 
 pub async fn rae_plan_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
     for (label, command) in &domain.commands {
@@ -225,30 +228,19 @@ pub async fn rae_plan_env(mut env: LEnv, domain: &OMPASDomain) -> LEnv {
 }
 
 pub async fn rae_plan_select(
+    task: &[LValue],
     candidates: &[LValue],
     state: &WorldStateSnapshot,
     env: &LEnv,
     config: RAEPlanConfig,
-) -> lruntimeerror::Result<LValue> {
+) -> LResult {
     let new_env = env.clone();
     let ctx = env.get_context::<ModRaePlan>(MOD_RAE_PLAN).unwrap();
 
-    // let mut new_env: LEnv = rae_plan_env(new_env, &ctx.domain.get_inner().await).await;
-    // new_env.import_module(ctx.new_from_tried(greedy.tried.to_vec(), 0), WithoutPrefix);
-    // new_env.update_context(ModState::new_from_snapshot(state.clone()));
-    //
-    // greedy.select = SelectKind::RealTime(RTSelect {
-    //     refinement_type: SelectMode::Planning(Planner::RAEPlan(config)),
-    // });
-    //
-    // let method: LValue = eval(&greedy.task_value, &mut new_env, None).await?;
-    //
-    // greedy.selected = method;
-    // greedy.duration.set_end(Timepoint::new_micros(
-    //     env.get_context::<ModTime>(MOD_TIME)?.get_micros().await,
-    // ));
+    let mut new_env: LEnv = rae_plan_env(new_env, &ctx.domain.get_inner().await).await;
+    new_env.import_module(ctx.new_from_tried(vec![], 0), WithoutPrefix);
+    new_env.update_context(ModState::new_from_snapshot(state.clone()));
 
-    // Ok(greedy)
-
-    greedy_select(candidates, state, env)
+    let method: LValue = eval(&LValue::from(task), &mut new_env, None).await?;
+    Ok(method)
 }

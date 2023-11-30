@@ -1,10 +1,12 @@
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::planning::conversion::context::ConversionContext;
+use crate::planning::conversion::convert_acting_domain;
+#[cfg(feature = "conversion_data")]
+use crate::planning::conversion::debug_with_markdown;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, PLEnv};
 use crate::planning::conversion::flow_graph::algo::p_eval::{p_eval, P_EVAL};
-use crate::planning::conversion::{convert_acting_domain, debug_with_markdown};
 use crate::planning::planner::problem::PlanningDomain;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::monitor::debug_conversion::*;
@@ -51,20 +53,36 @@ impl From<ModDebugConversion> for LModule {
 #[async_scheme_fn]
 pub async fn translate(env: &LEnv, obj: String) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
-    let mut context: ConversionContext = ctx.get_conversion_context().await;
-    context
-        .domain
-        .methods
-        .retain(|k, _| k.as_str() == obj.as_str());
-    context
-        .domain
-        .commands
-        .retain(|k, _| k.as_str() == obj.as_str());
+    let context: ConversionContext = ctx.get_conversion_context().await;
+    // context
+    //     .domain
+    //     .methods
+    //     .retain(|k, _| k.as_str() == obj.as_str());
+    // context
+    //     .domain
+    //     .commands
+    //     .retain(|k, _| k.as_str() == obj.as_str());
 
     let pd: PlanningDomain = convert_acting_domain(&context).await?;
-
-    debug_with_markdown(&obj, &pd.templates[0], "/tmp/".into(), true);
-
+    #[cfg(feature = "conversion_data")]
+    {
+        debug_with_markdown(
+            &obj,
+            pd.templates
+                .iter()
+                .find(|am| {
+                    am.chronicle
+                        .as_ref()
+                        .unwrap()
+                        .get_label()
+                        .unwrap()
+                        .contains(&obj)
+                })
+                .unwrap(),
+            "/tmp/".into(),
+            true,
+        );
+    }
     Ok(())
 }
 

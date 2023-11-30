@@ -542,6 +542,69 @@ impl FlowGraph {
     }
 }
 
+#[cfg(feature = "conversion_data")]
+impl FlowGraph {
+    pub fn n_nodes(&self, flow_id: FlowId) -> usize {
+        let mut n = 0;
+        let mut queue = vec![flow_id];
+        while let Some(id) = queue.pop() {
+            let flow = &self.flows[id];
+            match &flow.kind {
+                FlowKind::Lit(_) => {
+                    n += 1;
+                }
+                FlowKind::Seq(s) => {
+                    queue.append(&mut s.clone());
+                }
+                FlowKind::Branching(b) => {
+                    queue.push(b.cond_flow);
+                    let cond = self.get_flow_result(b.cond_flow);
+                    let cond_domain = self.st.get_domain_of_var(cond);
+                    if cond_domain.is_true() {
+                        queue.push(b.true_flow)
+                    } else if cond_domain.is_false() {
+                        queue.push(b.false_flow)
+                    } else {
+                        queue.push(b.true_flow);
+                        queue.push(b.false_flow);
+                    }
+                }
+                FlowKind::FlowHandle(h) => queue.push(*h),
+            }
+        }
+        n
+    }
+    pub fn n_branching(&self, flow_id: FlowId) -> usize {
+        let mut n = 0;
+        let mut queue = vec![flow_id];
+        while let Some(id) = queue.pop() {
+            let flow = &self.flows[id];
+            match &flow.kind {
+                FlowKind::Lit(_) => {}
+                FlowKind::Seq(s) => {
+                    queue.append(&mut s.clone());
+                }
+                FlowKind::Branching(b) => {
+                    queue.push(b.cond_flow);
+                    let cond = self.get_flow_result(b.cond_flow);
+                    let cond_domain = self.st.get_domain_of_var(cond);
+                    if cond_domain.is_true() {
+                        queue.push(b.true_flow)
+                    } else if cond_domain.is_false() {
+                        queue.push(b.false_flow)
+                    } else {
+                        n += 1;
+                        queue.push(b.true_flow);
+                        queue.push(b.false_flow);
+                    }
+                }
+                FlowKind::FlowHandle(h) => queue.push(*h),
+            }
+        }
+        n
+    }
+}
+
 pub const VERTICE_PREFIX: char = 'V';
 pub const RESULT_PREFIX: char = 'r';
 pub const HANDLE_PREFIX: char = 'h';

@@ -41,9 +41,12 @@ pub enum ChronicleKind {
     Task,
 }
 
-#[derive(Clone, Default)]
+#[cfg(feature = "conversion_data")]
+#[derive(Clone)]
 pub struct ChronicleDebugData {
+    pub raw_flow_graph: FlowGraph,
     pub flow_graph: FlowGraph,
+    pub raw_chronicle: Box<Chronicle>,
     pub convert_time: Duration,
 }
 
@@ -51,6 +54,7 @@ pub struct ChronicleDebugData {
 pub struct ChronicleMetaData {
     pub kind: ChronicleKind,
     label: String,
+    #[cfg(feature = "conversion_data")]
     pub debug: Option<ChronicleDebugData>,
 }
 
@@ -59,6 +63,7 @@ impl Clone for ChronicleMetaData {
         Self {
             kind: self.kind,
             label: self.label.to_string(),
+            #[cfg(feature = "conversion_data")]
             debug: None,
         }
     }
@@ -100,6 +105,7 @@ impl Chronicle {
             meta_data: ChronicleMetaData {
                 kind,
                 label: label.to_string(),
+                #[cfg(feature = "conversion_data")]
                 debug: None,
             },
             name: Default::default(),

@@ -1,7 +1,8 @@
 use crate::model::acting_domain::acting_model_collection::ActingModelCollection;
 use crate::model::acting_domain::model::ActingModel;
-
-use crate::model::chronicle::{Chronicle, ChronicleDebugData};
+use crate::model::chronicle::Chronicle;
+#[cfg(feature = "conversion_data")]
+use crate::model::chronicle::ChronicleDebugData;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::scheme::exec::ModExec;
 use crate::planning::conversion::chronicle::convert_graph;
@@ -25,6 +26,7 @@ use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::env::set_current_dir;
+use std::fmt::Write as OtherWrite;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -86,6 +88,12 @@ pub async fn convert(
 
     if let Some(ch) = &mut chronicle {
         try_eval_apply(ch, &p_env.env).await?;
+        #[cfg(feature = "conversion_data")]
+        try_eval_apply(
+            &mut ch.meta_data.debug.as_mut().unwrap().raw_chronicle,
+            &p_env.env,
+        )
+        .await?;
     }
 
     Ok(ActingModel {
@@ -115,8 +123,11 @@ pub fn _convert(
         );
     }
     let flow = convert_lv(lv, &mut graph, &mut Default::default())?;
-
     graph.flow = flow;
+
+    #[cfg(feature = "conversion_data")]
+    let raw_flow_graph = graph.clone();
+
     flow_graph_post_processing(&mut graph)?;
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
         println!(
@@ -141,11 +152,18 @@ pub fn _convert(
         );
     }
     graph.flat_bindings();
-    let debug = ChronicleDebugData {
-        flow_graph: graph,
-        convert_time: time.elapsed().unwrap(),
-    };
-    ch.meta_data.debug = Some(debug);
+    #[cfg(feature = "conversion_data")]
+    {
+        let raw_chronicle = ch.clone();
+
+        let debug = ChronicleDebugData {
+            raw_flow_graph,
+            flow_graph: graph,
+            raw_chronicle: Box::new(raw_chronicle),
+            convert_time: time.elapsed().unwrap(),
+        };
+        ch.meta_data.debug = Some(debug);
+    }
     Ok(ch)
 }
 
@@ -224,21 +242,41 @@ pub async fn convert_acting_domain(
         st: st.clone(),
     })
 }
-
-pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: bool) {
-    let ch = om.get_clean_instantiated_chronicle().unwrap();
+#[cfg(feature = "conversion_data")]
+pub fn debug_with_markdown(label: &str, am: &ActingModel, path: PathBuf, view: bool) {
+    let raw_ch = am.chronicle.as_ref().unwrap();
+    let ch = am.get_clean_instantiated_chronicle().unwrap();
     let label = label.replace('/', "_");
     let mut path = path;
     path.push(format!("graph-flow-output_{}", Master::get_string_date()));
     fs::create_dir_all(&path).unwrap();
 
     let mut path_dot = path.clone();
+    let dot_file_name = format!("raw_{}.dot", label);
+    path_dot.push(&dot_file_name);
+    let mut file = File::create(&path_dot).unwrap();
+    let raw_flow_graph = &raw_ch.meta_data.debug.as_ref().unwrap().raw_flow_graph;
+    let dot = raw_flow_graph.export_dot();
+    file.write_all(dot.as_bytes()).unwrap();
+    set_current_dir(&path).unwrap();
+
+    let raw_flow_file_name = format!("raw_{}.png", label);
+    Command::new("dot")
+        .args(["-Tpng", &dot_file_name, "-o", &raw_flow_file_name])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+
+    let mut path_dot = path.clone();
     let dot_file_name = format!("{}.dot", label);
     path_dot.push(&dot_file_name);
     let mut file = File::create(&path_dot).unwrap();
-    let dot = ch.meta_data.debug.as_ref().unwrap().flow_graph.export_dot();
+    let flow_graph = &raw_ch.meta_data.debug.as_ref().unwrap().flow_graph;
+    let dot = flow_graph.export_dot();
     file.write_all(dot.as_bytes()).unwrap();
     set_current_dir(&path).unwrap();
+
     let flow_file_name = format!("{}.png", label);
     Command::new("dot")
         .args(["-Tpng", &dot_file_name, "-o", &flow_file_name])
@@ -270,56 +308,91 @@ pub fn debug_with_markdown(label: &str, om: &ActingModel, path: PathBuf, view: b
         .write(true)
         .open(&md_path)
         .unwrap();
-    let md: String = format!(
+
+    let mut md = format!(
         "# Conversion of expression : {}\n
     Time to convert: {}µs\n
-    \n
-
-## Chronicles
-```
-{}
-```
-
-## Scheme code
-
-```lisp\n
-{}
-```
-\n
-## Post processed Scheme code
-```lisp\n
-{}
-```
-## Graph
-\n
-![]({})
-\n
-
-
-## Type Lattice
-\n
-![]({})
-\n
-
-## Sym Table
-```
-{}
-```
-    ",
+    \n",
         label,
-        ch.meta_data
+        raw_ch
+            .meta_data
             .debug
             .as_ref()
             .unwrap()
             .convert_time
             .as_micros(),
-        ch,
-        om.lv.format(0),
-        om.lv_expanded.as_ref().unwrap().format(0),
-        flow_file_name,
-        lattice_file_name,
-        ch.st
     );
+    let raw_chronicle = raw_ch
+        .meta_data
+        .debug
+        .as_ref()
+        .unwrap()
+        .raw_chronicle
+        .clone()
+        .add_models(vec![])
+        .instantiate(vec![]);
+
+    writeln!(md, "## Raw chronicle\n```\n{}\n```", raw_chronicle).unwrap();
+
+    writeln!(md, " ## Post processed chronicle\n```\n{}``̀`\n", ch).unwrap();
+    writeln!(md, "## Chronicle post-processing information:\n").unwrap();
+    writeln!(
+        md,
+        "- Variables: {} -> {}",
+        raw_chronicle.variables.len(),
+        ch.variables.len()
+    )
+    .unwrap();
+    writeln!(
+        md,
+        "- Constraints: {} -> {}",
+        raw_chronicle.constraints.len(),
+        ch.variables.len()
+    )
+    .unwrap();
+    writeln!(
+        md,
+        "- Conditions: {} -> {}",
+        raw_chronicle.conditions.len(),
+        ch.conditions.len()
+    )
+    .unwrap();
+
+    writeln!(md, "## Scheme code\n```lisp\n{}\n```", am.lv.format(0),).unwrap();
+
+    writeln!(
+        md,
+        "## Post processed Scheme code\n```lisp\n{}\n```",
+        am.lv_expanded.as_ref().unwrap().format(0),
+    )
+    .unwrap();
+    writeln!(md, "## Raw flow graph\n![]({})\n", raw_flow_file_name,).unwrap();
+    writeln!(
+        md,
+        "## Post processed flow graph\n![]({})\n",
+        flow_file_name,
+    )
+    .unwrap();
+
+    writeln!(md, "## Flow graph post-processing information:\n").unwrap();
+    writeln!(
+        md,
+        "- Nodes:{} -> {}",
+        raw_flow_graph.n_nodes(raw_flow_graph.flow),
+        flow_graph.n_nodes(flow_graph.flow),
+    )
+    .unwrap();
+    writeln!(
+        md,
+        "- Branching: {} -> {}",
+        raw_flow_graph.n_branching(raw_flow_graph.flow),
+        flow_graph.n_branching(flow_graph.flow),
+    )
+    .unwrap();
+
+    writeln!(md, "## Type Lattice\n![]({})", lattice_file_name,).unwrap();
+
+    writeln!(md, "## Sym Table\n```\n{}\n```", ch.st).unwrap();
 
     md_file.write_all(md.as_bytes()).unwrap();
 

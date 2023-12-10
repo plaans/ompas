@@ -3,7 +3,7 @@ use crate::model::acting_domain::OMPASDomain;
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::ompas::interface::stat::OMPASRunStat;
+use crate::ompas::interface::stat::OMPASRunData;
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
@@ -206,7 +206,7 @@ impl ActingManager {
         self.inner.read().await.export_to_csv()
     }
 
-    pub async fn get_run_stat(&self) -> OMPASRunStat {
+    pub async fn get_run_stat(&self) -> OMPASRunData {
         self.inner.read().await.get_run_stats().await
     }
 

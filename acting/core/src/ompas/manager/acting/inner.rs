@@ -8,7 +8,7 @@ use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::VarId;
-use crate::ompas::interface::stat::OMPASRunStat;
+use crate::ompas::interface::stat::OMPASRunData;
 use crate::ompas::manager::acting::acting_stat::ActingStat;
 use crate::ompas::manager::acting::acting_var::{
     ActingVal, ActingValUpdate, ActingVarCollection, ActingVarId, ActingVarRef, AsCst, PlanVarRef,
@@ -2104,8 +2104,8 @@ impl InnerActingManager {
         }
     }
 
-    pub async fn get_run_stats(&self) -> OMPASRunStat {
-        let mut stats = OMPASRunStat::default();
+    pub async fn get_run_stats(&self) -> OMPASRunData {
+        let mut stats = OMPASRunData::default();
         self.processes[0]
             .inner
             .as_root()

@@ -63,9 +63,9 @@ pub async fn translate(env: &LEnv, obj: String) -> Result<(), LRuntimeError> {
     //     .commands
     //     .retain(|k, _| k.as_str() == obj.as_str());
 
-    let pd: PlanningDomain = convert_acting_domain(&context).await?;
     #[cfg(feature = "conversion_data")]
     {
+        let pd: PlanningDomain = convert_acting_domain(&context).await?;
         debug_with_markdown(
             &obj,
             pd.templates

@@ -21,7 +21,6 @@ use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG};
 use debug_print::debug_println;
 use env_param::EnvParam;
 use ompas_language::exec::MOD_EXEC;
-use ompas_middleware::Master;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;

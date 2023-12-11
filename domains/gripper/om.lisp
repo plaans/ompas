@@ -40,20 +40,6 @@
                 (release res_g)
             )))
 
-    (def-method pick_and_drop_debug
-            (:task place)
-            (:params (?o carriable) (?r room) (?g gripper) (?p room))
-            (:pre-conditions (!= ?p ?r) (= (pos ?o) ?p))
-            (:body
-                (do
-                    (define rh (acquire 'robby))
-                    (go2 ?a)
-                    (pick ?o ?p ?g)
-                    (go2 ?r)
-                    (drop ?o ?r ?g)
-                )))
-
-
     (def-method move_and_drop
       (:task place)
         (:params (?o carriable) (?r room) (?g gripper))

@@ -1,5 +1,6 @@
-use ompas_stat::config::StatosConfig;
-use ompas_stat::stat::system::{SystemRunData, SystemStatFormatter};
+use ompas_stat::stat::formatter::SystemStatFormatter;
+use ompas_stat::stat::system::SystemRunData;
+use ompas_stat::statos_config::StatosConfig;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -27,7 +28,7 @@ pub fn main() {
     println!("config: {:?}", config);
 
     for config in config.configs {
-        let system_run = SystemRunData::new(&config.input_dir);
+        let system_run = SystemRunData::new(&config.input_dir, config.clone());
 
         let time = SystemTime::now();
         let stat = system_run.compute_stat();
@@ -40,14 +41,28 @@ pub fn main() {
 
         println!("{}", formatter);
 
-        let csv = formatter.to_csv();
+        if let Some(csv_output) = config.csv_output {
+            let csv = formatter.to_csv();
 
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&config.output_file)
-            .unwrap();
-        file.write_all(csv.as_bytes()).unwrap();
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&csv_output)
+                .unwrap();
+            file.write_all(csv.as_bytes()).unwrap();
+        }
+
+        if let Some(latex_output) = config.latex_output {
+            let csv = formatter.to_latex();
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&latex_output)
+                .unwrap();
+            file.write_all(csv.as_bytes()).unwrap();
+        }
     }
 }

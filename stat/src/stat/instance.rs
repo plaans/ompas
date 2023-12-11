@@ -9,6 +9,14 @@ pub struct InstanceRunStat {
     pub inner: HashMap<ConfigName, ConfigInstanceStat>,
 }
 
+pub struct ContinuousPlanningStat {
+    pub planning_time: f64,
+    pub planning_time_ratio: f64,
+    pub number_planning_instance: f64,
+    pub average_planning_time: f64,
+    pub planning_success_rate: f64,
+}
+
 #[derive(Default)]
 pub struct InstanceRunData {
     pub inner: HashMap<ConfigName, ConfigRunData>,
@@ -36,46 +44,41 @@ impl InstanceRunData {
             .map(|(c, run)| (c.clone(), run.get_config_instance_stat()))
             .collect();
 
-        // let best = config_stat
-        //     .iter()
-        //     .fold(None, |prev, (c, run)| match prev {
-        //         None => Some((c.clone(), run.execution_time.mean)),
-        //         Some(d) => {
-        //             if d.1 > run.execution_time.mean {
-        //                 Some((c.clone(), run.execution_time.mean))
-        //             } else {
-        //                 Some(d)
-        //             }
-        //         }
-        //     })
-        //     .unwrap();
-        //
-        // config_stat.iter_mut().for_each(|(c, run)| {
-        //     if c == &best.0 {
-        //         run.best_config_ratio = 1.0
-        //     }
-        //     run.distance_to_best = (run.execution_time.mean - best.1) / best.1
-        // });
-
-        let best = config_stat
+        let ((c_score, best_score), (c_exec_time, best_exec_time)) = config_stat
             .iter()
             .fold(None, |prev, (c, run)| match prev {
-                None => Some((c.clone(), run.score)),
-                Some(d) => {
-                    if d.1 > run.score {
-                        Some((c.clone(), run.score))
+                None => Some(((c.clone(), run.score), (c.clone(), run.execution_time.mean))),
+                Some(((c_score, b_score), (c_exec_time, best_exec_time))) => {
+                    let score = if run.score > b_score {
+                        (c.clone(), run.score)
                     } else {
-                        Some(d)
-                    }
+                        (c_score, b_score)
+                    };
+
+                    let exec_time = if run.execution_time.mean > best_exec_time {
+                        (c.clone(), run.execution_time.mean)
+                    } else {
+                        (c_exec_time, best_exec_time)
+                    };
+
+                    Some((score, exec_time))
                 }
             })
             .unwrap();
 
         config_stat.iter_mut().for_each(|(c, run)| {
-            if c == &best.0 {
-                run.best_config_ratio = 1.0
+            if c == &c_score {
+                run.best_score_ratio = 1.0;
+                run.distance_to_best_score = 0.0;
+            } else {
+                run.distance_to_best_score = (run.score - best_score) / best_score;
             }
-            run.distance_to_best = (run.score - best.1) / best.1
+            if c == &c_exec_time {
+                run.best_config_execution_time_ratio = 1.0;
+                run.distance_to_best_execution_time = 0.0;
+            } else {
+                run.distance_to_best_execution_time = (run.score - best_exec_time) / best_exec_time;
+            }
         });
 
         InstanceRunStat {

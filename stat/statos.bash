@@ -1,1 +1,1 @@
-cargo run --release --bin statos -- -c config.yml
+cargo run --bin statos -- -c config.yml > /home/jeremy/Bureau/result.txt

@@ -1,201 +1,31 @@
-use crate::stat::config::{ConfigName, ConfigProblemStat};
+use crate::stat::config::ConfigName;
 use crate::stat::problem::{ProblemName, ProblemRunData, ProblemStat};
+use crate::statos_config::StatConfig;
 use ompas_core::ompas::interface::stat::OMPASRunData;
 use ompas_language::output::{JSON_FORMAT, YAML_FORMAT};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::fmt::Write;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+
 pub type RunName = Vec<String>;
 
-#[derive(Default)]
 pub struct SystemStat {
     pub problem_stats: HashMap<ProblemName, ProblemStat>,
+    pub config: StatConfig,
 }
 
-#[derive(Clone)]
-pub struct Cell {
-    pre_sep: Option<char>,
-    post_sep: Option<char>,
-    info: String,
-}
-
-impl Cell {
-    pub fn empty() -> Self {
-        Self {
-            pre_sep: None,
-            post_sep: None,
-            info: "".to_string(),
-        }
-    }
-
-    pub fn end(info: String) -> Self {
-        Self {
-            pre_sep: None,
-            post_sep: Some('|'),
-            info,
-        }
-    }
-
-    pub fn start(info: String) -> Self {
-        Self {
-            pre_sep: Some('|'),
-            post_sep: None,
-            info,
-        }
-    }
-
-    pub fn double(info: String) -> Self {
-        Self {
-            pre_sep: Some('|'),
-            post_sep: Some('|'),
-            info,
-        }
-    }
-
-    pub fn format(&self, cell_size: usize) -> String {
-        let mut string = "".to_string();
-        if let Some(pre) = self.pre_sep {
-            string.push(pre)
-        }
-
-        write!(string, "{:^cell_size$}", self.info).unwrap();
-
-        if let Some(post) = self.post_sep {
-            string.push(post)
-        }
-
-        string
-    }
-}
-
-pub struct SystemStatFormatter {
-    lines: Vec<Vec<Cell>>,
-}
-
-impl SystemStatFormatter {
-    pub fn to_csv(&self) -> String {
-        let mut string = String::new();
-        for cells in &self.lines {
-            for (i, cell) in cells.iter().enumerate() {
-                if i != 0 {
-                    string.push(';');
-                }
-                write!(string, "{}", cell.info).unwrap();
-            }
-            string.push('\n');
-        }
-
-        string
-    }
-}
-
-impl From<&SystemStat> for SystemStatFormatter {
-    fn from(value: &SystemStat) -> Self {
-        let mut configs: HashMap<&ConfigName, HashMap<&ProblemName, &ConfigProblemStat>> =
-            Default::default();
-        let mut config_order: Vec<&ConfigName> = Default::default();
-        for (name, problem) in &value.problem_stats {
-            for (config_name, config) in &problem.inner {
-                match configs.entry(config_name) {
-                    Entry::Occupied(mut o) => {
-                        o.get_mut().insert(name, config);
-                    }
-                    Entry::Vacant(v) => {
-                        config_order.push(config_name);
-                        let mut map = HashMap::default();
-                        map.insert(name, config);
-                        v.insert(map);
-                    }
-                };
-            }
-        }
-
-        let mut lines = vec![];
-        let mut first_line = vec![Cell::start("".to_string()), Cell::double("".to_string())];
-        let mut second_line = vec![
-            Cell::start("Problem".to_string()),
-            Cell::double("Difficulty".to_string()),
-        ];
-        let header = ConfigProblemStat::header();
-        let header_len = header.len();
-        let mut empty_info = vec![Cell::start("".to_string()); header_len - 1];
-        empty_info.push(Cell::double("".to_string()));
-        for config_name in &config_order {
-            first_line.push(Cell::start(config_name.to_string()));
-            first_line.append(&mut vec![
-                Cell {
-                    pre_sep: Some(' '),
-                    post_sep: None,
-                    info: "".to_string(),
-                };
-                header_len - 2
-            ]);
-            first_line.push(Cell {
-                pre_sep: Some(' '),
-                post_sep: Some('|'),
-                info: "".to_string(),
-            });
-            second_line.append(&mut header.clone())
-        }
-        lines.push(first_line);
-        lines.push(second_line);
-
-        let mut names: Vec<_> = value.problem_stats.keys().collect();
-        names.sort();
-
-        for problem_name in names {
-            let mut line = vec![
-                Cell::start(problem_name.domain.to_string()),
-                Cell::double(problem_name.difficulty.to_string()),
-            ];
-            for config in &config_order {
-                let config = configs.get(config).unwrap();
-                match config.get(problem_name) {
-                    None => {
-                        line.append(&mut empty_info.clone());
-                    }
-                    Some(config) => line.append(&mut config.to_formatted()),
-                }
-            }
-            lines.push(line);
-        }
-        SystemStatFormatter { lines }
-    }
-}
-
-impl Display for SystemStatFormatter {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut column_size: Vec<usize> = vec![0; self.lines[0].len()];
-        for cells in &self.lines {
-            for (i, cell) in cells.iter().enumerate() {
-                column_size[i] = column_size[i].max(cell.info.len())
-            }
-        }
-
-        for cells in &self.lines {
-            for (i, cell) in cells.iter().enumerate() {
-                write!(f, "{}", cell.format(column_size[i]))?;
-            }
-            write!(f, "\n")?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Default)]
 pub struct SystemRunData {
     inner: HashMap<ProblemName, ProblemRunData>,
+    config: StatConfig,
 }
 
 impl SystemRunData {
-    pub fn new(path: &Path) -> Self {
-        let now = SystemTime::now();
+    pub fn new(path: &Path, config: StatConfig) -> Self {
         let mut collection = Self {
             inner: Default::default(),
+            config,
         };
 
         let json_files = Self::get_all_files_in_dir(path, JSON_FORMAT);
@@ -319,14 +149,15 @@ impl SystemRunData {
     }
 
     pub fn compute_stat(&self) -> SystemStat {
-        let mut system_stat = SystemStat::default();
+        let mut problem_stats: HashMap<ProblemName, ProblemStat> = Default::default();
 
         for (name, problem) in &self.inner {
-            system_stat
-                .problem_stats
-                .insert(name.clone(), problem.get_problem_stat());
+            problem_stats.insert(name.clone(), problem.get_problem_stat());
         }
 
-        system_stat
+        SystemStat {
+            problem_stats,
+            config: self.config.clone(),
+        }
     }
 }

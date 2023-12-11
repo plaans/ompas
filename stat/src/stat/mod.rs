@@ -1,4 +1,5 @@
 pub mod config;
+pub mod formatter;
 pub mod instance;
 pub mod problem;
 pub mod system;

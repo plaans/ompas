@@ -47,6 +47,17 @@ impl OMPASRunData {
         max_end.unwrap() - min_start.unwrap()
     }
 
+    pub fn get_deliberation_time(&self) -> f64 {
+        let mut deliberation_time = 0.0;
+        for stat in &self.inner {
+            if let OMPASStat::Process(p) = stat {
+                deliberation_time +=
+                    p.deliberation_time.mean.as_secs() * p.deliberation_time.instance as f64;
+            }
+        }
+        deliberation_time
+    }
+
     pub fn get_deliberation_time_ratio(&self) -> f64 {
         let mut deliberation_time = 0.0;
         let mut i = 0;
@@ -60,7 +71,7 @@ impl OMPASRunData {
         deliberation_time / i as f64
     }
 
-    pub fn get_success_rate(&self) -> f64 {
+    pub fn get_coverage(&self) -> f64 {
         let mut success = 0;
         let mut i = 0;
         for stat in &self.inner {
@@ -75,15 +86,25 @@ impl OMPASRunData {
     }
 
     pub fn get_n_failures(&self) -> u32 {
-        let mut n_failure = 0;
+        let mut n_failures = 0;
+        for stat in &self.inner {
+            if let OMPASStat::Process(p) = stat {
+                n_failures += p.n_failure;
+            }
+        }
+        n_failures
+    }
+
+    pub fn get_n_retries(&self) -> u32 {
+        let mut n_retries = 0;
         for stat in &self.inner {
             if let OMPASStat::Process(p) = stat {
                 if p.status.is_failed() {
-                    n_failure += 1;
+                    n_retries += p.n_retry;
                 }
             }
         }
-        n_failure
+        n_retries
     }
 }
 

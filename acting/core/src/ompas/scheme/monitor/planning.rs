@@ -7,8 +7,8 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::interval::Interval;
 use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::planning::extract_choices;
 use crate::ompas::manager::planning::problem_update::ExecutionProblem;
-use crate::ompas::manager::planning::{extract_choices, DebugDate};
 use crate::ompas::manager::state::state_update_manager::StateRule;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::state::ModState;
@@ -134,7 +134,11 @@ pub async fn __plan(
     events: Vec<Event>,
 ) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL)?;
-    let pre_compute_models = ctx.options.get_pre_compute_models().await;
+    let pre_compute_models = ctx
+        .acting_manager
+        .deliberation_manager
+        .get_pre_compute_models()
+        .await;
 
     let acting_manager = ctx.acting_manager.clone();
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
@@ -188,12 +192,11 @@ pub async fn __plan(
     let result = ompas_lcp::run_planner(
         &ep,
         &OMPASLCPConfig {
-            state_subscriber_id: subscriber.id,
+            state_subscriber_id: Some((subscriber.id, state_manager)),
             opt,
-            state_manager,
             domain: Arc::new(domain),
             env,
-            debug_date: DebugDate::new(0),
+            debug_date: None,
         },
         None,
         None,

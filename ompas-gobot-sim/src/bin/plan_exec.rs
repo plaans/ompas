@@ -1,4 +1,4 @@
-use ompas_core::ompas::manager::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::manager::platform::scheme_domain::SchemeDomain;
 use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_core::{OMPAS_DEBUG, OMPAS_LOG};
 use ompas_gobotsim::default_gobot_sim_plan_exec_domain;
@@ -57,7 +57,7 @@ async fn lisp_interpreter(opt: Opt) {
 
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(
-            LispDomain::File(
+            SchemeDomain::File(
                 opt.domain
                     .unwrap_or(default_gobot_sim_plan_exec_domain().into()),
             ),

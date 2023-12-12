@@ -25,6 +25,7 @@ use crate::ompas::manager::acting::process::task::{RefinementTrace, TaskProcess}
 use crate::ompas::manager::acting::process::{ActingProcess, ActingProcessInner, ProcessOrigin};
 use crate::ompas::manager::acting::{AMId, ActingProcessId, MethodModel};
 use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::deliberation::DeliberationManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::planning::plan_update::{ActingTreeUpdate, Choice, ChoiceInner};
 use crate::ompas::manager::planning::planner_manager_interface::{
@@ -108,6 +109,7 @@ pub struct InnerActingManager {
     pub clock_manager: ClockManager,
     domain_manager: DomainManager,
     pub env: Option<LEnv>,
+    deliberation_manager: DeliberationManager,
     planner_manager_interface: Option<PlannerManagerInterface>,
 }
 
@@ -116,6 +118,7 @@ impl InnerActingManager {
         resource_manager: ResourceManager,
         clock_manager: ClockManager,
         domain_manager: DomainManager,
+        deliberation_manager: DeliberationManager,
         st: RefSymTable,
     ) -> Self {
         let mut new = Self {
@@ -128,6 +131,7 @@ impl InnerActingManager {
             domain_manager,
             planner_manager_interface: None,
             env: None,
+            deliberation_manager: deliberation_manager,
         };
         new.init();
         new
@@ -1921,12 +1925,12 @@ impl InnerActingManager {
             let mut parent_pr = instance.pr.clone();
             //println!("chronicle pr: {}", parent_pr);
             let label_chronicle = parent_pr.pop().unwrap();
-            let label_parent = parent_pr.last().cloned().unwrap();
             let parent = match self.get_id(parent_pr.clone()) {
                 Some(id) => id,
                 None =>
                 //We need to create the task before adding the method
                 {
+                    let label_parent = parent_pr.last().cloned().unwrap();
                     let _ = parent_pr.pop().unwrap();
                     let parent = self.get_id(parent_pr).unwrap();
                     let task = chronicle.get_task();
@@ -1977,7 +1981,7 @@ impl InnerActingManager {
             let debug = chronicle.get_name().format(&st, true);
 
             let _ = match label_chronicle {
-                Label::AbstractModel => match label_parent {
+                Label::AbstractModel => match self.processes[parent].label().unwrap() {
                     Label::Command(_) => match self.processes[parent].inner.get_abstract_model() {
                         Some(id) => id,
                         None => self.new_abstract_model(&parent, instance.am),
@@ -2097,10 +2101,20 @@ impl InnerActingManager {
 
 ///Export functions
 impl InnerActingManager {
-    pub fn get_acting_stat(&self) -> ActingStat {
+    pub async fn get_acting_stat(&self) -> ActingStat {
         ActingStat {
             n_root_task: self.processes[0].inner.as_root().unwrap().tasks.len() as u32,
             n_command_task: self.processes[0].inner.as_root().unwrap().commands.len() as u32,
+            acting_time: Interval::new(Timepoint::new_micros(0), Some(self.clock_manager.now()))
+                .duration(),
+            select_mode: self.deliberation_manager.get_select_mode().await.into(),
+            continuous_planning_mode: self
+                .deliberation_manager
+                .get_continuous_planning_mode()
+                .await
+                .into(),
+            deliberation_reactivity: self.deliberation_manager.get_deliberation_reactivity(),
+            planner_reactivity: self.deliberation_manager.get_planner_reactivity(),
         }
     }
 
@@ -2113,7 +2127,7 @@ impl InnerActingManager {
             .tasks
             .iter()
             .for_each(|id| stats.add_stat(self.get_acting_process_stat(id)));
-        stats.add_stat(self.get_acting_stat());
+        stats.add_stat(self.get_acting_stat().await);
         if let Some(planner) = &self.planner_manager_interface {
             stats.add_stat(planner.get_stat().await)
         }

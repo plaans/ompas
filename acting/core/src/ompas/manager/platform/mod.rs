@@ -5,9 +5,9 @@ use crate::ompas::manager::platform::exec_platform::ExecPlatform;
 use crate::ompas::manager::platform::platform_config::PlatformConfig;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use async_trait::async_trait;
-use lisp_domain::LispDomain;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
 use ompas_middleware::ProcessInterface;
+use scheme_domain::SchemeDomain;
 use sompas_core::eval;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lmodule::LModule;
@@ -21,9 +21,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub mod exec_platform;
-pub mod lisp_domain;
 pub mod platform_config;
 pub mod platform_declaration;
+pub mod scheme_domain;
 
 /// Trait that a platform needs to implement to be able to be used as execution platform in RAE.
 #[async_trait]
@@ -35,7 +35,7 @@ pub trait PlatformDescriptor: Any + Send + Sync {
     async fn stop(&self);
 
     ///Returns the domain of the platform
-    async fn domain(&self) -> LispDomain;
+    async fn domain(&self) -> SchemeDomain;
 
     ///Returns a module loaded into the evaluation environment with other bindings
     async fn module(&self) -> Option<LModule>;
@@ -49,7 +49,7 @@ pub struct PlatformManager {
     ompas_domain: DomainManager,
     acting_manager: ActingManager,
     exec: Option<ExecPlatform>,
-    lisp_domain: LispDomain,
+    scheme_domain: SchemeDomain,
     interrupters: Arc<RwLock<HashMap<ActionId, InterruptionSender>>>,
 }
 
@@ -58,13 +58,13 @@ impl PlatformManager {
         ompas_domain: DomainManager,
         acting_manager: ActingManager,
         exec: Option<ExecPlatform>,
-        lisp_domain: LispDomain,
+        lisp_domain: SchemeDomain,
     ) -> Self {
         Self {
             ompas_domain,
             acting_manager,
             exec,
-            lisp_domain,
+            scheme_domain: lisp_domain,
             interrupters: Arc::new(Default::default()),
         }
     }
@@ -197,8 +197,8 @@ impl PlatformManager {
         }
     }
 
-    pub fn domain(&self) -> LispDomain {
-        self.lisp_domain.clone()
+    pub fn domain(&self) -> SchemeDomain {
+        self.scheme_domain.clone()
     }
 
     pub async fn module(&self) -> Option<LModule> {

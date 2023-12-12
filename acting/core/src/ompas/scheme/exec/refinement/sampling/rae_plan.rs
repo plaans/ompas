@@ -1,7 +1,8 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
-use crate::ompas::interface::select_mode::RAEPlanConfig;
+use crate::ompas::interface::select_mode::{Planner, RAEPlanConfig, SelectMode};
+use crate::ompas::manager::acting::process::task::Selected;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::refinement::sampling::cost::Cost;
@@ -233,7 +234,7 @@ pub async fn rae_plan_select(
     state: &WorldStateSnapshot,
     env: &LEnv,
     config: RAEPlanConfig,
-) -> LResult {
+) -> Result<Selected, LRuntimeError> {
     let new_env = env.clone();
     let ctx = env.get_context::<ModRaePlan>(MOD_RAE_PLAN).unwrap();
 
@@ -242,5 +243,8 @@ pub async fn rae_plan_select(
     new_env.update_context(ModState::new_from_snapshot(state.clone()));
 
     let method: LValue = eval(&LValue::from(task), &mut new_env, None).await?;
-    Ok(method)
+    Ok(Selected::Generated(
+        method,
+        SelectMode::Planning(Planner::RAEPlan(config)),
+    ))
 }

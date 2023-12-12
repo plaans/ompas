@@ -10,7 +10,7 @@ pub async fn main() {
     // command.arg("ompas");
     //
     let mut command = Command::new("ompas");
-    command.args(["-d","/home/jeremy/ompas_output/benchmark/gripper/problems/gripper_medium_0_random_satisfactory.lisp"]);
+    command.args(["-d","/home/jeremy/ompas_output/benchmark/gripper/problems/gripper_medium_0_random_satisfactory.scm"]);
     command.env(
         "OMPAS_WORKING_DIR",
         "/home/jeremy/ompas_output/benchmark/gripper",

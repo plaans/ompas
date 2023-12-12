@@ -1,6 +1,7 @@
 use crate::model::acting_domain::model::{ModelCollection, ModelKind};
 use crate::model::acting_domain::OMPASDomain;
-use crate::ompas::interface::select_mode::{UPOMConfig, UPOMMode};
+use crate::ompas::interface::select_mode::{Planner, SelectMode, UPOMConfig, UPOMMode};
+use crate::ompas::manager::acting::process::task::Selected;
 use crate::ompas::manager::event::run_fluent_checker;
 use crate::ompas::manager::state::state_update_manager::StateRule;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
@@ -26,6 +27,7 @@ use sompas_macros::async_scheme_fn;
 use sompas_structs::contextcollection::Context;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lmodule::LModule;
+use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
@@ -431,7 +433,7 @@ pub async fn upom_select(
     state: &WorldStateSnapshot,
     env: &LEnv,
     config: UPOMConfig,
-) -> LResult {
+) -> lruntimeerror::Result<Selected> {
     match config.get_mode() {
         UPOMMode::Efficiency => {
             _upom_select::<Efficiency>(task, candidates, state, env, config).await
@@ -448,7 +450,7 @@ async fn _upom_select<T: Utility>(
     state: &WorldStateSnapshot,
     env: &LEnv,
     config: UPOMConfig,
-) -> LResult {
+) -> lruntimeerror::Result<Selected> {
     let global = GLOBAL_UPOM.clone();
     let mut new_env = env.clone();
     let ctx_exec = new_env.get_context::<ModExec>(MOD_EXEC).unwrap();
@@ -596,7 +598,10 @@ async fn _upom_select<T: Utility>(
         }
     }
 
-    Ok(m)
+    Ok(Selected::Generated(
+        m,
+        SelectMode::Planning(Planner::UPOM(config)),
+    ))
 }
 
 pub async fn upom_env(env: &mut LEnv, domain: &OMPASDomain) {

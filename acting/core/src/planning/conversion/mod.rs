@@ -24,12 +24,19 @@ use ompas_language::exec::MOD_EXEC;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+#[cfg(feature = "conversion_data")]
 use std::env::set_current_dir;
+#[cfg(feature = "conversion_data")]
 use std::fmt::Write as OtherWrite;
+#[cfg(feature = "conversion_data")]
 use std::fs;
+#[cfg(feature = "conversion_data")]
 use std::fs::{File, OpenOptions};
+#[cfg(feature = "conversion_data")]
 use std::io::Write;
+#[cfg(feature = "conversion_data")]
 use std::path::PathBuf;
+#[cfg(feature = "conversion_data")]
 use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::SystemTime;
@@ -141,7 +148,10 @@ pub fn _convert(
 
     let cv = &ConvertParameters { max_capacity };
 
+    #[cfg(feature = "conversion_data")]
     let mut ch = convert_graph(ch, &mut graph, flow, &p_env.env, cv)?;
+    #[cfg(not(feature = "conversion_data"))]
+    let ch = convert_graph(ch, &mut graph, flow, &p_env.env, cv)?;
 
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
         println!(

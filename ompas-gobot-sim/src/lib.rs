@@ -20,28 +20,28 @@ pub fn default_gobot_sim_path() -> String {
 
 pub fn default_gobot_sim_domain() -> String {
     format!(
-        "{}/ompas-gobot-sim/test_domain/domain.lisp",
+        "{}/ompas-gobot-sim/test_domain/domain.scm",
         OMPAS_PATH.get_ref()
     )
 }
 
 pub fn default_gobot_sim_plan_domain() -> String {
     format!(
-        "{}/ompas-gobot-sim/planning_domain/domain_plan.lisp",
+        "{}/ompas-gobot-sim/planning_domain/domain_plan.scm",
         OMPAS_PATH.get_ref()
     )
 }
 
 pub fn default_gobot_sim_plan_domain_e() -> String {
     format!(
-        "{}/ompas-gobot-sim/planning_domain/domain_plan_extended.lisp",
+        "{}/ompas-gobot-sim/planning_domain/domain_plan_extended.scm",
         OMPAS_PATH.get_ref()
     )
 }
 
 pub fn default_gobot_sim_plan_exec_domain() -> String {
     format!(
-        "{}/ompas-gobot-sim/planning_domain/domain.lisp",
+        "{}/ompas-gobot-sim/planning_domain/domain.scm",
         OMPAS_PATH.get_ref()
     )
 }

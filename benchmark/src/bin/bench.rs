@@ -7,7 +7,10 @@ use ompas_benchmark::config::job_config::{
 use ompas_benchmark::config::BenchConfig;
 use ompas_benchmark::{install_binary, send_email, BenchmarkData, RunData};
 use ompas_core::OMPAS_PATH;
-use ompas_language::monitor::control::SET_PRE_COMPUTE_MODELS;
+use ompas_language::continuous_planning::*;
+use ompas_language::monitor::control::{
+    SET_CONTINUOUS_PLANNING, SET_PLANNER_REACTIVITY, SET_PRE_COMPUTE_MODELS,
+};
 use ompas_middleware::{LogLevel, OMPAS_WORKING_DIR};
 use std::convert::TryInto;
 use std::fmt::Debug;
@@ -38,7 +41,6 @@ pub fn benchmark_working_dir() -> PathBuf {
 
 pub struct RunConfig {
     label: String,
-    start: String,
     path: PathBuf,
 }
 
@@ -142,10 +144,11 @@ async fn main() {
             run_bar.println("Getting specific problems");
             let mut filtered = vec![];
             for problem in specific_problems {
-                match problems.iter().find(|p| &p.label == problem) {
-                    Some(p) => filtered.push(p.clone()),
-                    None => run_bar.println(format!("Could not find problem {}", problem)),
-                }
+                problems.iter().for_each(|p| {
+                    if p.label.contains(problem) {
+                        filtered.push(p.clone())
+                    }
+                });
             }
             problems = filtered
         }
@@ -166,10 +169,10 @@ async fn main() {
         run_config_path.push("run_config");
         fs::create_dir_all(&run_config_path).unwrap();
         for heuristic in heuristics {
-            let (label, code, start) = generate_config(heuristic, &domain_path, config.log_level);
+            let (label, code) = generate_config(heuristic, &domain_path, config.log_level);
             //Store in file
             let mut config_path = run_config_path.clone();
-            config_path.push(format!("{}.lisp", label));
+            config_path.push(format!("{}.scm", label));
             let mut file = OpenOptions::new()
                 .create(true)
                 .truncate(true)
@@ -181,7 +184,6 @@ async fn main() {
             //Store file name in run_configs
             run_configs.push(RunConfig {
                 label,
-                start,
                 path: config_path,
             })
         }
@@ -204,12 +206,9 @@ async fn main() {
                 let config_path = run_config.path.to_str().unwrap();
 
                 let mut problem_config_path: PathBuf = problems_path.clone();
-                let problem_config_name = format!(
-                    "{}_{}",
-                    problem.label.replace(".lisp", ""),
-                    run_config.label
-                );
-                problem_config_path.push(format!("{}.lisp", problem_config_name));
+                let problem_config_name =
+                    format!("{}_{}", problem.label.replace(".scm", ""), run_config.label);
+                problem_config_path.push(format!("{}.scm", problem_config_name));
                 let mut file = OpenOptions::new()
                     .write(true)
                     .create(true)
@@ -218,17 +217,14 @@ async fn main() {
                     .unwrap();
                 let content = format!(
                     "(begin
-    (read \"{}\")
-    (read \"{}\")
-    {}
-    (sleep {})
-    (wait-end-all {})
-    (export-report {}.yml)
+    (load \"{}\")
+    (load \"{}\")
+    (start)
+    (bench {} {} {}.yml)
     (stop)
     (exit 0))",
                     config_path,
                     problem_path,
-                    run_config.start,
                     min_time.unwrap_or(0),
                     timeout - min_time.unwrap_or(0),
                     problem_config_name,
@@ -314,46 +310,16 @@ fn generate_config(
     heuristic: &HeuristicConfig,
     domain: &Path,
     log_level: LogLevel,
-) -> (String, String, String) {
+) -> (String, String) {
     let select = match heuristic.select {
         SelectConfig::Greedy => "greedy",
         SelectConfig::Random => "random",
         SelectConfig::UPOM => "upom",
+        SelectConfig::Aries => "aries",
+        SelectConfig::AriesOpt => "aries-opt",
     };
 
     let mut config_name = select.to_string();
-
-    let start = match heuristic.continuous_planning {
-        ContinuousPlanningConfig::No => {
-            config_name.push_str("_reactive");
-            "(start)".to_string()
-        }
-        ContinuousPlanningConfig::Satisfactory(r) => {
-            config_name.push_str("_satisfactory");
-
-            format!(
-                "{}(set-planner-reactivity {})\n\t(start-with-planner false)",
-                if let Some(b) = heuristic.pre_compute_models {
-                    format!("\n\t({} {})", SET_PRE_COMPUTE_MODELS, b)
-                } else {
-                    "".to_string()
-                },
-                r,
-            )
-        }
-        ContinuousPlanningConfig::Optimality(r) => {
-            config_name.push_str("_optimality");
-            format!(
-                "{}(set-planner-reactivity {})\n\t(start-with-planner true)",
-                if let Some(b) = heuristic.pre_compute_models {
-                    format!("\n\t({} {})", SET_PRE_COMPUTE_MODELS, b)
-                } else {
-                    "".to_string()
-                },
-                r,
-            )
-        }
-    };
 
     let domain = match &heuristic.specific_domain {
         None => domain.canonicalize().unwrap().to_str().unwrap().to_string(),
@@ -369,17 +335,43 @@ fn generate_config(
         }
     };
 
-    (
-        config_name,
-        format!(
-            "(begin
-    (read \"{}\") ; loading domain
+    let config = format!(
+        "(begin
+    (load \"{}\") ; loading domain
     (set-log-level {}) ;setting log-level
-    (set-select {})) ; define the algorithm of select",
-            domain, log_level, select,
-        ),
-        start.to_string(),
-    )
+    (set-select {}) ; define the algorithm of select
+    (set-deliberation-reactivity {}) ; define the reactivity of the deliberation
+    {}) ; define the continuous planning mode
+    ",
+        domain,
+        log_level,
+        select,
+        heuristic.deliberation_reactivity,
+        match heuristic.continuous_planning {
+            ContinuousPlanningConfig::No => {
+                config_name.push_str("_reactive");
+                format!("({SET_CONTINUOUS_PLANNING} {NONE})")
+            }
+            ContinuousPlanningConfig::Satisfactory(r) => {
+                config_name.push_str("_satisfactory");
+                format!(
+                    "({SET_CONTINUOUS_PLANNING} {SATISFACTORY})\n({SET_PLANNER_REACTIVITY} {})\n({SET_PRE_COMPUTE_MODELS} {})",
+                    r,
+                    heuristic.pre_compute_models.unwrap_or(false)
+                )
+            }
+            ContinuousPlanningConfig::Optimality(r) => {
+                config_name.push_str("_optimality");
+                format!(
+                    "({SET_CONTINUOUS_PLANNING} {OPTIMALITY})\n\t({SET_PLANNER_REACTIVITY} {})({SET_PRE_COMPUTE_MODELS} {})",
+                    r,
+                    heuristic.pre_compute_models.unwrap_or(false)
+                )
+            }
+        }
+    );
+
+    (config_name, config)
 }
 
 fn get_all_problems_files(path: &Path) -> Vec<Problem> {
@@ -399,7 +391,7 @@ fn get_all_problems_files(path: &Path) -> Vec<Problem> {
                 queue.push(path);
             } else if path.is_file() {
                 let file_name = path.file_name().unwrap().to_str().unwrap();
-                if file_name.contains(".lisp") {
+                if file_name.contains(".scm") {
                     problem_files.push(Problem {
                         label: file_name.to_string(),
                         path,

@@ -1,5 +1,5 @@
 //use ompas_gobotsim::mod_godot::CtxGodot;
-use ompas_core::ompas::manager::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::manager::platform::scheme_domain::SchemeDomain;
 use ompas_core::ompas::scheme::monitor::ModMonitor;
 use ompas_gobotsim::default_gobot_sim_plan_domain;
 use ompas_gobotsim::platform::PlatformGobotSim;
@@ -46,7 +46,7 @@ async fn lisp_interpreter(opt: Opt) -> lruntimeerror::Result<()> {
 
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(
-            LispDomain::File(opt.domain.unwrap_or(default_gobot_sim_plan_domain().into())),
+            SchemeDomain::File(opt.domain.unwrap_or(default_gobot_sim_plan_domain().into())),
             !opt.view,
             LogClient::new(PLATFORM_CLIENT, LOG_TOPIC_PLATFORM).await,
         ),

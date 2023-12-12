@@ -54,4 +54,5 @@ serde = { version = "1.0.188", features = ["derive"] }
 new_type = "0.4.1"
 atomic_float = "0.1.0"
 lazy_static = { version = "1.4.0", features = [] }
+log = "0.4.17"
 

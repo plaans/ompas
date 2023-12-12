@@ -56,17 +56,12 @@ impl From<ModIO> for LModule {
     fn from(m: ModIO) -> Self {
         let mut module = LModule::new(m, MOD_IO, DOC_MOD_IO);
         module.add_fn(PRINT, print, (DOC_PRINT, DOC_PRINT_VERBOSE), false);
-        module.add_fn(
-            __READ__,
-            __read__,
-            (DOC___READ__, DOC___READ___VERBOSE),
-            false,
-        );
+        module.add_fn(READ, read, (DOC_READ, DOC_READ_VERBOSE), false);
         module.add_fn(WRITE, write, DOC_WRITE, false);
         module.add_fn(GET_CURRENT_DIR, get_current_dir, DOC_GET_CURRENT_DIR, false);
         module.add_fn(SET_CURRENT_DIR, set_current_dir, DOC_SET_CURRENT_DIR, false);
         module.add_async_fn(GET_ENV_VAR, get_env_var, DOC_GET_ENV_VAR, false);
-        module.add_macro(READ, MACRO_READ, DOC_READ);
+        module.add_macro(LOAD, MACRO_LOAD, DOC_LOAD);
 
         module
     }
@@ -113,10 +108,10 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
 /// Read the content of a file and sends the content to the lisp interpreter.
 /// The name of the file is given via args.
 #[scheme_fn]
-pub fn __read__(file_name: String) -> LResult {
+pub fn read(file_name: String) -> LResult {
     let mut file = match File::open(&file_name) {
         Ok(f) => f,
-        Err(e) => return Err(lruntimeerror!(READ, format!("{}: {}", file_name, e))),
+        Err(e) => return Err(lruntimeerror!(LOAD, format!("{}: {}", file_name, e))),
     };
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;

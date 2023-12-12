@@ -61,10 +61,10 @@ To run a binary, you can use the following command: `cargo run --bin <name> -- <
         input-path: /home/<path>/ompas/acting/flow_graph/examples/
         output-path: /home/<name>/Desktop
         problems:
-            - method/m_process_package.lisp
-            - atom.lisp
-            - expression.lisp
-            - nested-expression.lisp
+            - method/m_process_package.scm
+            - atom.scm
+            - expression.scm
+            - nested-expression.scm
         ```
     Other binaries are defined in the apps submodules, but most of them have been used for debugging during development.
 - Gobot-Sim binaries:
@@ -95,9 +95,9 @@ To run a binary, you can use the following command: `cargo run --bin <name> -- <
             number: 4 # number of run per problem.
             max-time: 300 # maximum time allowed to finish a problem in seconds.
             problems: # file names of the problems
-                - j02.lisp
-                - j06.lisp
-                - j02_teleport.lisp
+                - j02.scm
+                - j06.scm
+                - j02_teleport.scm
             bin_path: <path>/ompas/benchmark/
             log_path: <path>/ompas/benchmark/
             domain_path: <path>/ompas/domains/godot/

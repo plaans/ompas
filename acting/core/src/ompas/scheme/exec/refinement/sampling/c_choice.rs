@@ -2,6 +2,7 @@
 use crate::model::acting_domain::model::ModelKind;
 use crate::model::acting_domain::OMPASDomain;
 use crate::ompas::interface::select_mode::CChoiceConfig;
+use crate::ompas::manager::acting::process::task::Selected;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::refinement::sampling::cost::Cost;
@@ -225,7 +226,7 @@ pub async fn c_choice_select(
     state: &WorldStateSnapshot,
     env: &LEnv,
     config: CChoiceConfig,
-) -> lruntimeerror::Result<LValue> {
+) -> lruntimeerror::Result<Selected> {
     let new_env = env.clone();
     let ctx = env.get_context::<ModCChoice>(MOD_C_CHOICE).unwrap();
     //

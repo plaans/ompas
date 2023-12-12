@@ -703,7 +703,7 @@ pub mod error {
 
     pub const CHECK: &str = "check";
     pub const LAMBDA_CHECK: &str = "(lambda (a) (if a nil (err nil)))";
-    pub const MACRO_CHECK: &str= "(lambda (a)
+    pub const MACRO_CHECK: &str = "(lambda (a)
 	`(if ,a
 	    nil
 	    (err (,a \" is false\"))))";
@@ -941,9 +941,9 @@ pub mod io {
     pub const DOC_PRINT: &str = "Print in stdout a LValue.";
     pub const DOC_PRINT_VERBOSE: &str = "Takes a list of arguments and print them in stdout.";
 
-    pub const __READ__: &str = "__read__";
-    pub const DOC___READ__: &str = "Read a file an evaluate it";
-    pub const DOC___READ___VERBOSE: &str = "Takes the name of the file as argument.\n\
+    pub const READ: &str = "read";
+    pub const DOC_READ: &str = "Read a file an evaluate it";
+    pub const DOC_READ_VERBOSE: &str = "Takes the name of the file as argument.\n\
                                 Note: The file path is relative to the path of the executable.\n\
                                 Return an error if the file is not found or there is a problem while parsing and evaluation.";
     pub const WRITE: &str = "write";
@@ -951,10 +951,10 @@ pub mod io {
     pub const DOC_WRITE_VERBOSE: &str = "Takes two arguments: the name of the file and the LValue\n\
                                  Note: The path of the file is relative to the path of the executable";
 
-    pub const READ: &str = "read";
-    pub const DOC_READ: &str = "Wrapper around __read__";
-    pub const MACRO_READ: &str = "(lambda (x)\
-        `(eval (parse (__read__ ,x))))";
+    pub const LOAD: &str = "load";
+    pub const DOC_LOAD: &str = "Read and evaluate the file.";
+    pub const MACRO_LOAD: &str = "(lambda (x)\
+        `(eval (parse (read ,x))))";
 
     pub const GET_CURRENT_DIR: &str = "get-current-dir";
     pub const DOC_GET_CURRENT_DIR: &str = "Returns the current working dir.";

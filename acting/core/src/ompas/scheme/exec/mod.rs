@@ -3,7 +3,6 @@ use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::acting::{ActingManager, ActingProcessId};
 use crate::ompas::manager::domain::DomainManager;
-use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::PlatformManager;
 use crate::ompas::scheme::exec::acting_context::ModActingContext;
 use crate::ompas::scheme::exec::mode::RAEMode;
@@ -33,6 +32,7 @@ use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lswitch::new_interruption_handler;
 use sompas_structs::lvalue::LValue;
+use std::sync::Arc;
 use std::time::Duration;
 pub mod acting_context;
 pub mod mode;
@@ -48,21 +48,21 @@ pub const LABEL_ENUMERATE_PARAMS: &str = "enumerate-params";
 
 ///Context that will contains primitives for the RAE executive
 pub struct ModExec {
-    options: OMPASManager,
     pub acting_manager: ActingManager,
     domain: DomainManager,
     platform: PlatformManager,
     log: LogClient,
+    empty_env: Arc<LEnv>,
 }
 
 impl ModExec {
     pub async fn new(monitor: &ModControl) -> Self {
         Self {
-            options: monitor.options.clone(),
             acting_manager: monitor.acting_manager.clone(),
             domain: monitor.acting_manager.domain_manager.clone(),
             platform: monitor.platform.clone(),
             log: LogClient::new("exec-ompas", LOG_TOPIC_OMPAS).await,
+            empty_env: monitor.empty_env.clone(),
         }
     }
 }

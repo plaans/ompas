@@ -33,15 +33,22 @@ use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror, wrong_n_args, wrong_type};
 use std::convert::TryInto;
+use std::sync::Arc;
 
 pub struct ModModel {
     state_manager: StateManager,
     st: RefSymTable,
     resource_manager: ResourceManager,
-    empty_env: LEnv,
+    empty_env: Arc<LEnv>,
     domain_description: InitScheme,
-    domain: DomainManager,
+    pub domain_manager: DomainManager,
     log: LogClient,
+}
+
+pub async fn get_plan_env(domain_manager: &DomainManager, mut empty_env: LEnv) -> LEnv {
+    let env_symbols: LEnvSymbols = domain_manager.get_convert_env().await;
+    empty_env.set_new_top_symbols(env_symbols);
+    empty_env
 }
 
 impl ModModel {
@@ -52,27 +59,20 @@ impl ModModel {
             resource_manager: monitor.acting_manager.resource_manager.clone(),
             empty_env: monitor.empty_env.clone(),
             domain_description: monitor.platform.domain().into(),
-            domain: monitor.acting_manager.domain_manager.clone(),
+            domain_manager: monitor.acting_manager.domain_manager.clone(),
             log: monitor.log.clone(),
         }
     }
 
     pub fn get_empty_env(&self) -> LEnv {
-        self.empty_env.clone()
+        self.empty_env.as_ref().clone()
     }
 
     pub async fn get_conversion_context(&self) -> ConversionContext {
         let state: WorldStateSnapshot = self.get_plan_state().await;
-        let domain: OMPASDomain = self.domain.get_inner().await;
+        let domain: OMPASDomain = self.domain_manager.get_inner().await;
         let env = self.get_plan_env().await;
         ConversionContext::new(domain, self.st.clone(), state, env)
-    }
-
-    pub async fn get_plan_env(&self) -> LEnv {
-        let env_symbols: LEnvSymbols = self.domain.get_convert_env().await;
-        let mut env = self.empty_env.clone();
-        env.set_new_top_symbols(env_symbols);
-        env
     }
 
     pub async fn get_plan_state(&self) -> WorldStateSnapshot {
@@ -80,6 +80,10 @@ impl ModModel {
         let snap_resource: WorldStateSnapshot = self.resource_manager.get_snapshot(None).await;
         state.absorb(snap_resource);
         state
+    }
+
+    pub async fn get_plan_env(&self) -> LEnv {
+        get_plan_env(&self.domain_manager, self.empty_env.as_ref().clone()).await
     }
 }
 
@@ -343,7 +347,7 @@ pub async fn add_state_function(
     let result_debug = st.format_domain(&result);
     let state_function =
         StateFunction::new(label.to_string(), params, result, result_debug, Some(body));
-    ctx.domain
+    ctx.domain_manager
         .add_state_function(label.to_string(), state_function)
         .await?;
     Ok(())
@@ -392,7 +396,7 @@ pub async fn add_function(
     let result_debug = st.format_domain(&result);
     let state_function =
         StateFunction::new(label.to_string(), params, result, result_debug, Some(body));
-    ctx.domain
+    ctx.domain_manager
         .add_state_function(label.to_string(), state_function)
         .await?;
     Ok(())
@@ -564,7 +568,7 @@ pub async fn add_command(
     let cost = eval(&expand(&lv_cost, true, &mut env).await?, &mut env, None).await?;
     command.set_cost(cost);
 
-    ctx.domain
+    ctx.domain_manager
         .add_command(command.get_label().to_string(), command)
         .await?;
 
@@ -580,7 +584,9 @@ pub async fn add_command_model(
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = generate_model(env, model).await?;
     let kind = ModelKind::PlanModel;
-    ctx.domain.add_command_model(label, model, kind).await?;
+    ctx.domain_manager
+        .add_command_model(label, model, kind)
+        .await?;
     Ok(())
 }
 #[async_scheme_fn]
@@ -646,7 +652,7 @@ pub async fn add_task(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<()
         task.set_model(model, ModelKind::SimModel);
     }
 
-    ctx.domain
+    ctx.domain_manager
         .add_task(task.get_label().to_string(), task)
         .await?;
 
@@ -662,7 +668,9 @@ pub async fn add_task_model(
     let label: String = model.get(&NAME.into()).unwrap().try_into()?;
     let model = generate_model(env, model).await?;
     let kind = ModelKind::PlanModel;
-    ctx.domain.add_task_model(label, model, kind).await?;
+    ctx.domain_manager
+        .add_task_model(label, model, kind)
+        .await?;
     Ok(())
 }
 
@@ -776,7 +784,9 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
 
     method.lambda_body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
 
-    ctx.domain.add_method(method.label.clone(), method).await?;
+    ctx.domain_manager
+        .add_method(method.label.clone(), method)
+        .await?;
 
     Ok(())
 }
@@ -861,7 +871,7 @@ pub async fn add_event(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<(
 
     let lambda_body = eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?;
 
-    ctx.domain
+    ctx.domain_manager
         .add_event(
             event_label.clone(),
             Event::new(event_label, event_parameters, trigger, lambda_body),
@@ -896,7 +906,7 @@ pub async fn add_lambda(env: &LEnv, label: String, lambda: &LValue) -> Result<()
     let mut e = get_root_env().await;
     let result = eval(&expanded, &mut e, None).await?;
     if let LValue::Lambda(_) = &result {
-        ctx.domain.add_lambda(label, result).await;
+        ctx.domain_manager.add_lambda(label, result).await;
     }
     Ok(())
 }
@@ -908,7 +918,7 @@ pub async fn add_env(env: &LEnv, label: String, value: &LValue) -> Result<(), LR
     let expanded = expand(value, true, &mut env).await?;
     let mut e = get_root_env().await;
     let value = eval(&expanded, &mut e, None).await?;
-    ctx.domain.add_env(label, value).await;
+    ctx.domain_manager.add_env(label, value).await;
 
     Ok(())
 }
@@ -1076,32 +1086,32 @@ pub async fn add_resources(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
 #[async_scheme_fn]
 pub async fn add_init(env: &LEnv, body: LValue) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
-    ctx.domain.add_init(body).await;
+    ctx.domain_manager.add_init(body).await;
     Ok(())
 }
 
 #[async_scheme_fn]
 pub async fn remove_command(env: &LEnv, label: String) {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
-    ctx.domain.remove_command(&label).await;
+    ctx.domain_manager.remove_command(&label).await;
 }
 
 #[async_scheme_fn]
 pub async fn remove_state_function(env: &LEnv, label: String) {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
-    ctx.domain.remove_state_function(&label).await;
+    ctx.domain_manager.remove_state_function(&label).await;
 }
 
 #[async_scheme_fn]
 pub async fn remove_method(env: &LEnv, label: String) {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
-    ctx.domain.remove_method(&label).await;
+    ctx.domain_manager.remove_method(&label).await;
 }
 
 #[async_scheme_fn]
 pub async fn remove_task(env: &LEnv, label: String) {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
-    ctx.domain.remove_task(&label).await;
+    ctx.domain_manager.remove_task(&label).await;
 }
 
 #[async_scheme_fn]
@@ -1112,7 +1122,7 @@ pub async fn remove_object(env: &LEnv, label: String) {
 #[async_scheme_fn]
 pub async fn remove_event(env: &LEnv, label: String) {
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
-    ctx.domain.remove_event(&label).await;
+    ctx.domain_manager.remove_event(&label).await;
 }
 
 #[cfg(test)]

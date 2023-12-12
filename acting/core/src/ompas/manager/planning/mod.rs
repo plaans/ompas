@@ -11,8 +11,9 @@ use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::manager::acting::interval::Duration as OMPASDuration;
-use crate::ompas::manager::acting::{PlannerReactivity, RefInnerActingManager};
+use crate::ompas::manager::acting::RefInnerActingManager;
 use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::deliberation::{Planner, Reactivity};
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::planning::plan_update::*;
@@ -77,7 +78,7 @@ struct PlannerManagerConfig {
     domain_manager: DomainManager,
     st: RefSymTable,
     env: LEnv,
-    planner_reactivity: PlannerReactivity,
+    planner_reactivity: Reactivity<Planner>,
     opt: Option<PMetric>,
     rx_update: mpsc::UnboundedReceiver<PlannerUpdate>,
     stats: Arc<RwLock<PlannerStat>>,
@@ -114,7 +115,7 @@ impl DebugDate {
 pub struct UpdateConfig {
     state_update_subscriber: StateUpdateSubscriber,
     acting_tree_update_subscriber: UnboundedReceiver<PlannerUpdate>,
-    planner_reactivity: PlannerReactivity,
+    planner_reactivity: Reactivity<Planner>,
 }
 
 impl UpdateConfig {
@@ -164,7 +165,7 @@ impl PlannerManager {
         domain_manager: DomainManager,
         st: RefSymTable,
         env: LEnv,
-        planner_reactivity: PlannerReactivity,
+        planner_reactivity: Reactivity<Planner>,
         opt: Option<PMetric>,
     ) -> PlannerManagerInterface {
         let (tx_update, rx_update) = mpsc::unbounded_channel();
@@ -290,12 +291,14 @@ impl PlannerManager {
             let config = PlannerInstanceConfig {
                 id: instance,
                 config: OMPASLCPConfig {
-                    state_subscriber_id: update_config.state_update_subscriber.id,
+                    state_subscriber_id: Some((
+                        update_config.state_update_subscriber.id,
+                        state_manager.clone(),
+                    )),
                     opt,
-                    state_manager: state_manager.clone(),
                     domain: domain.clone(),
                     env,
-                    debug_date,
+                    debug_date: Some(debug_date),
                 },
                 clock_manager: clock_manager.clone(),
                 explanation,
@@ -313,11 +316,17 @@ impl PlannerManager {
                                     debug_date
                                 }) =>  {
                                     if let Some(update) = update {
-                                debug_date.print_msg("Updating Acting tree");
+                                        if let Some(dd) = debug_date {
+                                            dd.print_msg("Updating Acting tree");
+                                        }
                                 acting_manager.write().await.update_acting_tree(update).await;
-                                debug_date.print_msg("Acting Tree Updated");
+                                if let Some(dd) = debug_date {
+                                    dd.print_msg("Acting Tree Updated");
+                                            }
                                     } else {
-                                        debug_date.print_msg("Planner did not find a solution");
+                                        if let Some(dd) = debug_date {
+                                            dd.print_msg("Planner did not find a solution");
+                                        }
                                         acting_manager.write().await.notify_plan_update(FilterWatchedProcesses::All)
                                     }
                                 }
@@ -392,7 +401,7 @@ pub enum PlannerResult {
 
 pub struct PlanUpdate {
     update: Option<ActingTreeUpdate>,
-    debug_date: DebugDate,
+    debug_date: Option<DebugDate>,
 }
 
 pub struct PlannerInstanceConfig {
@@ -477,10 +486,12 @@ impl PlannerInstance {
                             let PlanResult { pp, .. } = &pr;
 
                             if OMPAS_PLAN_OUTPUT.get() {
-                                debug_date.print_msg(format!(
-                                    "Successfully planned for (sol n°{}):\n{}",
-                                    stat.n_solution, exp
-                                ));
+                                if let Some(dd) = &debug_date {
+                                    dd.print_msg(format!(
+                                        "Successfully planned for (sol n°{}):\n{}",
+                                        stat.n_solution, exp
+                                    ));
+                                }
 
                                 if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
                                     for (origin, chronicle) in pp
@@ -518,7 +529,9 @@ impl PlannerInstance {
                     }
                 } else {
                     if OMPAS_PLAN_OUTPUT.get() {
-                        debug_date.print_msg("No solution found by planner for");
+                        if let Some(dd) = &debug_date {
+                            dd.print_msg("No solution found by planner for");
+                        }
                         if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
                             for (origin, chronicle) in ep
                                 .chronicles
@@ -550,7 +563,7 @@ impl PlannerInstance {
 
         Self {
             _id: id,
-            debug_date,
+            debug_date: debug_date.unwrap(),
             _updater,
             interrupter,
             plan_receiver,
@@ -561,6 +574,28 @@ impl PlannerInstance {
         for update in updates {
             let _ = self._updater.send(update);
         }
+    }
+}
+
+pub fn get_update(result: anyhow::Result<SolverResult<PlanResult>>) -> Option<ActingTreeUpdate> {
+    if let Ok(solver_result) = result {
+        match solver_result {
+            SolverResult::Sol(pr) => {
+                let choices = extract_choices(&pr);
+
+                let new_ams = extract_new_acting_models(&pr);
+
+                Some(ActingTreeUpdate {
+                    acting_models: new_ams,
+                    choices,
+                })
+            }
+            SolverResult::Unsat => None,
+            SolverResult::Interrupt(_) => None,
+            SolverResult::Timeout(_) => None,
+        }
+    } else {
+        None
     }
 }
 
@@ -866,11 +901,11 @@ pub async fn populate_problem<'a>(
                                 }
                             };
                             let mut pr = p_method.pr;
-                            let method_id = RefinementLabel {
+                            let refinement_label = RefinementLabel {
                                 refinement_id: 0,
                                 method_label: MethodLabel::Possibility(i),
                             };
-                            pr.push(Label::Refinement(method_id));
+                            pr.push(Label::Refinement(refinement_label.clone()));
                             let instance = ChronicleInstance {
                                 instantiated_chronicle: am
                                     .get_clean_instantiated_chronicle()
@@ -879,10 +914,7 @@ pub async fn populate_problem<'a>(
                                 origin: p_method.origin,
                                 am,
                                 pr,
-                                refinement_label: RefinementLabel {
-                                    refinement_id: 0,
-                                    method_label: MethodLabel::Possibility(0),
-                                },
+                                refinement_label,
                             };
 
                             add_instance(&mut new_p_actions, &mut instances, instance);

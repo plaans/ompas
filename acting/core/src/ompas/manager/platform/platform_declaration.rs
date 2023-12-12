@@ -1,4 +1,4 @@
-use crate::ompas::manager::platform::lisp_domain::LispDomain;
+use crate::ompas::manager::platform::scheme_domain::SchemeDomain;
 use crate::ompas::manager::platform::PlatformDescriptor;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 #[derive(Clone)]
 pub enum PlatformDeclaration {
     Exec(Arc<RwLock<dyn PlatformDescriptor>>),
-    Simu(LispDomain),
+    Simu(SchemeDomain),
 }
 
 impl PlatformDeclaration {

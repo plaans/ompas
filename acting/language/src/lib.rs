@@ -977,11 +977,22 @@ pub mod monitor {
         pub const DOC_SET_SELECT: &str =
             "Set the select engine: greedy, aries, upom, c_choice, etc.";
 
+        pub const SET_CONTINUOUS_PLANNING: &str = "set-continuous-planning";
+        pub const DOC_SET_CONTINUOUS_PLANNING: &str =
+            "Set continuous planning mode of OMPAS: none, satisfactory, optimality.";
+
         pub const SET_PLANNER_REACTIVITY: &str = "set-planner-reactivity";
         pub const DOC_SET_PLANNER_REACTIVITY: &str= "Set the time that will define the reactivity of the planner. The value can be the symbol \"inf\", or a number in secs";
 
         pub const GET_PLANNER_REACTIVITY: &str = "get-planner-reactivity";
         pub const DOC_GET_PLANNER_REACTIVITY: &str = "Returns the reactivity of the planner.";
+
+        pub const SET_DELIBERATION_REACTIVITY: &str = "set-deliberation-reactivity";
+        pub const DOC_SET_DELIBERATION_REACTIVITY: &str= "Set the time that will define the reactivity of the deliberation. The value can be the symbol \"inf\", or a number in secs";
+
+        pub const GET_DELIBERATION_REACTIVITY: &str = "get-deliberation-reactivity";
+        pub const DOC_GET_DELIBERATION_REACTIVITY: &str =
+            "Returns the reactivity of the deliberation.";
 
         pub const SET_PRE_COMPUTE_MODELS: &str = "set-pre-compute-models";
         pub const DOC_SET_PRE_COMPUTE_MODELS: &str =
@@ -1062,6 +1073,9 @@ pub mod monitor {
 
         pub const WAIT_END_ALL: &str = "wait-end-all";
         pub const DOC_WAIT_END_ALL: &str = "Wait that all current high-level tasks are terminated.";
+
+        pub const BENCH: &str = "bench";
+        pub const DOC_BENCH: &str = "Function to benchmark OMPAS.";
     }
 }
 
@@ -1105,6 +1119,12 @@ pub mod select {
     pub const UPOM: &str = "upom";
     pub const RAE_PLAN: &str = "rae-plan";
     pub const C_CHOICE: &str = "c-choice";
+}
+
+pub mod continuous_planning {
+    pub const NONE: &str = "none";
+    pub const SATISFACTORY: &str = "satisfactory";
+    pub const OPTIMALITY: &str = "optimality";
 }
 
 pub mod process {

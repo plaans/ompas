@@ -1,12 +1,15 @@
+use crate::ompas::interface::continuous_planning_mode::ContinuousPlanningMode;
 use crate::ompas::interface::job::{Job, JobType};
 use crate::ompas::interface::rae_command::OMPASJob;
-use crate::ompas::interface::select_mode::{Planner, SelectMode};
+use crate::ompas::interface::select_mode::{AriesConfig, Planner, SelectMode};
+use crate::ompas::interface::stat::BenchStat;
 use crate::ompas::interface::trigger_collection::{JobCollection, JobHandle, PendingJob, Response};
 use crate::ompas::manager::acting::filter::ProcessFilter;
 use crate::ompas::manager::acting::inner::ActingProcessKind;
-use crate::ompas::manager::acting::{ActingManager, MAX_REACTIVITY};
+use crate::ompas::manager::acting::interval::Interval;
+use crate::ompas::manager::acting::ActingManager;
+use crate::ompas::manager::deliberation::MAX_REACTIVITY;
 use crate::ompas::manager::event::{run_event_checker, run_fluent_checker};
-use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::platform_config::PlatformConfig;
 use crate::ompas::manager::platform::PlatformManager;
 use crate::ompas::manager::state::action_status::ProcessStatus;
@@ -17,6 +20,7 @@ use crate::ompas::scheme::exec::ModExec;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::planning::planner::solver::PMetric;
+use ompas_language::continuous_planning::*;
 use ompas_language::exec::state::{DYNAMIC, INNER_DYNAMIC, INNER_STATIC, INSTANCE, STATIC};
 use ompas_language::monitor::control::*;
 use ompas_language::monitor::model::MOD_MODEL;
@@ -47,23 +51,23 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::{mpsc, RwLock};
 
 pub struct ModControl {
-    pub(crate) options: OMPASManager,
     pub acting_manager: ActingManager,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::UnboundedSender<OMPASJob>>>>,
     pub(crate) platform: PlatformManager,
     pub(crate) jobs: JobCollection,
+    pub empty_env: Arc<LEnv>,
 }
 
 impl ModControl {
     pub fn new(monitor: &ModMonitor) -> Self {
         Self {
-            options: monitor.options.clone(),
             acting_manager: monitor.acting_manager.clone(),
             log: monitor.log.clone(),
             task_stream: monitor.task_stream.clone(),
             platform: monitor.platform.clone(),
             jobs: Default::default(),
+            empty_env: monitor.empty_env.clone(),
         }
     }
 
@@ -107,12 +111,12 @@ impl From<ModControl> for LModule {
     fn from(m: ModControl) -> Self {
         let mut module = LModule::new(m, MOD_CONTROL, DOC_MOD_CONTROL);
         module.add_async_fn(START, start, DOC_START, false);
-        module.add_async_fn(
-            START_WITH_PLANNER,
-            start_with_planner,
-            DOC_START_WITH_PLANNER,
-            false,
-        );
+        // module.add_async_fn(
+        //     START_WITH_PLANNER,
+        //     start_with_planner,
+        //     DOC_START_WITH_PLANNER,
+        //     false,
+        // );
         module.add_async_fn(STOP, stop, DOC_STOP, false);
         module.add_async_fn(
             __DEBUG_OMPAS__,
@@ -147,6 +151,12 @@ impl From<ModControl> for LModule {
         );
         module.add_async_fn(SET_SELECT, set_select, DOC_SET_SELECT, false);
         module.add_async_fn(
+            SET_CONTINUOUS_PLANNING,
+            set_continuous_planning,
+            DOC_SET_CONTINUOUS_PLANNING,
+            false,
+        );
+        module.add_async_fn(
             SET_PLANNER_REACTIVITY,
             set_planner_reactivity,
             DOC_SET_PLANNER_REACTIVITY,
@@ -156,6 +166,19 @@ impl From<ModControl> for LModule {
             GET_PLANNER_REACTIVITY,
             get_planner_reactivity,
             DOC_GET_PLANNER_REACTIVITY,
+            false,
+        );
+
+        module.add_async_fn(
+            SET_DELIBERATION_REACTIVITY,
+            set_deliberation_reactivity,
+            DOC_SET_DELIBERATION_REACTIVITY,
+            false,
+        );
+        module.add_async_fn(
+            GET_DELIBERATION_REACTIVITY,
+            get_deliberation_reactivity,
+            DOC_GET_DELIBERATION_REACTIVITY,
             false,
         );
         module.add_async_fn(
@@ -227,6 +250,7 @@ impl From<ModControl> for LModule {
 
         module.add_async_fn(EXPORT_REPORT, export_report, DOC_EXPORT_REPORT, false);
         module.add_async_fn(WAIT_END_ALL, wait_end_all, DOC_WAIT_END_ALL, false);
+        module.add_async_fn(BENCH, bench, DOC_BENCH, false);
 
         // Macros
         module.add_macro(DEBUG_OMPAS, MACRO_DEBUG_OMPAS, DOC_DEBUG_OMPAS);
@@ -235,7 +259,9 @@ impl From<ModControl> for LModule {
     }
 }
 
-async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeError> {
+/// Launch main loop of rae in an other asynchronous task.
+#[async_scheme_fn]
+async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let plan_env: LEnv = ctx.get_plan_env().await;
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
@@ -287,12 +313,18 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
 
     let start_result: String = ctx.platform.start(Default::default()).await?;
 
+    let continuous_planning_mode = ctx
+        .acting_manager
+        .deliberation_manager
+        .get_continuous_planning_mode()
+        .await;
+
     log.info(format!(
-        "Started OMPAS with config {}",
-        match planner {
-            None => "reactive",
-            Some(false) => "planner = satisfactory",
-            Some(true) => "planner = optimality",
+        "Started OMPAS with config: {}",
+        match &continuous_planning_mode {
+            ContinuousPlanningMode::None => "planner = none",
+            ContinuousPlanningMode::Satisfactory => "planner = satisfactory",
+            ContinuousPlanningMode::Optimality(_) => "planner = optimality",
         }
     ));
     let sender = ctx.get_sender().await.unwrap();
@@ -311,26 +343,39 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
         }
     }
 
-    if let Some(opt) = planner {
-        let start = SystemTime::now();
-        acting_manager
-            .domain_manager
-            .init_planning_domain(
-                &plan_env,
-                acting_manager.state_manager.get_snapshot().await,
-                &acting_manager.st,
-                ctx.options.get_pre_compute_models().await,
-            )
-            .await;
-        log.info(format!(
-            "Pre generation of acting models took {:.3} ms",
-            start.elapsed().unwrap().as_secs_f64() * 1000.0
-        ));
+    let start = SystemTime::now();
+    acting_manager
+        .domain_manager
+        .init_planning_domain(
+            &plan_env,
+            acting_manager.state_manager.get_snapshot().await,
+            &acting_manager.st,
+            ctx.acting_manager
+                .deliberation_manager
+                .get_pre_compute_models()
+                .await,
+        )
+        .await;
+    log.info(format!(
+        "Pre generation of acting models took {:.3} ms",
+        start.elapsed().unwrap().as_secs_f64() * 1000.0
+    ));
 
-        acting_manager
-            .start_planner_manager(plan_env, if opt { Some(PMetric::Makespan) } else { None })
-            .await;
+    match &continuous_planning_mode {
+        ContinuousPlanningMode::None => {}
+        _ => {
+            let opt = match continuous_planning_mode {
+                ContinuousPlanningMode::None => {
+                    unreachable!()
+                }
+                ContinuousPlanningMode::Satisfactory => None,
+                ContinuousPlanningMode::Optimality(pmetric) => Some(pmetric),
+            };
+
+            acting_manager.start_planner_manager(plan_env, opt).await;
+        }
     }
+
     let (tx, rx) = tokio::sync::oneshot::channel();
     sender.send(OMPASJob::StartHandlingEvent(tx)).unwrap();
     let _ = rx.await;
@@ -356,16 +401,10 @@ async fn _start(env: &LEnv, planner: Option<bool>) -> Result<String, LRuntimeErr
 }
 
 /// Launch main loop of rae in an other asynchronous task.
-#[async_scheme_fn]
-pub async fn start(env: &LEnv) -> Result<String, LRuntimeError> {
-    _start(env, None).await
-}
-
-/// Launch main loop of rae in an other asynchronous task.
-#[async_scheme_fn]
+/*#[async_scheme_fn]
 pub async fn start_with_planner(env: &LEnv, opt: bool) -> Result<String, LRuntimeError> {
     _start(env, Some(opt)).await
-}
+}*/
 
 #[async_scheme_fn]
 pub async fn stop(env: &LEnv) {
@@ -570,7 +609,11 @@ pub async fn get_config_platform(env: &LEnv) -> Result<String, LRuntimeError> {
 pub async fn get_select(env: &LEnv) -> String {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
 
-    ctx.options.get_select_mode().await.to_string()
+    ctx.acting_manager
+        .deliberation_manager
+        .get_select_mode()
+        .await
+        .to_string()
 }
 
 #[async_scheme_fn]
@@ -580,25 +623,54 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
     let select_mode = match m.as_str() {
         RANDOM => SelectMode::Random,
         GREEDY => SelectMode::Greedy,
-        PLANNING | ARIES => SelectMode::Planning(Planner::Aries(false)),
-        ARIES_OPT => SelectMode::Planning(Planner::Aries(true)),
+        PLANNING | ARIES => SelectMode::Planning(Planner::Aries(AriesConfig::Satisfactory)),
+        ARIES_OPT => {
+            SelectMode::Planning(Planner::Aries(AriesConfig::Optimality(PMetric::Makespan)))
+        }
         UPOM => SelectMode::Planning(Planner::UPOM(Default::default())),
         RAE_PLAN => SelectMode::Planning(Planner::RAEPlan(Default::default())),
         C_CHOICE => SelectMode::Planning(Planner::CChoice(Default::default())),
-        HEURISTIC => SelectMode::Heuristic,
-        LEARNING => SelectMode::Learning,
         _ => {
             return Err(lruntimeerror!(
                 SET_SELECT,
                 format!(
-                    "Select mode is either {}, {}, {}, {} or {}.",
-                    GREEDY, RANDOM, PLANNING, HEURISTIC, LEARNING
+                    "Select mode is either {}, {}, or {}.",
+                    GREEDY, RANDOM, PLANNING,
                 )
             ))
         }
     };
 
-    ctx.options.set_select_mode(select_mode).await;
+    ctx.acting_manager
+        .deliberation_manager
+        .set_select_mode(select_mode)
+        .await;
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn set_continuous_planning(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+
+    let continuous_planning_mode = match m.as_str() {
+        NONE => ContinuousPlanningMode::None,
+        SATISFACTORY => ContinuousPlanningMode::Satisfactory,
+        OPTIMALITY | ARIES => ContinuousPlanningMode::Optimality(PMetric::Makespan),
+        _ => {
+            return Err(lruntimeerror!(
+                SET_CONTINUOUS_PLANNING,
+                format!(
+                    "Continuous planning mode is either {}, {}, or {}.",
+                    NONE, SATISFACTORY, OPTIMALITY
+                )
+            ))
+        }
+    };
+
+    ctx.acting_manager
+        .deliberation_manager
+        .set_continuous_planning_mode(continuous_planning_mode)
+        .await;
     Ok(())
 }
 
@@ -627,6 +699,7 @@ pub async fn set_planner_reactivity(env: &LEnv, reactivity: LValue) -> Result<()
     };
 
     ctx.acting_manager
+        .deliberation_manager
         .set_planner_reactivity(planner_reactivity);
     Ok(())
 }
@@ -634,7 +707,57 @@ pub async fn set_planner_reactivity(env: &LEnv, reactivity: LValue) -> Result<()
 #[async_scheme_fn]
 pub async fn get_planner_reactivity(env: &LEnv) -> Result<LValue, LRuntimeError> {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    let f = ctx.acting_manager.get_planner_reactivity();
+    let f = ctx
+        .acting_manager
+        .deliberation_manager
+        .get_planner_reactivity();
+    if f < MAX_REACTIVITY {
+        Ok(f.into())
+    } else {
+        Ok("inf".into())
+    }
+}
+
+#[async_scheme_fn]
+pub async fn set_deliberation_reactivity(
+    env: &LEnv,
+    reactivity: LValue,
+) -> Result<(), LRuntimeError> {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+
+    let deliberation_reactivity = match reactivity {
+        LValue::Symbol(s) => {
+            if s.as_str() == "inf" {
+                f64::MAX
+            } else {
+                return Err(LRuntimeError::new(
+                    "",
+                    format!("Expected Symbol(\"inf\") or number, got {}", s),
+                ));
+            }
+        }
+        LValue::Number(n) => f64::from(&n),
+        lv => {
+            return Err(LRuntimeError::new(
+                "",
+                format!("Expected Symbol(\"inf\") or number, got {}", lv),
+            ))
+        }
+    };
+
+    ctx.acting_manager
+        .deliberation_manager
+        .set_deliberation_reactivity(deliberation_reactivity);
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn get_deliberation_reactivity(env: &LEnv) -> Result<LValue, LRuntimeError> {
+    let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
+    let f = ctx
+        .acting_manager
+        .deliberation_manager
+        .get_planner_reactivity();
     if f < MAX_REACTIVITY {
         Ok(f.into())
     } else {
@@ -645,13 +768,19 @@ pub async fn get_planner_reactivity(env: &LEnv) -> Result<LValue, LRuntimeError>
 #[async_scheme_fn]
 pub async fn set_pre_compute_models(env: &LEnv, value: bool) {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.options.set_pre_compute_models(value).await;
+    ctx.acting_manager
+        .deliberation_manager
+        .set_pre_compute_models(value)
+        .await;
 }
 
 #[async_scheme_fn]
 pub async fn get_pre_compute_models(env: &LEnv) -> bool {
     let ctx = env.get_context::<ModControl>(MOD_CONTROL).unwrap();
-    ctx.options.get_pre_compute_models().await
+    ctx.acting_manager
+        .deliberation_manager
+        .get_pre_compute_models()
+        .await
 }
 
 /// Returns the whole state if no args, or specific part of it ('static', 'dynamic', 'inner world')
@@ -947,14 +1076,100 @@ pub async fn stop_acting_tree_display(env: &LEnv) -> Result<(), LRuntimeError> {
     Ok(())
 }
 
-#[async_scheme_fn]
-pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+pub async fn _export_report(
+    env: &LEnv,
+    file_name: Option<String>,
+    format: &str,
+    bench_info: Option<(f64, f64)>,
+) -> Result<(), LRuntimeError> {
     let acting_manager = &env.get_context::<ModControl>(MOD_CONTROL)?.acting_manager;
 
     let mut run_dir = Master::get_run_dir();
     run_dir.push("report");
     fs::create_dir_all(run_dir.clone()).unwrap();
 
+    let state = acting_manager.state_manager.get_state(None).await;
+    let mut state_str = "State:\n".to_string();
+    for (k, v) in state.inner {
+        writeln!(state_str, "- {} = {}", k.to_string(), v.value.to_string()).unwrap();
+    }
+
+    let mut state_file_path = run_dir.clone();
+    state_file_path.push(format!(
+        "{}.txt",
+        match &file_name {
+            Some(f) => f.as_str(),
+            None => "state",
+        }
+    ));
+    let mut acting_tree_file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open(state_file_path)
+        .unwrap();
+    acting_tree_file.write_all(state_str.as_bytes()).unwrap();
+
+    let acting_tree = acting_manager.acting_tree_as_dot().await;
+
+    let mut acting_tree_file_path = run_dir.clone();
+    acting_tree_file_path.push(format!(
+        "{}.dot",
+        match &file_name {
+            Some(f) => f.as_str(),
+            None => "acting_tree",
+        }
+    ));
+    let mut acting_tree_file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open(acting_tree_file_path)
+        .unwrap();
+    acting_tree_file.write_all(acting_tree.as_bytes()).unwrap();
+
+    let mut stats = acting_manager.get_run_stat().await;
+    match bench_info {
+        None => {}
+        Some((min, max)) => {
+            let bench_stat = BenchStat {
+                min_time: Interval::new(0.0, Some(min)).duration(),
+                max_time: Interval::new(0.0, Some(max)).duration(),
+            };
+            stats.add_stat(bench_stat)
+        }
+    }
+
+    let mut stats_file_path = run_dir.clone();
+    stats_file_path.push(format!(
+        "{}.{}",
+        match &file_name {
+            Some(f) => f.as_str(),
+            None => "stats",
+        },
+        format
+    ));
+    let mut stats_file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open(stats_file_path)
+        .unwrap();
+    stats_file
+        .write_all(
+            match format {
+                YAML_FORMAT => serde_yaml::to_string(&stats).unwrap(),
+                JSON_FORMAT => serde_json::to_string(&stats).unwrap(),
+                _ => unreachable!(),
+            }
+            .as_bytes(),
+        )
+        .unwrap();
+
+    Ok(())
+}
+
+fn extract_file_name(args: &[LValue]) -> Result<(Option<String>, &'static str), LRuntimeError> {
     let mut format = JSON_FORMAT;
     let mut file_name = None;
     match args.len() {
@@ -1002,73 +1217,14 @@ pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeEr
         }
     }
 
-    let state = acting_manager.state_manager.get_state(None).await;
-    let mut state_str = "State:\n".to_string();
-    for (k, v) in state.inner {
-        writeln!(state_str, "- {} = {}", k.to_string(), v.value.to_string()).unwrap();
-    }
+    Ok((file_name, format))
+}
 
-    let mut state_file_path = run_dir.clone();
-    state_file_path.push(format!(
-        "{}.txt",
-        match &file_name {
-            Some(f) => f.as_str(),
-            None => "state",
-        }
-    ));
-    let mut acting_tree_file = OpenOptions::new()
-        .truncate(true)
-        .write(true)
-        .create(true)
-        .open(state_file_path)
-        .unwrap();
-    acting_tree_file.write_all(state_str.as_bytes()).unwrap();
+#[async_scheme_fn]
+pub async fn export_report(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
+    let (file_name, format) = extract_file_name(args)?;
 
-    let acting_tree = acting_manager.acting_tree_as_dot().await;
-
-    let mut acting_tree_file_path = run_dir.clone();
-    acting_tree_file_path.push(format!(
-        "{}.dot",
-        match &file_name {
-            Some(f) => f.as_str(),
-            None => "acting_tree",
-        }
-    ));
-    let mut acting_tree_file = OpenOptions::new()
-        .truncate(true)
-        .write(true)
-        .create(true)
-        .open(acting_tree_file_path)
-        .unwrap();
-    acting_tree_file.write_all(acting_tree.as_bytes()).unwrap();
-
-    let stats = acting_manager.get_run_stat().await;
-
-    let mut stats_file_path = run_dir.clone();
-    stats_file_path.push(format!(
-        "{}.{}",
-        match &file_name {
-            Some(f) => f.as_str(),
-            None => "stats",
-        },
-        format
-    ));
-    let mut stats_file = OpenOptions::new()
-        .truncate(true)
-        .write(true)
-        .create(true)
-        .open(stats_file_path)
-        .unwrap();
-    stats_file
-        .write_all(
-            match format {
-                YAML_FORMAT => serde_yaml::to_string(&stats).unwrap(),
-                JSON_FORMAT => serde_json::to_string(&stats).unwrap(),
-                _ => unreachable!(),
-            }
-            .as_bytes(),
-        )
-        .unwrap();
+    _export_report(env, file_name, format, None).await?;
 
     Ok(())
 }
@@ -1118,5 +1274,14 @@ pub async fn wait_end_all(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
         }
     }
 
+    Ok(())
+}
+
+#[async_scheme_fn]
+pub async fn bench(env: &LEnv, min: f64, max: f64, export: String) -> Result<(), LRuntimeError> {
+    tokio::time::sleep(Duration::from_secs_f64(min)).await;
+    wait_end_all(env, &[(max - min).into()]).await?;
+    let (file_name, format) = extract_file_name(&[export.into()])?;
+    _export_report(env, file_name, format, Some((min, max))).await?;
     Ok(())
 }

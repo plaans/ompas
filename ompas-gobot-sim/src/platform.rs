@@ -3,8 +3,8 @@ use crate::platform_server::PlatformGobotSimService;
 use crate::tcp::task_tcp_connection;
 use crate::TOKIO_CHANNEL_SIZE;
 use async_trait::async_trait;
-use ompas_core::ompas::manager::platform::lisp_domain::LispDomain;
 use ompas_core::ompas::manager::platform::platform_config::{InnerPlatformConfig, PlatformConfig};
+use ompas_core::ompas::manager::platform::scheme_domain::SchemeDomain;
 use ompas_core::ompas::manager::platform::PlatformDescriptor;
 use ompas_core::OMPAS_PATH;
 use ompas_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
@@ -45,7 +45,7 @@ pub struct PlatformGobotSim {
     pub service_info: SocketAddr,
     pub godot_tcp_info: SocketAddr,
     pub headless: bool,
-    pub domain: LispDomain,
+    pub domain: SchemeDomain,
     pub config: String,
     pub log: LogClient,
 }
@@ -62,7 +62,7 @@ impl Default for PlatformGobotSim {
                 .parse()
                 .unwrap(),
             headless: false,
-            domain: LispDomain::default(),
+            domain: SchemeDomain::default(),
             config: "".to_string(),
             log: Default::default(),
         }
@@ -70,7 +70,7 @@ impl Default for PlatformGobotSim {
 }
 
 impl PlatformGobotSim {
-    pub fn new(domain: LispDomain, headless: bool, log: LogClient) -> Self {
+    pub fn new(domain: SchemeDomain, headless: bool, log: LogClient) -> Self {
         PlatformGobotSim {
             service_info: format!(
                 "{}:{}",
@@ -350,7 +350,7 @@ impl PlatformDescriptor for PlatformGobotSim {
         //
     }
 
-    async fn domain(&self) -> LispDomain {
+    async fn domain(&self) -> SchemeDomain {
         self.domain.clone()
     }
 

@@ -144,7 +144,7 @@ impl Problem for JobshopProblem {
         {
             let mut path_scenario = path.clone();
             let file_name = path_scenario.file_name().unwrap();
-            path_scenario.set_file_name(file_name.to_str().unwrap().replace(".lisp", "_jf.txt"));
+            path_scenario.set_file_name(file_name.to_str().unwrap().replace(".scm", "_jf.txt"));
             let mut file_jobshop = File::create(&path_scenario).unwrap();
             file_jobshop
                 .write_all(self.jobshop_string().as_bytes())

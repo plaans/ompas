@@ -44,7 +44,7 @@ pub fn main() {
         .unwrap();
     let mut path: PathBuf = "/tmp/continuous".into();
     let _ = fs::create_dir_all(&path);
-    path.push("problem.lisp");
+    path.push("problem.scm");
     problem.store(&path);
     let sompas = problem.to_sompas();
     println!("{sompas}");

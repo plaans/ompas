@@ -51,23 +51,14 @@ impl From<ModDebugConversion> for LModule {
 }
 
 #[async_scheme_fn]
-pub async fn translate(env: &LEnv, obj: String) -> Result<(), LRuntimeError> {
-    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
-    let context: ConversionContext = ctx.get_conversion_context().await;
-    // context
-    //     .domain
-    //     .methods
-    //     .retain(|k, _| k.as_str() == obj.as_str());
-    // context
-    //     .domain
-    //     .commands
-    //     .retain(|k, _| k.as_str() == obj.as_str());
-
+pub async fn translate(_env: &LEnv, _obj: String) -> Result<(), LRuntimeError> {
     #[cfg(feature = "conversion_data")]
     {
+        let ctx = _env.get_context::<ModModel>(MOD_MODEL)?;
+        let context: ConversionContext = ctx.get_conversion_context().await;
         let pd: PlanningDomain = convert_acting_domain(&context).await?;
         debug_with_markdown(
-            &obj,
+            &_obj,
             pd.templates
                 .iter()
                 .find(|am| {
@@ -76,7 +67,7 @@ pub async fn translate(env: &LEnv, obj: String) -> Result<(), LRuntimeError> {
                         .unwrap()
                         .get_label()
                         .unwrap()
-                        .contains(&obj)
+                        .contains(&_obj)
                 })
                 .unwrap(),
             "/tmp/".into(),

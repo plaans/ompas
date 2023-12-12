@@ -3,8 +3,8 @@ use ompas_language::interface::{
 };
 
 use crate::ompas::manager::acting::ActingManager;
-use crate::ompas::manager::platform::lisp_domain::LispDomain;
 use crate::ompas::manager::platform::platform_config::PlatformConfig;
+use crate::ompas::manager::platform::scheme_domain::SchemeDomain;
 use crate::ompas::manager::platform::PlatformDescriptor;
 use crate::ompas::manager::resource::Capacity;
 use crate::ompas::manager::state::action_status::ProcessStatus;
@@ -346,7 +346,7 @@ impl PlatformDescriptor for ExecPlatform {
     }
 
     ///Returns the domain of the platform
-    async fn domain(&self) -> LispDomain {
+    async fn domain(&self) -> SchemeDomain {
         self.inner.read().await.domain().await
     }
 

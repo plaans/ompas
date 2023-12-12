@@ -14,7 +14,6 @@ use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::acting::{ActingManager, ActingProcessId, MethodModel};
 use crate::ompas::manager::clock::ClockManager;
 use crate::ompas::manager::domain::DomainManager;
-use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
 use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
@@ -43,15 +42,16 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror};
 use std::borrow::Borrow;
 use std::convert::TryInto;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
 pub struct ModRefinement {
     pub domain: DomainManager,
     pub acting_manager: ActingManager,
-    pub options: OMPASManager,
     pub clock_manager: ClockManager,
     pub log: LogClient,
+    empty_env: Arc<LEnv>,
 }
 
 impl ModRefinement {
@@ -60,8 +60,8 @@ impl ModRefinement {
             domain: exec.domain.clone(),
             log: exec.log.clone(),
             acting_manager: exec.acting_manager.clone(),
-            options: exec.options.clone(),
             clock_manager: exec.acting_manager.clock_manager.clone(),
+            empty_env: exec.empty_env.clone(),
         }
     }
 }
@@ -162,7 +162,7 @@ async fn check_refinement_trace(
     let acting_manager = &ctx.acting_manager;
     let debug = acting_manager.get_debug(task_id).await.unwrap();
     let method_id = match &rt.selected {
-        Selected::Anticipated(id) => {
+        Selected::Anticipated(id) | Selected::PlannerGenerated(id, _) => {
             let method_debug = acting_manager.get_debug(id).await.unwrap();
             log.debug(format!(
                 "({task_id}) Chose planned refinement for {debug}: ({id}) {method_debug}"
@@ -342,7 +342,9 @@ pub async fn select(
                 if let Some(mut watcher) = watcher {
                     log.info(format!("({}) Waiting on plan update.", task_id));
 
-                    let duration = acting_manager.get_planner_reactivity_duration();
+                    let duration = acting_manager
+                        .deliberation_manager
+                        .get_deliberation_reactivity_duration();
 
                     tokio::select! {
                         _ = tokio::time::sleep(duration) => {
@@ -395,44 +397,49 @@ pub async fn select(
     };
 
     selected = if selected.is_none() {
-        let select_mode: SelectMode = mod_refinement.options.get_select_mode().await;
+        let select_mode: SelectMode = mod_refinement
+            .acting_manager
+            .deliberation_manager
+            .get_select_mode()
+            .await;
 
-        Some(Selected::Generated(
-            match select_mode {
-                SelectMode::Greedy => {
-                    /*
-                    Returns all applicable methods sorted by their score
-                     */
-                    greedy_select(&candidates, &state, env)?
-                }
-                SelectMode::Random => random_select(&candidates, &state, env)?,
-                SelectMode::Score => score_select(&candidates, &state, env).await?,
-                SelectMode::Planning(Planner::Aries(bool)) => {
-                    aries_select(&candidates, &state, env, bool)
-                        .await
-                        .map_err(|e| e.chain("planning_select"))?
-                }
-                SelectMode::Planning(Planner::CChoice(config)) => {
-                    c_choice_select(&candidates, &state, env, config)
-                        .await
-                        .map_err(|e| e.chain("c_choice_select"))?
-                }
-                SelectMode::Planning(Planner::RAEPlan(config)) => {
-                    rae_plan_select(&task, &candidates, &state, env, config)
-                        .await
-                        .map_err(|e| e.chain("rae_plan_select"))?
-                }
-                SelectMode::Planning(Planner::UPOM(config)) => {
-                    upom_select(&task, &candidates, &state, env, config)
-                        .await
-                        .map_err(|e| e.chain("UPOM"))?
-                }
-                SelectMode::Heuristic | SelectMode::Learning => {
-                    todo!()
-                }
-            },
-            select_mode,
-        ))
+        Some(match select_mode {
+            SelectMode::Greedy => {
+                /*
+                Returns all applicable methods sorted by their score
+                 */
+                greedy_select(&candidates, &state, env)?
+            }
+            SelectMode::Random => random_select(&candidates, &state, env)?,
+            SelectMode::Score => score_select(&candidates, &state, env).await?,
+            SelectMode::Planning(Planner::Aries(aries_config)) => aries_select(
+                task_id,
+                &task,
+                &candidates,
+                &state,
+                env,
+                aries_config,
+                acting_manager.clone(),
+                mod_refinement.empty_env.as_ref().clone(),
+            )
+            .await
+            .map_err(|e| e.chain("planning_select"))?,
+            SelectMode::Planning(Planner::CChoice(config)) => {
+                c_choice_select(&candidates, &state, env, config)
+                    .await
+                    .map_err(|e| e.chain("c_choice_select"))?
+            }
+            SelectMode::Planning(Planner::RAEPlan(config)) => {
+                rae_plan_select(&task, &candidates, &state, env, config)
+                    .await
+                    .map_err(|e| e.chain("rae_plan_select"))?
+            }
+            SelectMode::Planning(Planner::UPOM(config)) => {
+                upom_select(&task, &candidates, &state, env, config)
+                    .await
+                    .map_err(|e| e.chain("UPOM"))?
+            }
+        })
     } else {
         selected
     };
@@ -564,7 +571,7 @@ pub async fn score_select(
     candidates: &[LValue],
     state: &WorldStateSnapshot,
     env: &LEnv,
-) -> lruntimeerror::Result<LValue> {
+) -> lruntimeerror::Result<Selected> {
     let mut tuple: Vec<(&LValue, i64)> = vec![];
 
     let domain = env.get_context::<ModExec>(MOD_EXEC)?.domain.clone();
@@ -602,24 +609,33 @@ pub async fn score_select(
 
     tuple.sort_by_key(|(_, s)| *s);
 
-    Ok(tuple.last().map(|e| e.0.clone()).unwrap())
+    Ok(Selected::Generated(
+        tuple.last().map(|e| e.0.clone()).unwrap(),
+        SelectMode::Score,
+    ))
 }
 
 pub fn random_select(
     candidates: &[LValue],
     _: &WorldStateSnapshot,
     _: &LEnv,
-) -> lruntimeerror::Result<LValue> {
+) -> lruntimeerror::Result<Selected> {
     let mut rng = rand::thread_rng();
     let mut candidates: Vec<&LValue> = candidates.iter().to_vec();
     candidates.shuffle(&mut rng);
-    Ok(candidates.get(0).cloned().unwrap_or(&LValue::Nil).clone())
+    Ok(Selected::Generated(
+        candidates.get(0).cloned().unwrap_or(&LValue::Nil).clone(),
+        SelectMode::Random,
+    ))
 }
 
 pub fn greedy_select(
     candidates: &[LValue],
     _: &WorldStateSnapshot,
     _: &LEnv,
-) -> lruntimeerror::Result<LValue> {
-    Ok(candidates.get(0).cloned().unwrap_or(LValue::Nil))
+) -> lruntimeerror::Result<Selected> {
+    Ok(Selected::Generated(
+        candidates.get(0).cloned().unwrap_or(LValue::Nil),
+        SelectMode::Greedy,
+    ))
 }

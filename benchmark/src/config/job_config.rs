@@ -42,6 +42,7 @@ pub struct ProblemConfig {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct HeuristicConfig {
     pub select: SelectConfig,
+    pub deliberation_reactivity: f64,
     pub continuous_planning: ContinuousPlanningConfig,
     pub pre_compute_models: Option<bool>,
     pub specific_domain: Option<SpecificDomain>,
@@ -59,6 +60,8 @@ pub enum SelectConfig {
     Greedy,
     Random,
     UPOM,
+    Aries,
+    AriesOpt,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

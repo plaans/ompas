@@ -39,12 +39,11 @@ pub type PlannerInterrupter = tokio::sync::watch::Receiver<bool>;
 pub type PlannerInterruptSender = tokio::sync::watch::Sender<bool>;
 
 pub struct OMPASLCPConfig {
-    pub state_subscriber_id: usize,
+    pub state_subscriber_id: Option<(usize, StateManager)>,
     pub opt: Option<PMetric>,
-    pub state_manager: StateManager,
     pub domain: Arc<OMPASDomain>,
     pub env: LEnv,
-    pub debug_date: DebugDate,
+    pub debug_date: Option<DebugDate>,
 }
 
 fn is_fully_populated(instances: &[ChronicleInstance]) -> bool {
@@ -75,9 +74,8 @@ pub async fn run_planner(
     intermediate_sender: Option<UnboundedSender<Result<SolverResult<PlanResult>>>>,
 ) -> Result<SolverResult<PlanResult>> {
     let OMPASLCPConfig {
-        state_subscriber_id,
+        state_subscriber_id: state_subscriber,
         opt,
-        state_manager,
         domain,
         env,
         debug_date,
@@ -110,7 +108,9 @@ pub async fn run_planner(
         } else {
             depth.to_string()
         };
-        debug_date.print_msg(format!("{depth_string} Solving with depth {depth_string}"));
+        if let Some(dd) = &debug_date {
+            dd.print_msg(format!("{depth_string} Solving with depth {depth_string}"));
+        }
 
         let new_pp = populate_problem(FinitePlanningProblem::PlannerProblem(&pp), domain, env, 1)
             .await
@@ -120,7 +120,9 @@ pub async fn run_planner(
                 return Ok(SolverResult::Interrupt(None));
             }
         }
-        debug_date.print_msg("OMPAS Chronicles populated");
+        if let Some(dd) = &debug_date {
+            dd.print_msg("OMPAS Chronicles populated");
+        }
         let fully_populated = is_fully_populated(&new_pp.instances);
 
         if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::On {
@@ -142,16 +144,18 @@ pub async fn run_planner(
                 .collect(),
         );
 
-        state_manager
-            .update_subscriber_rule(state_subscriber_id, rule)
-            .await;
+        if let Some((id, sm)) = state_subscriber {
+            sm.update_subscriber_rule(id, rule).await;
+        }
 
         let debug_date = debug_date.clone();
         let interrupter_2 = interrupter.clone();
         let r: Result<_> = handle
             .spawn_blocking(move || {
                 let (mut problem, table) = encode(&new_pp).unwrap();
-                debug_date.print_msg("Aries chronicles generated");
+                if let Some(dd) = &debug_date {
+                    dd.print_msg("Aries chronicles generated");
+                }
                 if let Some(interrupter) = &interrupter_2 {
                     if *interrupter.borrow() {
                         return Ok(SolverResult::Interrupt(None));
@@ -167,9 +171,13 @@ pub async fn run_planner(
                 if PRINT_RAW_MODEL.get() {
                     Printer::print_problem(&problem);
                 }
-                debug_date.print_msg("===== Preprocessing ======");
+                if let Some(dd) = &debug_date {
+                    dd.print_msg("===== Preprocessing ======");
+                }
                 aries_planning::chronicles::preprocessing::preprocess(&mut problem);
-                debug_date.print_msg("==========================");
+                if let Some(dd) = &debug_date {
+                    dd.print_msg("==========================");
+                }
                 if let Some(interrupter) = &interrupter_2 {
                     if *interrupter.borrow() {
                         return Ok(SolverResult::Interrupt(None));
@@ -215,7 +223,9 @@ pub async fn run_planner(
         let table = Arc::new(table);
         let pb = Arc::new(pb);
         if PRINT_PLANNER_OUTPUT.get() {
-            debug_date.print_msg(" Populated");
+            if let Some(dd) = &debug_date {
+                dd.print_msg(" Populated");
+            }
         }
 
         let (tx, mut rx) = mpsc::unbounded_channel();
@@ -237,7 +247,9 @@ pub async fn run_planner(
             tx.send((r, true))
         });
         if PRINT_PLANNER_OUTPUT.get() {
-            debug_date.print_msg(" Solved");
+            if let Some(dd) = &debug_date {
+                dd.print_msg(" Solved");
+            }
         }
 
         'loop_result: while let Some(result) = rx.recv().await {
@@ -246,7 +258,9 @@ pub async fn run_planner(
             let r = match result {
                 SolverResult::Unsat => {
                     if fully_populated {
-                        debug_date.print_msg("No solution");
+                        if let Some(dd) = &debug_date {
+                            dd.print_msg("No solution");
+                        }
                         return Ok(SolverResult::Unsat);
                     }
                     break 'loop_result;
@@ -257,15 +271,17 @@ pub async fn run_planner(
                         best_cost = cost
                     }
                     if OMPAS_PLANNER_OUTPUT.get() {
-                        debug_date.print_msg("  Solution found");
-                        debug_date.print_msg(format!(
-                            "\n**** Decomposition ****\n\n\
+                        if let Some(dd) = &debug_date {
+                            dd.print_msg("  Solution found");
+                            dd.print_msg(format!(
+                                "\n**** Decomposition ****\n\n\
                     {}\n\n\
                     **** Plan ****\n\n\
                     {}",
-                            format_hddl_plan(&fp, &ass).unwrap(),
-                            format_pddl_plan(&fp, &ass).unwrap(),
-                        ));
+                                format_hddl_plan(&fp, &ass).unwrap(),
+                                format_pddl_plan(&fp, &ass).unwrap(),
+                            ));
+                        }
                     }
 
                     SolverResult::Sol(PlanResult {
@@ -277,13 +293,17 @@ pub async fn run_planner(
                 }
                 SolverResult::Timeout(_) => {
                     if OMPAS_PLANNER_OUTPUT.get() {
-                        debug_date.print_msg("Timeout");
+                        if let Some(dd) = &debug_date {
+                            dd.print_msg("Timeout");
+                        }
                     }
                     SolverResult::Timeout(None)
                 }
                 SolverResult::Interrupt(_) => {
                     if OMPAS_PLAN_OUTPUT.get() {
-                        debug_date.print_msg("Interrupt")
+                        if let Some(dd) = &debug_date {
+                            dd.print_msg("Interrupt");
+                        }
                     }
                     SolverResult::Interrupt(None)
                 } // continue (increase depth)
@@ -313,7 +333,7 @@ pub async fn run_planner(
 /// If a valid solution of the subproblem is found, the solver will return a satisfying assignment.
 #[allow(clippy::too_many_arguments)]
 async fn solve_finite_problem(
-    debug_date: DebugDate,
+    debug_date: Option<DebugDate>,
     pb: Arc<FiniteProblem>,
     strategies: &[Strat],
     metric: Option<Metric>,
@@ -341,7 +361,9 @@ async fn solve_finite_problem(
             return SolverResult::Interrupt(None);
         }
     }
-    debug_date.print_msg("[Aries] CSP problem encoded");
+    if let Some(dd) = &debug_date {
+        dd.print_msg("[Aries] CSP problem encoded");
+    }
     let Ok(EncodedProblem {
         mut model,
         objective: metric,
@@ -354,7 +376,9 @@ async fn solve_finite_problem(
         model.enforce(metric.le_lit(cost_upper_bound), []);
     }
     let solver = init_solver(model);
-    debug_date.print_msg("[Aries] Solver initialized");
+    if let Some(dd) = &debug_date {
+        dd.print_msg("[Aries] Solver initialized");
+    }
 
     let encoding = Arc::new(encoding);
 
@@ -372,13 +396,16 @@ async fn solve_finite_problem(
             return SolverResult::Interrupt(None);
         }
     }
-    debug_date.print_msg("[Aries] ParSolver initialized");
-
+    if let Some(dd) = &debug_date {
+        dd.print_msg("[Aries] ParSolver initialized");
+    }
     let input_stream = solver.input_stream();
     let interrupt_handle = tokio::spawn(async move {
         if let Some(mut interrupter) = interrupter {
             if interrupter.wait_for(|b| *b == true).await.is_ok() {
-                debug_date.print_msg("Interrupt received");
+                if let Some(dd) = &debug_date {
+                    dd.print_msg("Interrupt received");
+                }
                 let _ = input_stream.sender.send(InputSignal::Interrupt);
             }
         }
@@ -394,15 +421,18 @@ async fn solve_finite_problem(
     };
 
     let join = handle.spawn_blocking(move || {
-        debug_date.print_msg("[Aries] Starting solver");
+        if let Some(dd) = &debug_date {
+            dd.print_msg("[Aries] Starting solver");
+        }
 
         let result = if let Some(metric) = metric {
             solver.minimize_with(metric, on_new_solution, None)
         } else {
             solver.solve(None)
         };
-        debug_date.print_msg("Solver Ended");
-
+        if let Some(dd) = &debug_date {
+            dd.print_msg("Solver Ended");
+        }
         // tag result with cost
         let result = result.map(|s| {
             let cost = metric.map(|metric| s.domain_of(metric).0);

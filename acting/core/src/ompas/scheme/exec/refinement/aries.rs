@@ -1,184 +1,135 @@
+use crate::model::acting_domain::model::NewTask;
+use crate::model::acting_domain::OMPASDomain;
+use crate::model::process_ref::ProcessRef;
+use crate::ompas::interface::select_mode::{AriesConfig, Planner, SelectMode};
+use crate::ompas::manager::acting::acting_var::AsCst;
+use crate::ompas::manager::acting::process::task::Selected;
 use crate::ompas::manager::acting::ActingManager;
-use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::planning::get_update;
+use crate::ompas::manager::planning::problem_update::ExecutionProblem;
 use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::ompas::scheme::exec::refinement::greedy_select;
-use crate::ompas::scheme::exec::ModExec;
-use crate::planning::planner::problem::PlanningDomain;
-use ompas_middleware::logger::LogClient;
+use crate::ompas::scheme::exec::state::ModState;
+use crate::ompas::scheme::monitor::model::get_plan_env;
+use crate::planning::planner::ompas_lcp;
+use crate::planning::planner::ompas_lcp::OMPASLCPConfig;
+use crate::planning::planner::problem::new_problem_chronicle_instance;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-
-pub struct CtxAries {
-    _log: LogClient,
-    _acting_manager: ActingManager,
-    _domain: DomainManager,
-    _pd: Arc<RwLock<Option<PlanningDomain>>>,
-}
-
-impl CtxAries {
-    pub fn new(exec: &ModExec) -> Self {
-        Self {
-            _log: exec.log.clone(),
-            _acting_manager: exec.acting_manager.clone(),
-            _domain: exec.domain.clone(),
-            _pd: Arc::new(Default::default()),
-        }
-    }
-}
 
 //Returns the method to do.
 pub async fn aries_select(
-    _candidates: &[LValue],
-    _state: &WorldStateSnapshot,
-    _env: &LEnv,
-    _optimize: bool,
-) -> lruntimeerror::Result<LValue> {
-    greedy_select(_candidates, _state, _env)
-    /*let ctx = env.get_context::<CtxAries>(CTX_ARIES)?;
-    let log = ctx.log.clone();
+    task_id: usize,
+    task: &[LValue],
+    candidates: &[LValue],
+    state: &WorldStateSnapshot,
+    env: &LEnv,
+    aries_config: AriesConfig,
+    acting_manager: ActingManager,
+    empty_env: LEnv,
+) -> lruntimeerror::Result<Selected> {
+    let mut plan_env = get_plan_env(&acting_manager.domain_manager, empty_env).await;
 
-    println!("\n\nTask to plan: {}", LValue::from(task.clone()));
-    println!("\t*tried: {}", LValue::from(tried));
-    println!("\t*greedy: {}", LValue::from(&greedy.applicable_methods));
+    plan_env.update_context(ModState::new_from_snapshot(state.clone()));
+    let opt = match aries_config {
+        AriesConfig::Satisfactory => None,
+        AriesConfig::Optimality(opt) => Some(opt),
+    };
+    let st = acting_manager.st.clone();
 
-    let parent_task = env
-        .get_context::<ModActingContext>(MOD_ACTING_CONTEXT)?
-        .get_task_id()
-        .await;
-    match parent_task {
-        Some(parent_id) => {
-            let parent_stack: TaskMetaData = ctx.supervisor.get_task(&parent_id).await?;
-            let n = ctx.supervisor.get_number_of_subtasks(&parent_id).await - 1;
-            println!("{} subtask of {}", n + 1, parent_id);
-            println!("Searching for a generated plan...");
-            if let Some(plan) = &parent_stack.get_last_refinement().unwrap().plan {
-                //Get number of subtasks for
-                println!("Parent task has a plan!!!\n {}", plan.format_hierarchy());
-                let root_id = plan.get_root_task().unwrap();
-                let instance: AbstractTaskInstance = plan
-                    .chronicles
-                    .get(&root_id)
-                    .unwrap()
-                    .clone()
-                    .try_into()
-                    .expect("root task is not an abstract task");
-                let task_id = instance.subtasks[n];
-                println!("subtask {:?}: ", plan.chronicles.get(&task_id).unwrap());
-                let refinement: AbstractTaskInstance =
-                    match plan.chronicles.get(&task_id).unwrap().clone().try_into() {
-                        Ok(a) => a,
-                        Err(_) => {
-                            return Err(lruntimeerror!(
-                                SELECT_ARIES,
-                                format!("task {} is not an abstract task:", n)
-                            ))
-                        }
-                    };
+    let domain: OMPASDomain = acting_manager.domain_manager.get_inner().await;
 
-                let task_to_refine = LValue::from(&task);
-                println!(
-                    "\n* Previous plan propose: ({}) -> {}",
-                    refinement.task, refinement.method,
-                );
-                println!("We verify that the method is still applicable...");
-
-                let planner_method = refinement.method;
-
-                if refinement.task == task_to_refine
-                    && !tried.contains(&refinement.task)
-                    && greedy.applicable_methods.contains(&planner_method)
-                {
-                    let subtask_plan = plan.extract_sub_plan(task_id);
-                    println!("Method is applicable! We can bypass the planner.");
-
-                    println!("*Plan for subtask:\n{}", subtask_plan.format_hierarchy());
-                    greedy.applicable_methods.retain(|m| m != &planner_method);
-
-                    let mut applicable_methods = vec![planner_method];
-                    applicable_methods.append(&mut greedy.applicable_methods);
-                    greedy.plan = Some(subtask_plan);
-                    greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
-                    greedy.applicable_methods = applicable_methods;
-                    greedy.interval.set_end(ctx.supervisor.get_instant());
-                    greedy.refinement_type = SelectMode::Planning(Planner::Aries(optimize));
-                    return Ok(greedy);
-                } else {
-                    println!("Error in continuum, we are going to plan...");
-                    println!("State: {}", LValue::from(state.clone()))
-                }
-            } else {
-                println!("No plan available for parent task...A plan is needed!")
-            }
-        }
-        None => println!("Root task, a plan is needed."),
+    let resource_state = acting_manager.resource_manager.get_snapshot(None).await;
+    let mut plan_state = state.clone();
+    plan_state.absorb(resource_state);
+    let tasks = vec![NewTask {
+        start: Some(acting_manager.clock_manager.now()),
+        args: task.iter().map(|lv| lv.as_cst().unwrap()).collect(),
+    }];
+    let ep: ExecutionProblem = ExecutionProblem {
+        state: plan_state,
+        st: st.clone(),
+        chronicles: vec![new_problem_chronicle_instance(&st, tasks.clone(), vec![], vec![]).await],
     };
 
-    let problem = PlanningProblem {
-        domain: ctx.pd.read().await.clone().unwrap(),
-        instance: PlanningInstance {
-            state,
-            tasks: vec![LValue::from(task).try_into()?],
-            instances: vec![],
+    // //hack
+    // for (i, task) in tasks.iter().enumerate() {
+    //     if let Some(start) = task.start {
+    //         let ch = &mut ep.chronicles[i + 1].instantiated_chronicle;
+    //         *ch = ch.clone().instantiate(vec![Instantiation::new(
+    //             ch.interval.get_start(),
+    //             st.new_cst(start.as_cst().unwrap()),
+    //         )]);
+    //     }
+    // }
+
+    let result = ompas_lcp::run_planner(
+        &ep,
+        &OMPASLCPConfig {
+            state_subscriber_id: None,
+            opt,
+            domain: Arc::new(domain),
+            env: plan_env,
+            debug_date: None,
         },
-        st: Default::default(),
+        None,
+        None,
+    )
+    .await;
+
+    let update_pr = |pr: &mut ProcessRef| {
+        let ProcessRef::Relative(id, vec) = pr else {
+            unreachable!()
+        };
+        *id = task_id;
+        vec.remove(0);
     };
 
-    let mut bindings = BindingAriesAtoms::default();
-
-    let mut aries_problem = generate_templates(&problem, &mut bindings)?;
-    let instant = Instant::now();
-    let result = run_solver_for_htn(&mut aries_problem, optimize);
-
-    log.info(format!(
-        "Time to run solver: {:^3} ms (optimize = {})",
-        instant.elapsed().as_micros() as f64 / 1000.0,
-        optimize
-    ))
-    .await;
-    // println!("{}", format_partial_plan(&pb, &x)?);
-
-    let mut greedy: RefinementTrace = greedy;
-
-    if let Some(x) = &result {
-        let plan = solver::extract_plan(x);
-        let first_task_id = plan.get_first_subtask().unwrap();
-        let method_plan = plan.extract_sub_plan(first_task_id);
-        let task: AbstractTaskInstance = plan
-            .chronicles
-            .get(&first_task_id)
-            .unwrap()
-            .clone()
-            .try_into()?;
-
-        greedy.plan = Some(method_plan);
-
-        let mut greedy_methods = greedy.applicable_methods.clone();
-
-        //let planner_methods = solver::extract_instantiated_methods(x)?;
-        //let result: Vec<LValue> = planner_methods.try_into()?;
-        //let planner_method = result[0].clone();
-
-        let planner_method = task.method;
-        println!("planner method: {}", planner_method);
-        if greedy_methods.contains(&planner_method) {
-            greedy_methods.retain(|m| m != &planner_method);
-        } else {
-            panic!("planner found a non applicable method...")
+    let selected = if let Some(mut update) = get_update(result) {
+        for chronicle in &mut update.acting_models {
+            update_pr(&mut chronicle.pr);
+            // println!(
+            //     "{}; {}\n{}",
+            //     chronicle.pr,
+            //     chronicle.refinement_label,
+            //     chronicle.instantiated_chronicle.to_string()
+            // );
         }
-
-        let mut applicable_methods = vec![planner_method];
-        applicable_methods.append(&mut greedy_methods);
-        applicable_methods.retain(|m| !tried.contains(m));
-
-        greedy.choosed = applicable_methods.get(0).cloned().unwrap_or(LValue::Nil);
-        greedy.applicable_methods = applicable_methods;
-        greedy.interval.set_end(ctx.supervisor.get_instant());
-        greedy.refinement_type = SelectMode::Planning(Planner::Aries(optimize));
-        Ok(greedy)
+        //Remove choices for C_0 interval and task name;
+        update.choices.remove(0);
+        update.choices.remove(0);
+        for choice in &mut update.choices {
+            update_pr(&mut choice.process_ref);
+        }
+        // for choice in &update.choices {
+        //     println!("{}:{}", choice.process_ref, choice.choice_inner);
+        // }
+        //panic!()
+        // for choice in &update.choices {
+        //     if let ChoiceInner::Refinement(r) = &choice.choice_inner {
+        //
+        //         return Ok()
+        //     }
+        // }
+        acting_manager.update_acting_tree(update).await;
+        let method_id = acting_manager
+            .get_last_planned_refinement(&task_id)
+            .await
+            .unwrap();
+        let lv = acting_manager.get_refinement_lv(&method_id).await;
+        if candidates.contains(&lv) {
+            Selected::PlannerGenerated(
+                method_id,
+                SelectMode::Planning(Planner::Aries(aries_config)),
+            )
+        } else {
+            greedy_select(candidates, &state, &env)?
+        }
     } else {
-        Ok(greedy)
-    }*/
+        greedy_select(candidates, &state, &env)?
+    };
+
+    Ok(selected)
 }

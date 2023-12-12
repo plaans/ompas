@@ -17,7 +17,6 @@ pub mod model;
 pub mod planning;
 use crate::ompas::interface::rae_command::OMPASJob;
 use crate::ompas::manager::acting::ActingManager;
-use crate::ompas::manager::ompas::OMPASManager;
 use crate::ompas::manager::platform::exec_platform::ExecPlatform;
 use crate::ompas::manager::platform::platform_declaration::PlatformDeclaration;
 use crate::ompas::manager::platform::PlatformManager;
@@ -35,12 +34,11 @@ use sompas_structs::lenv::{ImportType, LEnv};
 
 #[derive(Default)]
 pub struct ModMonitor {
-    pub(crate) options: OMPASManager,
     pub acting_manager: ActingManager,
     pub log: LogClient,
     pub task_stream: Arc<RwLock<Option<tokio::sync::mpsc::UnboundedSender<OMPASJob>>>>,
     pub(crate) platform: PlatformManager,
-    pub(crate) empty_env: LEnv,
+    pub(crate) empty_env: Arc<LEnv>,
 }
 
 impl From<ModMonitor> for LModule {
@@ -108,12 +106,11 @@ impl ModMonitor {
 
     /// Initialize the libraries to load inside Scheme env.
     /// Takes as argument the execution platform.
-    ///
     async fn init_empty_env(&mut self) {
         let mut env: LEnv = get_root_env().await;
         env.import_module(ModExtendedStd::default(), WithoutPrefix);
         env.import_module(ModExec::new(&ModControl::new(self)).await, WithoutPrefix);
         eval_init(&mut env).await;
-        self.empty_env = env;
+        self.empty_env = Arc::new(env);
     }
 }

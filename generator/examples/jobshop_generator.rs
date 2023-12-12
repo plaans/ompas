@@ -34,7 +34,7 @@ pub fn main() {
     let mut problem = JobshopGenerator::default().new_problem(&recipe).unwrap();
     let mut path: PathBuf = "/tmp/jobshop".into();
     let _ = fs::create_dir_all(&path);
-    path.push("problem.lisp");
+    path.push("problem.scm");
     problem.store(&path);
     let sompas = problem.to_sompas();
     println!("{sompas}");

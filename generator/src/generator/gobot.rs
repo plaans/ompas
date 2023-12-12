@@ -414,7 +414,7 @@ impl Problem for GobotProblem {
                 file_name
                     .to_str()
                     .unwrap()
-                    .replace(".lisp", "_scenario.json"),
+                    .replace(".scm", "_scenario.json"),
             );
             let mut file_jobshop = File::create(&path_scenario).unwrap();
             file_jobshop

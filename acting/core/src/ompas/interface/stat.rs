@@ -113,6 +113,13 @@ pub enum OMPASStat {
     Process(ActingProcessStat),
     Planner(PlannerStat),
     Acting(ActingStat),
+    Bench(BenchStat),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BenchStat {
+    pub min_time: Duration,
+    pub max_time: Duration,
 }
 
 impl From<ActingProcessStat> for OMPASStat {
@@ -130,5 +137,11 @@ impl From<PlannerStat> for OMPASStat {
 impl From<ActingStat> for OMPASStat {
     fn from(value: ActingStat) -> Self {
         Self::Acting(value)
+    }
+}
+
+impl From<BenchStat> for OMPASStat {
+    fn from(value: BenchStat) -> Self {
+        Self::Bench(value)
     }
 }

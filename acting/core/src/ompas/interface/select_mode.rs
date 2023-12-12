@@ -1,4 +1,6 @@
+use crate::planning::planner::solver::PMetric;
 use ompas_language::select::*;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 pub const UPOM_D_MAX_DEFAULT: u64 = 10;
@@ -6,25 +8,60 @@ pub const UPOM_N_RO_DEFAULT: u64 = 10;
 pub const UPOM_TIMEOUT_DEFAULT: f64 = 1.0;
 pub const UPOM_C_DEFAULT: f64 = 2.0;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum SelectMode {
     Greedy,
     Random,
     Score,
     Planning(Planner),
-    Heuristic,
-    Learning,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum SelectModeSerde {
+    Greedy,
+    Random,
+    Score,
+    Aries,
+    AriesOpt,
+    UPOM,
+    CChoice,
+    RAEPlan,
+}
+
+impl From<SelectMode> for SelectModeSerde {
+    fn from(value: SelectMode) -> Self {
+        match value {
+            SelectMode::Greedy => Self::Greedy,
+            SelectMode::Random => Self::Random,
+            SelectMode::Score => Self::Score,
+            SelectMode::Planning(p) => match p {
+                Planner::Aries(aries) => match aries {
+                    AriesConfig::Satisfactory => Self::Aries,
+                    AriesConfig::Optimality(_) => Self::AriesOpt,
+                },
+                Planner::UPOM(_) => Self::UPOM,
+                Planner::CChoice(_) => Self::CChoice,
+                Planner::RAEPlan(_) => Self::RAEPlan,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum Planner {
-    Aries(bool),
+    Aries(AriesConfig),
     UPOM(UPOMConfig),
     CChoice(CChoiceConfig),
     RAEPlan(RAEPlanConfig),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum AriesConfig {
+    Satisfactory,
+    Optimality(PMetric),
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct UPOMConfig {
     ///Number of methods to compare.
     d_max: u64,
@@ -49,7 +86,7 @@ impl Default for UPOMConfig {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub enum UPOMMode {
     #[default]
     Efficiency,
@@ -82,7 +119,7 @@ impl UPOMConfig {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct CChoiceConfig {
     ///Number of methods to compare.
     b: Option<usize>,
@@ -105,7 +142,7 @@ impl CChoiceConfig {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct RAEPlanConfig {
     //Number of methods to compare.
     b: Option<usize>,
@@ -134,8 +171,8 @@ impl Display for Planner {
             f,
             "{}",
             match self {
-                Planner::Aries(true) => ARIES_OPT.to_string(),
-                Planner::Aries(false) => ARIES.to_string(),
+                Planner::Aries(AriesConfig::Optimality(_)) => ARIES_OPT.to_string(),
+                Planner::Aries(AriesConfig::Satisfactory) => ARIES.to_string(),
                 Planner::UPOM(config) => format!("{}; config = {:?}", UPOM, config),
                 Planner::RAEPlan(config) => format!("{} ; config = {:?}", RAE_PLAN, config),
                 Planner::CChoice(config) => format!("{} ; config = {:?}", C_CHOICE, config),
@@ -152,8 +189,6 @@ impl Display for SelectMode {
             match self {
                 SelectMode::Greedy => GREEDY.to_string(),
                 SelectMode::Planning(p) => format!("{}", p),
-                SelectMode::Heuristic => HEURISTIC.to_string(),
-                SelectMode::Learning => LEARNING.to_string(),
                 SelectMode::Random => RANDOM.to_string(),
                 SelectMode::Score => SCORE.to_string(),
             }

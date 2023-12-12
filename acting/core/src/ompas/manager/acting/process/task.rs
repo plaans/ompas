@@ -150,6 +150,7 @@ pub struct RefinementTrace {
 pub enum Selected {
     Anticipated(ActingProcessId),
     Generated(LValue, SelectMode),
+    PlannerGenerated(ActingProcessId, SelectMode),
 }
 
 impl Display for Selected {
@@ -160,6 +161,9 @@ impl Display for Selected {
             }
             Selected::Generated(m, algo) => {
                 write!(f, "Generated(method = {}, algo = {})", m, algo)
+            }
+            Selected::PlannerGenerated(m, algo) => {
+                write!(f, "PlannerGenerated(method = {}, algo = {})", m, algo)
             }
         }
     }

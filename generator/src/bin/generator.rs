@@ -82,7 +82,7 @@ pub fn main() -> Result<(), String> {
             for i in 0..n {
                 let mut file_path = path.clone();
                 let name = format!("{}_{}_{}", job.name, recipe_label, i);
-                file_path.push(format!("{}.lisp", name));
+                file_path.push(format!("{}.scm", name));
                 let mut pb = generator.new_problem(recipe)?;
 
                 pb.store(&file_path);

@@ -1,8 +1,8 @@
 pub mod acting;
 pub mod clock;
+pub mod deliberation;
 pub mod domain;
 pub mod event;
-pub mod ompas;
 pub mod planning;
 pub mod platform;
 pub mod resource;

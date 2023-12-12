@@ -7,7 +7,7 @@ use crate::ompas::manager::state::action_status::ProcessStatus;
 use crate::ompas::manager::state::partial_state::Fact;
 use crate::ompas::scheme::exec::state::ModState;
 use crate::ompas::scheme::monitor::control::ModControl;
-use crate::ompas::scheme::monitor::model::ModModel;
+use crate::ompas::scheme::monitor::model::{get_plan_env, ModModel};
 use crate::ompas::scheme::monitor::ModMonitor;
 use crate::planning::planner::solver::PMetric;
 use ompas_language::monitor::continuous_planning::*;
@@ -56,7 +56,14 @@ pub async fn start(env: &LEnv, opt: bool) -> LResult {
         .clone();
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
 
-    let mut env: LEnv = ctx.get_plan_env().await;
+    let mut env: LEnv = get_plan_env(
+        &ctx.domain_manager,
+        env.get_context::<ModControl>(MOD_CONTROL)?
+            .empty_env
+            .as_ref()
+            .clone(),
+    )
+    .await;
     let state = ctx.get_plan_state().await;
 
     env.update_context(ModState::new_from_snapshot(state));

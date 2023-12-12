@@ -10,6 +10,7 @@ use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::process::task::RefinementTrace;
 use crate::ompas::manager::acting::process::ProcessOrigin;
 use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::deliberation::DeliberationManager;
 use crate::ompas::manager::domain::DomainManager;
 use crate::ompas::manager::event::EventManager;
 use crate::ompas::manager::planning::plan_update::ActingTreeUpdate;
@@ -22,7 +23,6 @@ use crate::ompas::manager::state::StateManager;
 use crate::planning::conversion::flow_graph::algo::pre_processing::expand_lambda;
 use crate::planning::conversion::flow_graph::graph::Dot;
 use crate::planning::planner::solver::PMetric;
-use atomic_float::AtomicF64;
 use inner::InnerActingManager;
 use ompas_language::exec::acting_context::DEF_PROCESS_ID;
 use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
@@ -38,9 +38,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Duration as OtherDuration;
 use std::{fs, thread};
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, watch, RwLock};
@@ -65,36 +63,6 @@ pub struct ActingTreeDisplayer {
 
 pub type RefInnerActingManager = Arc<RwLock<InnerActingManager>>;
 
-pub const MAX_REACTIVITY: f64 = 3600.0;
-
-#[derive(Clone)]
-pub struct PlannerReactivity {
-    inner: Arc<AtomicF64>,
-}
-
-impl Default for PlannerReactivity {
-    fn default() -> Self {
-        Self {
-            inner: Arc::new(AtomicF64::new(MAX_REACTIVITY)),
-        }
-    }
-}
-
-impl PlannerReactivity {
-    pub fn get_planner_reactivity(&self) -> f64 {
-        self.inner.load(Ordering::Relaxed)
-    }
-
-    pub fn get_duration(&self) -> OtherDuration {
-        let reactivity = self.get_planner_reactivity();
-        if reactivity > MAX_REACTIVITY {
-            OtherDuration::from_secs_f64(MAX_REACTIVITY)
-        } else {
-            OtherDuration::from_secs_f64(reactivity)
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct ActingManager {
     pub st: RefSymTable,
@@ -104,8 +72,8 @@ pub struct ActingManager {
     pub state_manager: StateManager,
     pub inner: RefInnerActingManager,
     pub clock_manager: ClockManager,
+    pub deliberation_manager: DeliberationManager,
     acting_tree_displayer: Arc<RwLock<Option<ActingTreeDisplayer>>>,
-    planner_reactivity: PlannerReactivity,
 }
 
 impl Default for ActingManager {
@@ -123,6 +91,7 @@ impl ActingManager {
         let domain_manager: DomainManager = ompas_domain.into();
         let state_manager = StateManager::new(clock_manager.clone(), st.clone());
         let event_manager = EventManager::new(state_manager.clone(), clock_manager.clone());
+        let deliberation_manager = DeliberationManager::default();
         Self {
             st: st.clone(),
             resource_manager: resource_manager.clone(),
@@ -133,34 +102,15 @@ impl ActingManager {
                 resource_manager,
                 clock_manager.clone(),
                 domain_manager,
+                deliberation_manager.clone(),
                 st,
             ))),
             clock_manager,
+            deliberation_manager,
             acting_tree_displayer: Arc::new(Default::default()),
-            planner_reactivity: PlannerReactivity::default(),
         }
     }
 
-    pub fn get_planner_reactivity(&self) -> f64 {
-        self.planner_reactivity.get_planner_reactivity()
-    }
-
-    pub fn get_planner_reactivity_duration(&self) -> OtherDuration {
-        self.planner_reactivity.get_duration()
-    }
-
-    pub fn set_planner_reactivity(&self, planner_reactivity: f64) {
-        let old = self.planner_reactivity.inner.load(Ordering::Acquire);
-        self.planner_reactivity
-            .inner
-            .compare_exchange(
-                old,
-                planner_reactivity,
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
-            .unwrap();
-    }
     pub async fn is_planner_activated(&self) -> bool {
         self.inner.read().await.is_planner_activated()
     }
@@ -490,7 +440,7 @@ impl ActingManager {
             self.domain_manager.clone(),
             self.st.clone(),
             env,
-            self.planner_reactivity.clone(),
+            self.deliberation_manager.planner_reactivity.clone(),
             opt,
         )
         .await;

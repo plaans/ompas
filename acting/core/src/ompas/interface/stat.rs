@@ -19,6 +19,7 @@ impl OMPASRunData {
     }
 
     pub fn get_execution_time(&self) -> f64 {
+        let acting_time = self.get_acting_time();
         let mut min_start: Option<f64> = None;
         let mut max_end: Option<f64> = None;
         for stat in &self.inner {
@@ -27,7 +28,7 @@ impl OMPASRunData {
                 let end = start
                     + match p.duration.is_finite() {
                         true => p.duration.as_secs(),
-                        false => 0.0,
+                        false => acting_time,
                     };
                 match min_start {
                     None => {
@@ -45,6 +46,51 @@ impl OMPASRunData {
         }
 
         max_end.unwrap() - min_start.unwrap()
+    }
+
+    pub fn get_acting_time(&self) -> f64 {
+        self.inner
+            .iter()
+            .find_map(|run| {
+                if let OMPASStat::Acting(a) = run {
+                    Some(a)
+                } else {
+                    None
+                }
+            })
+            .unwrap()
+            .acting_time
+            .as_secs()
+    }
+
+    pub fn get_bench_min_time(&self) -> f64 {
+        self.inner
+            .iter()
+            .find_map(|run| {
+                if let OMPASStat::Bench(a) = run {
+                    Some(a)
+                } else {
+                    None
+                }
+            })
+            .unwrap()
+            .min_time
+            .as_secs()
+    }
+
+    pub fn get_bench_max_time(&self) -> f64 {
+        self.inner
+            .iter()
+            .find_map(|run| {
+                if let OMPASStat::Bench(a) = run {
+                    Some(a)
+                } else {
+                    None
+                }
+            })
+            .unwrap()
+            .max_time
+            .as_secs()
     }
 
     pub fn get_deliberation_time(&self) -> f64 {

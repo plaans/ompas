@@ -78,9 +78,21 @@ pub struct SystemStatFormatter {
 impl SystemStatFormatter {
     pub fn to_csv(&self) -> String {
         let mut string = String::new();
-        for cells in &self.lines {
+        let mut multi_line: Option<(usize, usize)> = None;
+        for (line, cells) in self.lines.iter().enumerate() {
             let mut c_i = 0;
             for cell in cells {
+                if let Some((c, l)) = multi_line {
+                    if c_i == c {
+                        string.push(';');
+                    }
+                    if line > l {
+                        multi_line = None;
+                    }
+                }
+                if cell.row > 1 {
+                    multi_line = Some((c_i, line + cell.row - 1))
+                }
                 if c_i != 0 {
                     string.push(';');
                 }
@@ -213,7 +225,7 @@ impl From<&SystemStat> for SystemStatFormatter {
                     column: 1,
                     row: n,
                     pre_sep: Some('|'),
-                    post_sep: Some('|'),
+                    post_sep: None,
                 });
                 same_domain = Some(l_i + n - 1);
             }
@@ -235,6 +247,9 @@ impl From<&SystemStat> for SystemStatFormatter {
 
 impl Display for SystemStatFormatter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // let mut column_span = None;
+        let mut line_span: Option<(usize, usize, &Cell)> = None;
+
         let mut column_size: Vec<usize> = vec![
             0;
             self.lines[0]
@@ -249,23 +264,81 @@ impl Display for SystemStatFormatter {
             }
         }
 
-        for cells in &self.lines {
-            for (i, cell) in cells.iter().enumerate() {
-                write!(f, "{}", cell.format(column_size[i]))?;
-                for i in 0..cell.column - 1 {
+        let write_cell = |cell: &Cell, i: &mut usize, f: &mut Formatter<'_>| -> std::fmt::Result {
+            if cell.column == 1 {
+                write!(f, "{}", cell.format(column_size[*i]))?;
+                *i += 1;
+            } else {
+                write!(
+                    f,
+                    "{}",
+                    Cell {
+                        info: cell.info.to_string(),
+                        column: 1,
+                        row: 1,
+                        pre_sep: cell.pre_sep,
+                        post_sep: None,
+                    }
+                    .format(column_size[*i])
+                );
+                *i += 1;
+                for _ in 1..cell.column - 1 {
                     write!(
                         f,
                         "{}",
                         Cell {
                             info: "".to_string(),
-                            column: 0,
-                            row: 0,
+                            column: 1,
+                            row: 1,
                             pre_sep: Some(' '),
-                            post_sep: Some(' '),
+                            post_sep: None,
                         }
-                        .format(column_size[i])
+                        .format(column_size[*i])
                     )?;
+                    *i += 1;
                 }
+                write!(
+                    f,
+                    "{}",
+                    Cell {
+                        info: "".to_string(),
+                        column: 1,
+                        row: 1,
+                        pre_sep: Some(' '),
+                        post_sep: cell.post_sep.clone()
+                    }
+                    .format(column_size[*i])
+                )?;
+                *i += 1;
+            }
+            Ok(())
+        };
+
+        for (line, cells) in self.lines.iter().enumerate() {
+            let mut i = 0;
+            for cell in cells {
+                if let Some((c, l, cell)) = line_span {
+                    if c == i {
+                        write_cell(
+                            &Cell {
+                                info: "".to_string(),
+                                column: cell.column,
+                                row: cell.row,
+                                pre_sep: cell.pre_sep,
+                                post_sep: cell.post_sep,
+                            },
+                            &mut i,
+                            f,
+                        )?;
+                    }
+                    if line > l {
+                        line_span = None;
+                    }
+                }
+                if cell.row > 1 {
+                    line_span = Some((i, line + cell.row - 1, cell));
+                }
+                write_cell(cell, &mut i, f)?;
             }
             write!(f, "\n")?;
         }

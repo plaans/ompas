@@ -58,6 +58,8 @@ impl ConfigRunData {
 
     pub fn get_config_instance_stat(&self) -> ConfigInstanceStat {
         ConfigInstanceStat {
+            bench_min_time: self.get_bench_min_time(),
+            bench_max_time: self.get_bench_max_time(),
             execution_time: self.get_execution_time_stat(),
             best_config_execution_time_ratio: 0.0,
             distance_to_best_execution_time: 0.0,
@@ -71,6 +73,24 @@ impl ConfigRunData {
             continuous_planning_stat: self.get_continuous_planning_stat(),
             coverage: self.get_coverage(),
         }
+    }
+
+    fn get_bench_min_time(&self) -> f64 {
+        let times: Vec<_> = self
+            .inner
+            .iter()
+            .map(|run| run.get_bench_min_time())
+            .collect();
+        times.iter().sum::<f64>() / times.len() as f64
+    }
+
+    fn get_bench_max_time(&self) -> f64 {
+        let times: Vec<_> = self
+            .inner
+            .iter()
+            .map(|run| run.get_bench_max_time())
+            .collect();
+        times.iter().sum::<f64>() / times.len() as f64
     }
 
     fn get_execution_time_stat(&self) -> DurationStat {
@@ -98,7 +118,8 @@ impl ConfigRunData {
     }
 
     fn get_score(&self) -> f64 {
-        self.get_coverage() * 100.0 / self.get_execution_time_stat().mean
+        (1.0 - self.get_execution_time_stat().mean / self.get_bench_max_time())
+            * self.get_coverage()
     }
 
     fn get_deliberation_time(&self) -> f64 {
@@ -141,6 +162,8 @@ impl ConfigRunData {
 }
 
 pub struct ConfigInstanceStat {
+    pub bench_min_time: f64,
+    pub bench_max_time: f64,
     pub execution_time: DurationStat,
     pub best_config_execution_time_ratio: f64,
     pub distance_to_best_execution_time: f64,
@@ -164,7 +187,7 @@ pub const COVERAGE: &str = "Cov";
 pub const SCORE: &str = "Score";
 pub const NUMBER_RETRIES: &str = "$N(retries)$";
 pub const NUMBER_FAILURES: &str = "$N(failures)$";
-pub const DISTANCE_TO_BEST_SCORE: &str = "$D(Best(Score)$";
+pub const DISTANCE_TO_BEST_SCORE: &str = "$D(Best(Score))$";
 pub const BEST_SCORE_RATIO: &str = "$R(Best(score))$";
 pub const PLANNING_TIME: &str = "$T(plan)$";
 pub const PLANNING_TIME_RATIO: &str = "$R(plan)$";
@@ -239,16 +262,16 @@ impl ConfigProblemStat {
                     format!("{:.1}", self.deliberation_time)
                 }
                 Field::DeliberationTimeRatio => {
-                    format!("{:.1}", self.deliberation_ratio)
+                    format!("{:.1}", self.deliberation_ratio * 100.0)
                 }
                 Field::Coverage => {
-                    format!("{:.1}", self.coverage)
+                    format!("{:.1}", self.coverage * 100.0)
                 }
                 Field::Score => {
-                    format!("{:.3}", self.score)
+                    format!("{:.3}", self.score * 100.0)
                 }
                 Field::DistanceToBestScore => {
-                    format!("{:.1}", self.distance_to_best_score)
+                    format!("{:.1}", self.distance_to_best_score * 100.0)
                 }
                 Field::NumberRetries => {
                     format!("{:.1}", self.number_retries)
@@ -262,7 +285,7 @@ impl ConfigProblemStat {
                 },
                 Field::PlanningTimeRatio => match &self.continuous_planning_stat {
                     None => "ND".to_string(),
-                    Some(c) => format!("{:.1}", c.planning_time_ratio),
+                    Some(c) => format!("{:.1}", c.planning_time_ratio * 100.0),
                 },
                 Field::NumberPlanningInstance => match &self.continuous_planning_stat {
                     None => "ND".to_string(),
@@ -274,13 +297,13 @@ impl ConfigProblemStat {
                 },
                 Field::PlanningSuccessRate => match &self.continuous_planning_stat {
                     None => "ND".to_string(),
-                    Some(c) => format!("{:.1}", c.planning_success_rate),
+                    Some(c) => format!("{:.1}", c.planning_success_rate * 100.0),
                 },
                 Field::BestExecutionTimeRatio => {
-                    format!("{:.1}", self.best_execution_time_ratio)
+                    format!("{:.1}", self.best_execution_time_ratio * 100.0)
                 }
                 Field::BestScoreRatio => {
-                    format!("{:.1}", self.best_score_ratio)
+                    format!("{:.1}", self.best_score_ratio * 100.0)
                 }
             };
 

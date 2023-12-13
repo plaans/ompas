@@ -71,13 +71,14 @@ impl InstanceRunData {
                 run.best_score_ratio = 1.0;
                 run.distance_to_best_score = 0.0;
             } else {
-                run.distance_to_best_score = (run.score - best_score) / best_score;
+                run.distance_to_best_score = ((run.score - best_score) / best_score).abs();
             }
             if c == &c_exec_time {
                 run.best_config_execution_time_ratio = 1.0;
                 run.distance_to_best_execution_time = 0.0;
             } else {
-                run.distance_to_best_execution_time = (run.score - best_exec_time) / best_exec_time;
+                run.distance_to_best_execution_time =
+                    ((run.score - best_exec_time) / best_exec_time).abs();
             }
         });
 

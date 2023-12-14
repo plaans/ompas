@@ -186,7 +186,7 @@ impl From<&SystemStat> for SystemStatFormatter {
         let header = ConfigProblemStat::header(&value.config.fields);
         let header_len = header.len();
         let mut empty_info = vec![Cell::start("ND".to_string()); header_len - 1];
-        empty_info.push(Cell::double("".to_string()));
+        empty_info.push(Cell::double("ND".to_string()));
         for config_name in &config_order {
             first_line.push(Cell {
                 info: config_name.format(),

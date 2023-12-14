@@ -37,6 +37,7 @@ use aries_planning::chronicles::{
 use aries_planning::parsing::pddl::TypedSymbol;
 use env_param::EnvParam;
 use function_name::named;
+use ompas_language::exec::state::UNKNOWN;
 use ompas_language::sym_table::*;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
@@ -90,6 +91,8 @@ pub fn encode_ctx(
             symbols.push(TypedSymbol::new(sym, t));
         }
     }
+
+    symbols.push(TypedSymbol::new(UNKNOWN, TYPE_OBJECT));
 
     for sf in &domain.sf {
         symbols.push(TypedSymbol::new(sf.get_label(), TYPE_STATE_FUNCTION));

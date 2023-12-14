@@ -33,22 +33,22 @@
             ))))
 
     (def-command open (:params (?d door) (?r room) (?g gripper)))
-    (def-command-pddl-model open
+    (def-command-om-model open
         (:params (?d door) (?r room) (?g gripper))
-        (:pre-conditions
-            (= (at-robby) ?r)
-            (= (carry ?g) empty)
-            (is_door_of ?d ?r))
-        (:effects
-            (durative 5 'opened ?d true)))
+        (:body
+            (do
+                (check (= (at-robby) ?r))
+                (check (= (carry ?g) empty))
+                (check (is_door_of ?d ?r))
+                (durative-effect 5 'opened ?d true))))
 
     (def-command close (:params (?d door) (?r room) (?g gripper)))
-    (def-command-pddl-model close
+    (def-command-om-model close
         (:params (?d door) (?r room) (?g gripper))
-        (:pre-conditions
-            (= (at-robby) ?r)
-            (= (carry ?g) empty)
-            (is_door_of ?d ?r))
-        (:effects
-            (durative 5 'opened ?d false)))
+        (:body
+            (do
+                (check (= (at-robby) ?r))
+                (check (= (carry ?g) empty))
+                (check (is_door_of ?d ?r))
+                (durative-effect 5 'opened ?d false))))
 )

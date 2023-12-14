@@ -17,7 +17,7 @@ use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::planning::conversion::flow_graph::graph::Dot;
 use new_type::newtype;
 use ompas_language::exec::resource::{MAX_Q, QUANTITY};
-use ompas_language::exec::state::INSTANCE;
+use ompas_language::exec::state::{INSTANCE, UNKNOWN};
 use ompas_language::sym_table::*;
 use sompas_language::kind::{ERR, NIL};
 use sompas_structs::lnumber::LNumber;
@@ -179,6 +179,9 @@ impl SymTable {
                 Box::new(Domain::Simple(TYPE_ID_INT)),
             ),
         );
+
+        //Add unk as symbol
+        st.new_constant_symbol(UNKNOWN, Domain::any());
 
         st
     }

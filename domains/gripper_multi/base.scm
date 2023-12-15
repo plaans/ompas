@@ -64,7 +64,7 @@
             (is_door_of ?d ?r)
             (= (carry ?ro ?g) 'empty))
         (:effects
-            ('opened ?d true)))
+            (durative 5 'opened ?d true)))
 
     (def-command close (:params (?ro robot) (?d door) (?r room) (?g gripper)))
     (def-command-pddl-model close
@@ -74,5 +74,5 @@
             (is_door_of ?d ?r)
             (= (carry ?ro ?g) 'empty))
         (:effects
-            ('opened ?d false)))
+            (durative 5 'opened ?d false)))
 )

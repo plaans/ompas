@@ -1,6 +1,6 @@
 use crate::stat::formatter::Cell;
 use crate::stat::instance::ContinuousPlanningStat;
-use crate::stat::DurationStat;
+use crate::stat::Stat;
 use crate::statos_config::Field;
 use ompas_core::ompas::interface::stat::OMPASRunData;
 use std::fmt::Write;
@@ -58,17 +58,17 @@ impl ConfigRunData {
             bench_min_time: self.get_bench_min_time(),
             bench_max_time: self.get_bench_max_time(),
             execution_time: self.get_execution_time_stat(),
-            best_config_execution_time_ratio: 0.0,
-            distance_to_best_execution_time: 0.0,
-            score: self.get_score(),
-            deliberation_time: self.get_deliberation_time(),
-            deliberation_ratio: self.get_deliberation_time_ratio(),
-            best_score_ratio: 0.0,
-            distance_to_best_score: 0.0,
+            best_config_execution_time_ratio: Default::default(),
+            distance_to_best_execution_time: Default::default(),
+            score: self.get_score_stat(),
+            deliberation_time: self.get_deliberation_time_stat(),
+            deliberation_ratio: self.get_deliberation_time_ratio_stat(),
+            best_score_ratio: Default::default(),
+            distance_to_best_score: Default::default(),
             number_failures: self.get_n_failures(),
             number_retries: self.get_n_retries(),
             continuous_planning_stat: self.get_continuous_planning_stat(),
-            coverage: self.get_coverage(),
+            coverage: self.get_coverage_stat(),
         }
     }
 
@@ -90,98 +90,74 @@ impl ConfigRunData {
         times.iter().sum::<f64>() / times.len() as f64
     }
 
-    fn get_execution_time_stat(&self) -> DurationStat {
+    fn get_execution_time_stat(&self) -> Stat {
         let times: Vec<_> = self
             .inner
             .iter()
             .map(|run| run.get_execution_time())
             .collect();
-        let min = times
-            .iter()
-            .fold(None, |prev, val| match prev {
-                None => Some(*val),
-                Some(prev) => Some(prev.min(*val)),
-            })
-            .unwrap();
-        let max = times
-            .iter()
-            .fold(None, |prev, val| match prev {
-                None => Some(*val),
-                Some(prev) => Some(prev.max(*val)),
-            })
-            .unwrap();
-        let mean = times.iter().sum::<f64>() / times.len() as f64;
-        DurationStat {
-            _min: min,
-            _max: max,
-            mean,
-        }
+        times.as_slice().into()
     }
 
-    fn get_score(&self) -> f64 {
-        let score =
-            self.get_coverage() * self.get_bench_max_time() / self.get_execution_time_stat().mean;
-        if score > 100.0 {
-            println!("score: {}", score)
-        }
-        score
-        // (1.0 - self.get_execution_time_stat().mean / self.get_bench_max_time())
-        //     * self.get_coverage()
+    fn get_score_stat(&self) -> Stat {
+        let stat_1 = self.get_coverage_stat();
+        let stat_2: Stat = Stat::new(self.get_bench_min_time());
+        let stat_3 = self.get_execution_time_stat();
+        stat_1 * stat_2 / stat_3
     }
 
-    fn get_deliberation_time(&self) -> f64 {
+    fn get_deliberation_time_stat(&self) -> Stat {
         let times: Vec<f64> = self
             .inner
             .iter()
             .map(|run| run.get_deliberation_time())
             .collect();
-        times.iter().sum::<f64>() / times.len() as f64
+        times.as_slice().into()
     }
 
-    fn get_deliberation_time_ratio(&self) -> f64 {
+    fn get_deliberation_time_ratio_stat(&self) -> Stat {
         let ratios: Vec<f64> = self
             .inner
             .iter()
             .map(|run| run.get_deliberation_time_ratio())
             .collect();
-        ratios.iter().sum::<f64>() / ratios.len() as f64
+        ratios.as_slice().into()
     }
 
     fn get_continuous_planning_stat(&self) -> Option<ContinuousPlanningStat> {
         None
     }
 
-    fn get_coverage(&self) -> f64 {
+    fn get_coverage_stat(&self) -> Stat {
         let coverages: Vec<f64> = self.inner.iter().map(|run| run.get_coverage()).collect();
-
-        coverages.iter().sum::<f64>() / coverages.len() as f64
+        coverages.as_slice().into()
     }
 
-    fn get_n_failures(&self) -> f64 {
+    fn get_n_failures(&self) -> Stat {
         let failures: Vec<_> = self.inner.iter().map(|run| run.get_n_failures()).collect();
-        failures.iter().sum::<u32>() as f64 / failures.len() as f64
+        failures.as_slice().into()
     }
 
-    fn get_n_retries(&self) -> f64 {
+    fn get_n_retries(&self) -> Stat {
         let retries: Vec<_> = self.inner.iter().map(|run| run.get_n_retries()).collect();
-        retries.iter().sum::<u32>() as f64 / retries.len() as f64
+        retries.as_slice().into()
     }
 }
 
 pub struct ConfigInstanceStat {
     pub bench_min_time: f64,
     pub bench_max_time: f64,
-    pub execution_time: DurationStat,
-    pub best_config_execution_time_ratio: f64,
-    pub distance_to_best_execution_time: f64,
-    pub deliberation_time: f64,
-    pub deliberation_ratio: f64,
-    pub coverage: f64,
-    pub score: f64,
-    pub best_score_ratio: f64,
-    pub distance_to_best_score: f64,
-    pub number_failures: f64,
-    pub number_retries: f64,
+    pub execution_time: Stat,
+    pub best_config_execution_time_ratio: Stat,
+    pub distance_to_best_execution_time: Stat,
+    pub deliberation_time: Stat,
+    pub deliberation_ratio: Stat,
+    pub coverage: Stat,
+    pub score: Stat,
+    pub best_score_ratio: Stat,
+    pub distance_to_best_score: Stat,
+    pub number_failures: Stat,
+    pub number_retries: Stat,
     pub continuous_planning_stat: Option<ContinuousPlanningStat>,
 }
 
@@ -293,23 +269,23 @@ impl ConfigProblemStat {
                 }
                 Field::PlanningTime => match &self.continuous_planning_stat {
                     None => "ND".to_string(),
-                    Some(c) => format!("{:.1}", c.planning_time),
+                    Some(c) => format!("{:.1}", c.planning_time.mean),
                 },
                 Field::PlanningTimeRatio => match &self.continuous_planning_stat {
                     None => "ND".to_string(),
-                    Some(c) => format!("{:.1}", c.planning_time_ratio * 100.0),
+                    Some(c) => format!("{:.1}", c.planning_time_ratio.mean * 100.0),
                 },
                 Field::NumberPlanningInstance => match &self.continuous_planning_stat {
                     None => "ND".to_string(),
-                    Some(c) => format!("{:.1}", c.planning_time_ratio),
+                    Some(c) => format!("{:.1}", c.planning_time_ratio.mean),
                 },
                 Field::AveragePlanningTime => match &self.continuous_planning_stat {
                     None => "ND".to_string(),
-                    Some(c) => format!("{:.1}", c.average_planning_time),
+                    Some(c) => format!("{:.1}", c.average_planning_time.mean),
                 },
                 Field::PlanningSuccessRate => match &self.continuous_planning_stat {
                     None => "ND".to_string(),
-                    Some(c) => format!("{:.1}", c.planning_success_rate * 100.0),
+                    Some(c) => format!("{:.1}", c.planning_success_rate.mean * 100.0),
                 },
                 Field::BestExecutionTimeRatio => {
                     format!("{:.1}", self.best_execution_time_ratio * 100.0)

@@ -36,15 +36,11 @@ impl ConfigName {
 
 impl Display for ConfigName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}_{}",
-            self.select_heuristic, self.continuous_planning_config
-        )?;
+        write!(f, "{}", self.select_heuristic,)?;
         for o in &self.other {
             write!(f, "_{}", o)?;
         }
-        Ok(())
+        write!(f, "_{}", self.continuous_planning_config)
     }
 }
 
@@ -89,7 +85,7 @@ impl ConfigRunData {
         let times: Vec<_> = self
             .inner
             .iter()
-            .map(|run| run.get_bench_max_time())
+            .map(|run| run.get_bench_min_time() + run.get_bench_max_time())
             .collect();
         times.iter().sum::<f64>() / times.len() as f64
     }
@@ -123,7 +119,8 @@ impl ConfigRunData {
     }
 
     fn get_score(&self) -> f64 {
-        let score = self.get_coverage() * 100.0 / self.get_execution_time_stat().mean;
+        let score =
+            self.get_coverage() * self.get_bench_max_time() / self.get_execution_time_stat().mean;
         if score > 100.0 {
             println!("score: {}", score)
         }
@@ -190,23 +187,20 @@ pub struct ConfigInstanceStat {
 
 pub const EXECUTION_TIME: &str = "$T$";
 pub const DISTANCE_TO_BEST_EXECUTION_TIME: &str = "$D_{BT}$";
-pub const BEST_EXECUTION_TIME_RATIO: &str = "$R(Best(T(exec)))$";
+pub const BEST_EXECUTION_TIME_RATIO: &str = "$R_{BT}$";
 pub const DELIBERATION_TIME: &str = "$T_D$";
 pub const DELIBERATION_TIME_RATIO: &str = "$R_D$";
-pub const COVERAGE: &str = "Cov";
-pub const SCORE: &str = "Score";
+pub const COVERAGE: &str = "SR";
+pub const SCORE: &str = "ES";
 pub const NUMBER_RETRIES: &str = "$N_R$";
 pub const NUMBER_FAILURES: &str = "$N_F$";
-pub const DISTANCE_TO_BEST_SCORE: &str = "$D_{BS}$";
-pub const BEST_SCORE_RATIO: &str = "$R_{BS}$";
+pub const DISTANCE_TO_BEST_SCORE: &str = "$D_{BES}$";
+pub const BEST_SCORE_RATIO: &str = "$R_{BES}$";
 pub const PLANNING_TIME: &str = "$T_P$";
 pub const PLANNING_TIME_RATIO: &str = "$R_P$";
 pub const NUMBER_PLANNING_INSTANCE: &str = "$N_{PI}$";
-pub const AVERAGE_PLANNING_TIME: &str = "$E(T(plan))$";
-pub const PLANNING_SUCCESS_RATE: &str = "$R(P_{Success})$";
-pub const VIRTUAL_BEST_RATIO: &str = "R(VBest)";
-pub const DISTANCE_TO_BEST: &str = "$D(VBest)$";
-pub const N_FAILURES: &str = "$N(Fail)$";
+pub const AVERAGE_PLANNING_TIME: &str = "$E_{\\Pi T}$";
+pub const PLANNING_SUCCESS_RATE: &str = "$R(\\PI SR)$";
 
 pub struct ConfigProblemStat {
     pub execution_time: (f64, bool),

@@ -9,7 +9,66 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone, Eq, PartialEq, Hash, Default, Ord)]
 pub struct ProblemName {
     pub domain: String,
-    pub difficulty: String,
+    pub difficulty: Difficulty,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Default, Ord)]
+pub enum Difficulty {
+    #[default]
+    Easy,
+    Medium,
+    Hard,
+    Other(String),
+}
+
+impl Difficulty {
+    fn as_u8(&self) -> u8 {
+        match self {
+            Difficulty::Easy => 0,
+            Difficulty::Medium => 1,
+            Difficulty::Hard => 2,
+            Difficulty::Other(_) => 3,
+        }
+    }
+}
+
+impl PartialOrd for Difficulty {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Self::Other(s), Self::Other(s2)) => s.partial_cmp(s2),
+            (e1, e2) => {
+                let e1: u8 = e1.as_u8();
+                let e2: u8 = e2.as_u8();
+                e1.partial_cmp(&e2)
+            }
+        }
+    }
+}
+
+impl From<&str> for Difficulty {
+    fn from(value: &str) -> Self {
+        match value {
+            "easy" | "simple" => Self::Easy,
+            "medium" => Self::Medium,
+            "difficult" | "hard" => Self::Hard,
+            _ => Self::Other(value.to_string()),
+        }
+    }
+}
+
+impl Display for Difficulty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Difficulty::Easy => "Easy",
+                Difficulty::Medium => "Medium",
+                Difficulty::Hard => "Hard",
+                Difficulty::Other(s) => s.as_str(),
+            }
+        )
+    }
 }
 
 impl PartialOrd for ProblemName {

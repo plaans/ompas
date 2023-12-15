@@ -25,19 +25,25 @@ pub fn main() {
     let config: StatosConfig =
         serde_yaml::from_str(&str).expect("Could not deserialize content of config");
 
-    println!("config: {:?}", config);
+    //println!("config: {:?}", config);
 
     for config in config.configs {
-        let system_run = SystemRunData::new(&config.input_dirs, config.clone());
-
         let time = SystemTime::now();
+        let system_run = SystemRunData::new(&config);
+        println!(
+            "Loaded {} files in {:.3} ms",
+            system_run.get_number_of_run(),
+            time.elapsed().unwrap().as_secs_f64() * 1000.0
+        );
         let stat = system_run.compute_stat();
         for output in &config.outputs {
+            let time = SystemTime::now();
+
             let formatter = SystemStatFormatter::new(&stat, &output.configs, &output.fields);
 
             println!(
-                "time to compute stat : {} s",
-                time.elapsed().unwrap().as_secs_f32()
+                "time to compute stat : {:.3} ms",
+                time.elapsed().unwrap().as_secs_f32() * 1000.0
             );
 
             // println!("{}", formatter);

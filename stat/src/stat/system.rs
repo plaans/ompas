@@ -21,24 +21,41 @@ pub struct SystemRunData {
 }
 
 impl SystemRunData {
-    pub fn new(dirs: &[PathBuf], config: StatConfig) -> Self {
+    pub fn new(config: &StatConfig) -> Self {
         let mut collection = Self {
             inner: Default::default(),
-            config,
+            config: config.clone(),
         };
 
-        for dir in dirs {
+        for input_dir in &config.input_dirs {
+            let dir = &input_dir.path;
             let json_files = Self::get_all_files_in_dir(dir, JSON_FORMAT);
             //println!("Found {} json files...", json_files.len());
 
             let yaml_files = Self::get_all_files_in_dir(dir, YAML_FORMAT);
             //println!("Found {} yaml files...", yaml_files.len());
 
-            for file in json_files {
+            'loop_file: for file in json_files {
+                if let Some(escapes) = &input_dir.escapes {
+                    for escape in escapes {
+                        if format!("{}", file.display()).contains(escape) {
+                            println!("escape file: {}", file.display());
+                            continue 'loop_file;
+                        }
+                    }
+                }
                 collection.read_file(&file, JSON_FORMAT)
             }
 
-            for file in yaml_files {
+            'loop_file: for file in yaml_files {
+                if let Some(escapes) = &input_dir.escapes {
+                    for escape in escapes {
+                        if format!("{}", file.display()).contains(escape) {
+                            println!("escape file: {}", file.display());
+                            continue 'loop_file;
+                        }
+                    }
+                }
                 collection.read_file(&file, YAML_FORMAT)
             }
         }
@@ -128,15 +145,17 @@ impl SystemRunData {
     pub fn add_stat(&mut self, file_name: RunName, run_stat: OMPASRunData) {
         let problem_name = ProblemName {
             domain: file_name[0].to_string(),
-            difficulty: file_name[1].to_string(),
+            difficulty: file_name[1].as_str().into(),
         };
 
         let instance_name = file_name[2].to_string();
 
+        let len_file_name = file_name.len();
+        let last = file_name.last().unwrap();
         let config_name = ConfigName {
             select_heuristic: file_name[3].to_string(),
-            continuous_planning_config: file_name[4].to_string(),
-            other: file_name[5..].to_vec(),
+            continuous_planning_config: last.to_string(),
+            other: file_name[4..len_file_name - 1].to_vec(),
         };
         let entry = self.inner.entry(problem_name);
         match entry {

@@ -187,7 +187,7 @@ impl SystemStatFormatter {
         }];
         let mut second_line = vec![
             Cell::start("Problem".to_string()),
-            Cell::double("Difficulty".to_string()),
+            Cell::double("Complexity".to_string()),
         ];
         let header = ConfigProblemStat::header(fields);
         let header_len = header.len();
@@ -234,10 +234,10 @@ impl SystemStatFormatter {
                     post_sep: None,
                 });
                 let max_span = l_i + n - 1;
-                println!(
+                /*println!(
                     "number of line for {}: {}, max_span = {}",
                     problem_name.domain, n, max_span
-                );
+                );*/
                 same_domain = Some(max_span);
             }
             line.push(Cell::double(problem_name.difficulty.to_string()));

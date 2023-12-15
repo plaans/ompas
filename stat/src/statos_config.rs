@@ -8,8 +8,14 @@ pub struct StatosConfig {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StatConfig {
-    pub input_dirs: Vec<PathBuf>,
+    pub input_dirs: Vec<InputDir>,
     pub outputs: Vec<Output>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct InputDir {
+    pub path: PathBuf,
+    pub escapes: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -20,6 +20,7 @@ impl OMPASRunData {
 
     pub fn get_execution_time(&self) -> f64 {
         let acting_time = self.get_acting_time();
+        //println!("acting_time:{}", acting_time);
         let mut min_start: Option<f64> = None;
         let mut max_end: Option<f64> = None;
         for stat in &self.inner {

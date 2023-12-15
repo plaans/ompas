@@ -28,41 +28,43 @@ pub fn main() {
     println!("config: {:?}", config);
 
     for config in config.configs {
-        let system_run = SystemRunData::new(&config.input_dir, config.clone());
+        let system_run = SystemRunData::new(&config.input_dirs, config.clone());
 
         let time = SystemTime::now();
         let stat = system_run.compute_stat();
-        let formatter = SystemStatFormatter::from(&stat);
+        for output in &config.outputs {
+            let formatter = SystemStatFormatter::new(&stat, &output.configs, &output.fields);
 
-        println!(
-            "time to compute stat : {} s",
-            time.elapsed().unwrap().as_secs_f32()
-        );
+            println!(
+                "time to compute stat : {} s",
+                time.elapsed().unwrap().as_secs_f32()
+            );
 
-        println!("{}", formatter);
+            // println!("{}", formatter);
 
-        if let Some(csv_output) = config.csv_output {
-            let csv = formatter.to_csv();
+            if let Some(csv_output) = &output.csv_output {
+                let csv = formatter.to_csv();
 
-            let mut file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(&csv_output)
-                .unwrap();
-            file.write_all(csv.as_bytes()).unwrap();
-        }
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(&csv_output)
+                    .unwrap();
+                file.write_all(csv.as_bytes()).unwrap();
+            }
 
-        if let Some(latex_output) = config.latex_output {
-            let csv = formatter.to_latex();
+            if let Some(latex_output) = &output.latex_output {
+                let csv = formatter.to_latex();
 
-            let mut file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(&latex_output)
-                .unwrap();
-            file.write_all(csv.as_bytes()).unwrap();
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(&latex_output)
+                    .unwrap();
+                file.write_all(csv.as_bytes()).unwrap();
+            }
         }
     }
 }

@@ -5,7 +5,6 @@ use ompas_core::ompas::interface::stat::OMPASRunData;
 use ompas_language::output::{JSON_FORMAT, YAML_FORMAT};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::fmt::Display;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -22,24 +21,26 @@ pub struct SystemRunData {
 }
 
 impl SystemRunData {
-    pub fn new(path: &Path, config: StatConfig) -> Self {
+    pub fn new(dirs: &[PathBuf], config: StatConfig) -> Self {
         let mut collection = Self {
             inner: Default::default(),
             config,
         };
 
-        let json_files = Self::get_all_files_in_dir(path, JSON_FORMAT);
-        //println!("Found {} json files...", json_files.len());
+        for dir in dirs {
+            let json_files = Self::get_all_files_in_dir(dir, JSON_FORMAT);
+            //println!("Found {} json files...", json_files.len());
 
-        let yaml_files = Self::get_all_files_in_dir(path, YAML_FORMAT);
-        //println!("Found {} yaml files...", yaml_files.len());
+            let yaml_files = Self::get_all_files_in_dir(dir, YAML_FORMAT);
+            //println!("Found {} yaml files...", yaml_files.len());
 
-        for file in json_files {
-            collection.read_file(&file, JSON_FORMAT)
-        }
+            for file in json_files {
+                collection.read_file(&file, JSON_FORMAT)
+            }
 
-        for file in yaml_files {
-            collection.read_file(&file, YAML_FORMAT)
+            for file in yaml_files {
+                collection.read_file(&file, YAML_FORMAT)
+            }
         }
 
         // println!(

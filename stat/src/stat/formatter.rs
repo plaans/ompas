@@ -1,6 +1,8 @@
 use crate::stat::config::{ConfigName, ConfigProblemStat};
 use crate::stat::problem::ProblemName;
 use crate::stat::system::SystemStat;
+use crate::statos_config::Field;
+use im::OrdMap;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Write};
@@ -150,24 +152,28 @@ impl SystemStatFormatter {
     }
 }
 
-impl From<&SystemStat> for SystemStatFormatter {
-    fn from(value: &SystemStat) -> Self {
+impl SystemStatFormatter {
+    pub fn new(value: &SystemStat, filter_configs: &[String], fields: &[Field]) -> Self {
         let mut configs: HashMap<&ConfigName, HashMap<&ProblemName, &ConfigProblemStat>> =
             Default::default();
-        let mut config_order: Vec<&ConfigName> = Default::default();
+        let mut config_order: OrdMap<usize, &ConfigName> = Default::default();
         for (name, problem) in &value.problem_stats {
-            for (config_name, config) in &problem.inner {
-                match configs.entry(config_name) {
-                    Entry::Occupied(mut o) => {
-                        o.get_mut().insert(name, config);
+            for (i, filter_config) in filter_configs.iter().enumerate() {
+                for (config_name, config) in &problem.inner {
+                    if filter_config == &config_name.to_string() {
+                        match configs.entry(config_name) {
+                            Entry::Occupied(mut o) => {
+                                o.get_mut().insert(name, config);
+                            }
+                            Entry::Vacant(v) => {
+                                config_order.insert(i, config_name);
+                                let mut map = HashMap::default();
+                                map.insert(name, config);
+                                v.insert(map);
+                            }
+                        };
                     }
-                    Entry::Vacant(v) => {
-                        config_order.push(config_name);
-                        let mut map = HashMap::default();
-                        map.insert(name, config);
-                        v.insert(map);
-                    }
-                };
+                }
             }
         }
 
@@ -183,11 +189,11 @@ impl From<&SystemStat> for SystemStatFormatter {
             Cell::start("Problem".to_string()),
             Cell::double("Difficulty".to_string()),
         ];
-        let header = ConfigProblemStat::header(&value.config.fields);
+        let header = ConfigProblemStat::header(fields);
         let header_len = header.len();
         let mut empty_info = vec![Cell::start("ND".to_string()); header_len - 1];
         empty_info.push(Cell::double("ND".to_string()));
-        for config_name in &config_order {
+        for (_, config_name) in &config_order {
             first_line.push(Cell {
                 info: config_name.format(),
                 column: header_len,
@@ -206,8 +212,8 @@ impl From<&SystemStat> for SystemStatFormatter {
         let mut same_domain: Option<usize> = None;
         for (l_i, problem_name) in names.iter().enumerate() {
             let mut line = vec![];
-            if let Some(span_domain) = same_domain {
-                if span_domain < l_i {
+            if let Some(max_span) = same_domain {
+                if max_span < l_i {
                     same_domain = None;
                 }
             }
@@ -227,16 +233,21 @@ impl From<&SystemStat> for SystemStatFormatter {
                     pre_sep: Some('|'),
                     post_sep: None,
                 });
-                same_domain = Some(l_i + n - 1);
+                let max_span = l_i + n - 1;
+                println!(
+                    "number of line for {}: {}, max_span = {}",
+                    problem_name.domain, n, max_span
+                );
+                same_domain = Some(max_span);
             }
             line.push(Cell::double(problem_name.difficulty.to_string()));
-            for config in &config_order {
+            for (_, config) in &config_order {
                 let config = configs.get(config).unwrap();
                 match config.get(problem_name) {
                     None => {
                         line.append(&mut empty_info.clone());
                     }
-                    Some(config) => line.append(&mut config.to_formatted(&value.config.fields)),
+                    Some(config) => line.append(&mut config.to_formatted(&fields)),
                 }
             }
             lines.push(line);
@@ -280,7 +291,7 @@ impl Display for SystemStatFormatter {
                         post_sep: None,
                     }
                     .format(column_size[*i])
-                );
+                )?;
                 *i += 1;
                 for _ in 1..cell.column - 1 {
                     write!(
@@ -315,10 +326,10 @@ impl Display for SystemStatFormatter {
         };
 
         for (line, cells) in self.lines.iter().enumerate() {
-            let mut i = 0;
+            let mut c_i = 0;
             for cell in cells {
                 if let Some((c, l, cell)) = line_span {
-                    if c == i {
+                    if c == c_i {
                         write_cell(
                             &Cell {
                                 info: "".to_string(),
@@ -327,7 +338,7 @@ impl Display for SystemStatFormatter {
                                 pre_sep: cell.pre_sep,
                                 post_sep: cell.post_sep,
                             },
-                            &mut i,
+                            &mut c_i,
                             f,
                         )?;
                     }
@@ -336,9 +347,11 @@ impl Display for SystemStatFormatter {
                     }
                 }
                 if cell.row > 1 {
-                    line_span = Some((i, line + cell.row - 1, cell));
+                    let max_line_span = line + cell.row - 1;
+                    println!("max_line_span = {}", max_line_span);
+                    line_span = Some((c_i, line + max_line_span, cell));
                 }
-                write_cell(cell, &mut i, f)?;
+                write_cell(cell, &mut c_i, f)?;
             }
             write!(f, "\n")?;
         }

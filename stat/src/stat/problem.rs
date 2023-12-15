@@ -70,12 +70,54 @@ impl ProblemRunData {
             }
         }
 
-        ProblemStat {
+        let mut problems = ProblemStat {
             inner: config_stats
                 .drain()
                 .map(|(c, stat)| (c, (stat.as_slice()).into()))
                 .collect(),
-        }
+        };
+
+        problems
+            .inner
+            .iter_mut()
+            .fold(
+                None,
+                |prev: Option<&mut ConfigProblemStat>, (_, stat)| match prev {
+                    Some(prev) => {
+                        if prev.score.0 > stat.score.0 {
+                            Some(prev)
+                        } else {
+                            Some(stat)
+                        }
+                    }
+                    None => Some(stat),
+                },
+            )
+            .unwrap()
+            .score
+            .1 = true;
+
+        problems
+            .inner
+            .iter_mut()
+            .fold(
+                None,
+                |prev: Option<&mut ConfigProblemStat>, (_, stat)| match prev {
+                    Some(prev) => {
+                        if prev.execution_time.0 > stat.execution_time.0 {
+                            Some(prev)
+                        } else {
+                            Some(stat)
+                        }
+                    }
+                    None => Some(stat),
+                },
+            )
+            .unwrap()
+            .execution_time
+            .1 = true;
+
+        problems
     }
 }
 

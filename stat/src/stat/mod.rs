@@ -17,12 +17,12 @@ pub struct RunStat {
 
 pub struct DurationStat {
     mean: f64,
-    min: f64,
-    max: f64,
+    _min: f64,
+    _max: f64,
 }
 
 pub struct RatioStat {
-    mean: f64,
-    min: f64,
-    max: f64,
+    _mean: f64,
+    _min: f64,
+    _max: f64,
 }

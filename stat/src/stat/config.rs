@@ -17,7 +17,8 @@ impl ConfigName {
     pub fn format(&self) -> String {
         let mut default = match self.select_heuristic.as_str() {
             "random" => "R".to_string(),
-            "upom" => "UPOM".to_string(),
+            "upom" => "U".to_string(),
+            "aries" => "A".to_string(),
             t => t.to_string(),
         };
         for o in &self.other {
@@ -114,12 +115,21 @@ impl ConfigRunData {
             })
             .unwrap();
         let mean = times.iter().sum::<f64>() / times.len() as f64;
-        DurationStat { min, max, mean }
+        DurationStat {
+            _min: min,
+            _max: max,
+            mean,
+        }
     }
 
     fn get_score(&self) -> f64 {
-        (1.0 - self.get_execution_time_stat().mean / self.get_bench_max_time())
-            * self.get_coverage()
+        let score = self.get_coverage() * 100.0 / self.get_execution_time_stat().mean;
+        if score > 100.0 {
+            println!("score: {}", score)
+        }
+        score
+        // (1.0 - self.get_execution_time_stat().mean / self.get_bench_max_time())
+        //     * self.get_coverage()
     }
 
     fn get_deliberation_time(&self) -> f64 {
@@ -178,20 +188,20 @@ pub struct ConfigInstanceStat {
     pub continuous_planning_stat: Option<ContinuousPlanningStat>,
 }
 
-pub const EXECUTION_TIME: &str = "$T(exec)$";
-pub const DISTANCE_TO_BEST_EXECUTION_TIME: &str = "$D(Best(T(exec)))$";
+pub const EXECUTION_TIME: &str = "$T$";
+pub const DISTANCE_TO_BEST_EXECUTION_TIME: &str = "$D_{BT}$";
 pub const BEST_EXECUTION_TIME_RATIO: &str = "$R(Best(T(exec)))$";
-pub const DELIBERATION_TIME: &str = "$T(delib)$";
-pub const DELIBERATION_TIME_RATIO: &str = "$R(delib)$";
+pub const DELIBERATION_TIME: &str = "$T_D$";
+pub const DELIBERATION_TIME_RATIO: &str = "$R_D$";
 pub const COVERAGE: &str = "Cov";
 pub const SCORE: &str = "Score";
-pub const NUMBER_RETRIES: &str = "$N(retries)$";
-pub const NUMBER_FAILURES: &str = "$N(failures)$";
-pub const DISTANCE_TO_BEST_SCORE: &str = "$D(Best(Score))$";
-pub const BEST_SCORE_RATIO: &str = "$R(Best(score))$";
-pub const PLANNING_TIME: &str = "$T(plan)$";
-pub const PLANNING_TIME_RATIO: &str = "$R(plan)$";
-pub const NUMBER_PLANNING_INSTANCE: &str = "$N(PI)$";
+pub const NUMBER_RETRIES: &str = "$N_R$";
+pub const NUMBER_FAILURES: &str = "$N_F$";
+pub const DISTANCE_TO_BEST_SCORE: &str = "$D_{BS}$";
+pub const BEST_SCORE_RATIO: &str = "$R_{BS}$";
+pub const PLANNING_TIME: &str = "$T_P$";
+pub const PLANNING_TIME_RATIO: &str = "$R_P$";
+pub const NUMBER_PLANNING_INSTANCE: &str = "$N_{PI}$";
 pub const AVERAGE_PLANNING_TIME: &str = "$E(T(plan))$";
 pub const PLANNING_SUCCESS_RATE: &str = "$R(P_{Success})$";
 pub const VIRTUAL_BEST_RATIO: &str = "R(VBest)";
@@ -199,12 +209,12 @@ pub const DISTANCE_TO_BEST: &str = "$D(VBest)$";
 pub const N_FAILURES: &str = "$N(Fail)$";
 
 pub struct ConfigProblemStat {
-    pub execution_time: f64,
+    pub execution_time: (f64, bool),
     pub best_execution_time_ratio: f64,
     pub distance_to_best_execution_time: f64,
     pub deliberation_time: f64,
     pub deliberation_ratio: f64,
-    pub score: f64,
+    pub score: (f64, bool),
     pub best_score_ratio: f64,
     pub distance_to_best_score: f64,
     pub coverage: f64,
@@ -253,7 +263,11 @@ impl ConfigProblemStat {
         for (i, field) in fields.iter().enumerate() {
             let info = match field {
                 Field::ExecutionTime => {
-                    format!("{:.1}", self.execution_time)
+                    if self.execution_time.1 {
+                        format!("\\textbf{{{:.1}}}", self.execution_time.0)
+                    } else {
+                        format!("{:.1}", self.execution_time.0)
+                    }
                 }
                 Field::DistanceToBestExecutionTime => {
                     todo!()
@@ -268,10 +282,14 @@ impl ConfigProblemStat {
                     format!("{:.1}", self.coverage * 100.0)
                 }
                 Field::Score => {
-                    format!("{:.3}", self.score * 100.0)
+                    if self.score.1 {
+                        format!("\\textbf{{{:.3}}}", self.score.0)
+                    } else {
+                        format!("{:.3}", self.score.0)
+                    }
                 }
                 Field::DistanceToBestScore => {
-                    format!("{:.1}", self.distance_to_best_score * 100.0)
+                    format!("{:.0}\\%", self.distance_to_best_score * 100.0)
                 }
                 Field::NumberRetries => {
                     format!("{:.1}", self.number_retries)
@@ -334,12 +352,15 @@ impl From<&[ConfigInstanceStat]> for ConfigProblemStat {
     fn from(stats: &[ConfigInstanceStat]) -> Self {
         let n = stats.len() as f64;
 
-        Self {
-            execution_time: stats
-                .iter()
-                .map(|stat| stat.execution_time.mean)
-                .sum::<f64>()
-                / n,
+        let stat = Self {
+            execution_time: (
+                stats
+                    .iter()
+                    .map(|stat| stat.execution_time.mean)
+                    .sum::<f64>()
+                    / n,
+                false,
+            ),
             best_execution_time_ratio: stats
                 .iter()
                 .map(|stat| stat.best_config_execution_time_ratio)
@@ -350,7 +371,7 @@ impl From<&[ConfigInstanceStat]> for ConfigProblemStat {
                 .map(|stat| stat.distance_to_best_execution_time)
                 .sum::<f64>()
                 / n,
-            score: stats.iter().map(|stat| stat.score).sum::<f64>() / n,
+            score: (stats.iter().map(|stat| stat.score).sum::<f64>() / n, false),
             best_score_ratio: stats.iter().map(|stat| stat.best_score_ratio).sum::<f64>() / n,
             deliberation_ratio: stats
                 .iter()
@@ -367,6 +388,8 @@ impl From<&[ConfigInstanceStat]> for ConfigProblemStat {
                 .map(|stat| stat.distance_to_best_score)
                 .sum::<f64>()
                 / n,
-        }
+        };
+
+        stat
     }
 }

@@ -14,6 +14,7 @@ serde = { workspace = true}
 serde_yaml = { workspace = true, features = [] }
 serde_json = { workspace = true, features = [] }
 map-macro = {workspace = true}
+im = {workspace = true}
 
 [[bin]]
 name = "statos"

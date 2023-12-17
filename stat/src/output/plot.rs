@@ -106,7 +106,7 @@ impl Plot {
         }
         x_tick.push('}');
 
-        let x_label = "Configuration";
+        let x_label = "Instance";
         let y_label = "Time (s)";
 
         let mut tex = format!(
@@ -124,7 +124,6 @@ impl Plot {
               ymax= {y_max},
               bar width=12pt,
               enlarge x limits = 0.3,
-              nodes near coords,
               point meta=explicit symbolic,
               scatter/position=absolute,
               every node near coord/.style={{
@@ -146,9 +145,7 @@ impl Plot {
                 write!(
                     tex,
                     "
-            \\addplot+
-            plot[
-                mark=square,
+            \\addplot+[
                 error bars/.cd,
                 y explicit,
                 y dir=both,

@@ -285,6 +285,29 @@ impl OMPASRunData {
             Some(p) => p.inner.iter().map(|run| run.n_solution as f64).collect(),
         }
     }
+
+    pub fn get_planning_successes(&self) -> Vec<f64> {
+        match self.inner.iter().find_map(|stat| {
+            if let OMPASStat::Planner(p) = stat {
+                Some(p)
+            } else {
+                None
+            }
+        }) {
+            None => vec![],
+            Some(p) => p
+                .inner
+                .iter()
+                .map(|run| {
+                    if run.status == PlanningStatus::Sat {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                })
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

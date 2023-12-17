@@ -7,6 +7,7 @@ use std::fmt::{Display, Formatter};
 pub enum PlanningField {
     PlanningTimes,
     PlanningSolutions,
+    PlanningSuccesses,
 }
 
 impl PlanningField {
@@ -26,6 +27,9 @@ impl Display for PlanningField {
                 }
                 PlanningField::PlanningSolutions => {
                     "PS"
+                }
+                PlanningField::PlanningSuccesses => {
+                    "PSR"
                 }
             }
         )

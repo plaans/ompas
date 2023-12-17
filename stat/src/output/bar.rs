@@ -103,7 +103,6 @@ impl Bar {
               ybar=0pt,
               bar width=12pt,
               enlarge x limits = 0.3,
-              nodes near coords,
               point meta=explicit symbolic,
               scatter/position=absolute,
               every node near coord/.style={{
@@ -125,11 +124,12 @@ impl Bar {
             write!(
                 tex,
                 "
-            \\addplot+[bar shift = 0pt]
-            plot[
-                error bars/.cd,
+            \\addplot+[
+            bar shift = 0pt,
+            error bars/.cd,
             y dir=both,
-            y explicit]
+            y explicit
+            ]
             table[
                 x=Config,
                 y={},

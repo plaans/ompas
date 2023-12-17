@@ -104,6 +104,11 @@ impl ConfigRunData {
             PlanningField::PlanningSolutions,
             self.get_planning_solution_per_instance(),
         );
+
+        map.insert(
+            PlanningField::PlanningSuccesses,
+            self.get_planning_successes_per_instance(),
+        );
         ConfigPlanningStat { stat_map: map }
     }
 
@@ -134,6 +139,28 @@ impl ConfigRunData {
             .inner
             .iter()
             .map(|run| run.get_planning_solutions())
+            .collect();
+        let mut instances: Vec<Vec<f64>> = vec![];
+        for run in &times {
+            for (i, time) in run.iter().enumerate() {
+                if instances.len() > i {
+                    instances[i].push(*time);
+                } else {
+                    instances.push(vec![*time]);
+                }
+            }
+        }
+        instances
+            .drain(..)
+            .map(|instance| instance.as_slice().into())
+            .collect()
+    }
+
+    fn get_planning_successes_per_instance(&self) -> Vec<Stat> {
+        let times: Vec<Vec<f64>> = self
+            .inner
+            .iter()
+            .map(|run| run.get_planning_successes())
             .collect();
         let mut instances: Vec<Vec<f64>> = vec![];
         for run in &times {

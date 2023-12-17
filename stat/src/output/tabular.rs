@@ -1,83 +1,27 @@
 use crate::stat::config::{ConfigName, ConfigProblemStat};
 use crate::stat::problem::ProblemName;
 use crate::stat::system::SystemStat;
-use crate::statos_config::Field;
+use crate::stat::Field;
 use im::OrdMap;
+use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Write};
+use std::path::PathBuf;
 
-#[derive(Clone)]
-pub struct Cell {
-    info: String,
-    column: usize,
-    row: usize,
-    pre_sep: Option<char>,
-    post_sep: Option<char>,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Tabular {
+    pub csv_output: Option<PathBuf>,
+    pub latex_output: Option<PathBuf>,
+    pub fields: Vec<Field>,
+    pub configs: Vec<String>,
 }
 
-impl Cell {
-    pub fn empty() -> Self {
-        Self {
-            pre_sep: None,
-            column: 1,
-            row: 1,
-            post_sep: None,
-            info: "".to_string(),
-        }
-    }
-
-    pub fn end(info: String) -> Self {
-        Self {
-            pre_sep: None,
-            column: 1,
-            row: 1,
-            post_sep: Some('|'),
-            info,
-        }
-    }
-
-    pub fn start(info: String) -> Self {
-        Self {
-            pre_sep: Some('|'),
-            column: 1,
-            row: 1,
-            post_sep: None,
-            info,
-        }
-    }
-
-    pub fn double(info: String) -> Self {
-        Self {
-            pre_sep: Some('|'),
-            column: 1,
-            row: 1,
-            post_sep: Some('|'),
-            info,
-        }
-    }
-
-    pub fn format(&self, cell_size: usize) -> String {
-        let mut string = "".to_string();
-        if let Some(pre) = self.pre_sep {
-            string.push(pre)
-        }
-
-        write!(string, "{:^cell_size$}", self.info).unwrap();
-
-        if let Some(post) = self.post_sep {
-            string.push(post)
-        }
-
-        string
-    }
-}
-
-pub struct SystemStatFormatter {
+pub struct TabularOutput {
     lines: Vec<Vec<Cell>>,
 }
 
-impl SystemStatFormatter {
+impl TabularOutput {
     pub fn to_csv(&self) -> String {
         let mut string = String::new();
         let mut multi_line: Option<(usize, usize)> = None;
@@ -152,13 +96,13 @@ impl SystemStatFormatter {
     }
 }
 
-impl SystemStatFormatter {
-    pub fn new(value: &SystemStat, filter_configs: &[String], fields: &[Field]) -> Self {
+impl Tabular {
+    pub fn new_tabular_output(&self, value: &SystemStat) -> TabularOutput {
         let mut configs: HashMap<&ConfigName, HashMap<&ProblemName, &ConfigProblemStat>> =
             Default::default();
         let mut config_order: OrdMap<usize, &ConfigName> = Default::default();
         for (name, problem) in &value.problem_stats {
-            for (i, filter_config) in filter_configs.iter().enumerate() {
+            for (i, filter_config) in self.configs.iter().enumerate() {
                 for (config_name, config) in &problem.inner {
                     if filter_config == &config_name.to_string() {
                         match configs.entry(config_name) {
@@ -189,7 +133,7 @@ impl SystemStatFormatter {
             Cell::start("Problem".to_string()),
             Cell::double("Complexity".to_string()),
         ];
-        let header = ConfigProblemStat::header(fields);
+        let header = ConfigProblemStat::header(&self.fields);
         let header_len = header.len();
         let mut empty_info = vec![Cell::start("ND".to_string()); header_len - 1];
         empty_info.push(Cell::double("ND".to_string()));
@@ -247,16 +191,16 @@ impl SystemStatFormatter {
                     None => {
                         line.append(&mut empty_info.clone());
                     }
-                    Some(config) => line.append(&mut config.to_formatted(&fields)),
+                    Some(config) => line.append(&mut config.to_formatted(&self.fields)),
                 }
             }
             lines.push(line);
         }
-        SystemStatFormatter { lines }
+        TabularOutput { lines }
     }
 }
 
-impl Display for SystemStatFormatter {
+impl Display for TabularOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // let mut column_span = None;
         let mut line_span: Option<(usize, usize, &Cell)> = None;
@@ -356,5 +300,71 @@ impl Display for SystemStatFormatter {
             write!(f, "\n")?;
         }
         Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct Cell {
+    info: String,
+    column: usize,
+    row: usize,
+    pre_sep: Option<char>,
+    post_sep: Option<char>,
+}
+
+impl Cell {
+    pub fn empty() -> Self {
+        Self {
+            pre_sep: None,
+            column: 1,
+            row: 1,
+            post_sep: None,
+            info: "".to_string(),
+        }
+    }
+
+    pub fn end(info: String) -> Self {
+        Self {
+            pre_sep: None,
+            column: 1,
+            row: 1,
+            post_sep: Some('|'),
+            info,
+        }
+    }
+
+    pub fn start(info: String) -> Self {
+        Self {
+            pre_sep: Some('|'),
+            column: 1,
+            row: 1,
+            post_sep: None,
+            info,
+        }
+    }
+
+    pub fn double(info: String) -> Self {
+        Self {
+            pre_sep: Some('|'),
+            column: 1,
+            row: 1,
+            post_sep: Some('|'),
+            info,
+        }
+    }
+
+    pub fn format(&self, cell_size: usize) -> String {
+        let mut string = "".to_string();
+        if let Some(pre) = self.pre_sep {
+            string.push(pre)
+        }
+
+        write!(string, "{:^cell_size$}", self.info).unwrap();
+
+        if let Some(post) = self.post_sep {
+            string.push(post)
+        }
+
+        string
     }
 }

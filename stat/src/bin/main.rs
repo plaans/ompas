@@ -1,4 +1,3 @@
-use ompas_stat::stat::formatter::SystemStatFormatter;
 use ompas_stat::stat::system::SystemRunData;
 use ompas_stat::statos_config::StatosConfig;
 use std::fs;
@@ -36,10 +35,67 @@ pub fn main() {
             time.elapsed().unwrap().as_secs_f64() * 1000.0
         );
         let stat = system_run.compute_stat();
+
+        for output in &config.output_bars {
+            let time = SystemTime::now();
+
+            let bar = output.to_latex(&system_run);
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&bar.output_dat)
+                .unwrap();
+            file.write_all(bar.dat.as_bytes()).unwrap();
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&bar.output_tex)
+                .unwrap();
+            file.write_all(bar.tex.as_bytes()).unwrap();
+
+            println!(
+                "time to compute stat : {:.3} ms",
+                time.elapsed().unwrap().as_secs_f32() * 1000.0
+            );
+        }
+
+        for output in &config.output_plots {
+            let time = SystemTime::now();
+
+            let bar = output.to_latex(&system_run);
+
+            for dat in &bar.dats {
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(&dat.path)
+                    .unwrap();
+                file.write_all(dat.content.as_bytes()).unwrap();
+            }
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&bar.output_tex)
+                .unwrap();
+            file.write_all(bar.tex.as_bytes()).unwrap();
+
+            println!(
+                "time to compute stat : {:.3} ms",
+                time.elapsed().unwrap().as_secs_f32() * 1000.0
+            );
+        }
+
         for output in &config.outputs {
             let time = SystemTime::now();
 
-            let formatter = SystemStatFormatter::new(&stat, &output.configs, &output.fields);
+            let formatter = output.new_tabular_output(&stat);
 
             println!(
                 "time to compute stat : {:.3} ms",

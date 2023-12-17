@@ -1,3 +1,6 @@
+use crate::output::bar::Bar;
+use crate::output::plot::Plot;
+use crate::output::tabular::Tabular;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -9,39 +12,13 @@ pub struct StatosConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StatConfig {
     pub input_dirs: Vec<InputDir>,
-    pub outputs: Vec<Output>,
+    pub outputs: Vec<Tabular>,
+    pub output_bars: Vec<Bar>,
+    pub output_plots: Vec<Plot>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InputDir {
     pub path: PathBuf,
     pub escapes: Option<Vec<String>>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Output {
-    pub csv_output: Option<PathBuf>,
-    pub latex_output: Option<PathBuf>,
-    pub fields: Vec<Field>,
-    pub configs: Vec<String>,
-}
-
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum Field {
-    ExecutionTime,
-    BestExecutionTimeRatio,
-    DistanceToBestExecutionTime,
-    DeliberationTime,
-    DeliberationTimeRatio,
-    Coverage,
-    Score,
-    BestScoreRatio,
-    DistanceToBestScore,
-    NumberRetries,
-    NumberFailures,
-    PlanningTime,
-    PlanningTimeRatio,
-    NumberPlanningInstance,
-    AveragePlanningTime,
-    PlanningSuccessRate,
 }

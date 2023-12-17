@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct PlannerStat {
-    inner: Vec<PlanningInstanceStat>,
+    pub inner: Vec<PlanningInstanceStat>,
 }
 
 impl PlannerStat {
@@ -21,13 +21,13 @@ pub struct PlanningInstanceStat {
     pub planner_mode: PlannerMode,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum PlannerMode {
     Satisfactory,
     Optimality,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PlanningStatus {
     Timeout,
     Interrupted,

@@ -16,7 +16,7 @@ pub struct SystemStat {
 }
 
 pub struct SystemRunData {
-    inner: HashMap<ProblemName, ProblemRunData>,
+    pub inner: HashMap<ProblemName, ProblemRunData>,
     config: StatConfig,
 }
 

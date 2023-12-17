@@ -1,5 +1,6 @@
 use crate::stat::config::{ConfigInstanceStat, ConfigName, ConfigProblemStat};
 use crate::stat::instance::{InstanceName, InstanceRunData};
+use crate::stat::Field::*;
 use ompas_core::ompas::interface::stat::OMPASRunData;
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
@@ -143,7 +144,7 @@ impl ProblemRunData {
                 None,
                 |prev: Option<&mut ConfigProblemStat>, (_, stat)| match prev {
                     Some(prev) => {
-                        if prev.score.0 > stat.score.0 {
+                        if prev.get(&Score).unwrap().mean > stat.get(&Score).unwrap().mean {
                             Some(prev)
                         } else {
                             Some(stat)
@@ -153,8 +154,9 @@ impl ProblemRunData {
                 },
             )
             .unwrap()
-            .score
-            .1 = true;
+            .get_mut(&Score)
+            .unwrap()
+            .best = true;
 
         problems
             .inner
@@ -163,7 +165,9 @@ impl ProblemRunData {
                 None,
                 |prev: Option<&mut ConfigProblemStat>, (_, stat)| match prev {
                     Some(prev) => {
-                        if prev.execution_time.0 > stat.execution_time.0 {
+                        if prev.get(&ExecutionTime).unwrap().mean
+                            > stat.get(&ExecutionTime).unwrap().mean
+                        {
                             Some(prev)
                         } else {
                             Some(stat)
@@ -173,8 +177,9 @@ impl ProblemRunData {
                 },
             )
             .unwrap()
-            .execution_time
-            .1 = true;
+            .get_mut(&ExecutionTime)
+            .unwrap()
+            .best = true;
 
         problems
     }

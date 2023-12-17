@@ -1,7 +1,7 @@
 use crate::ompas::manager::acting::acting_stat::ActingStat;
 use crate::ompas::manager::acting::interval::Duration;
 use crate::ompas::manager::acting::process::process_stat::ActingProcessStat;
-use crate::ompas::manager::planning::planner_stat::PlannerStat;
+use crate::ompas::manager::planning::planner_stat::{PlannerStat, PlanningStatus};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -118,6 +118,112 @@ impl OMPASRunData {
         deliberation_time / i as f64
     }
 
+    pub fn get_planning_waiting_time(&self) -> f64 {
+        let mut planning_waiting_time = 0.0;
+        for stat in &self.inner {
+            if let OMPASStat::Process(p) = stat {
+                planning_waiting_time += p.planning_waiting_time.mean.as_secs()
+                    * p.planning_waiting_time.instance as f64;
+            }
+        }
+        planning_waiting_time
+    }
+
+    pub fn get_planning_waiting_time_ratio(&self) -> f64 {
+        let mut planning_waiting_time = 0.0;
+        let mut i = 0;
+        for stat in &self.inner {
+            if let OMPASStat::Process(p) = stat {
+                planning_waiting_time += p.planning_waiting_time.mean.as_secs()
+                    * p.planning_waiting_time.instance as f64;
+                i += 1;
+            }
+        }
+        planning_waiting_time / i as f64
+    }
+
+    pub fn get_planning_time(&self) -> f64 {
+        let mut planning_time = 0.0;
+        for stat in &self.inner {
+            if let OMPASStat::Planner(p) = stat {
+                for stat in &p.inner {
+                    planning_time += stat.duration.as_secs();
+                }
+            }
+        }
+        planning_time
+    }
+
+    pub fn get_planning_time_ratio(&self) -> f64 {
+        self.get_planning_time() / self.get_acting_time()
+    }
+
+    pub fn get_number_planning_instance(&self) -> f64 {
+        match self.inner.iter().find_map(|stat| {
+            if let OMPASStat::Planner(p) = stat {
+                Some(p)
+            } else {
+                None
+            }
+        }) {
+            None => 0.0,
+            Some(p) => p.inner.len() as f64,
+        }
+    }
+
+    pub fn get_average_planning_time(&self) -> f64 {
+        match self.inner.iter().find_map(|stat| {
+            if let OMPASStat::Planner(p) = stat {
+                Some(p)
+            } else {
+                None
+            }
+        }) {
+            None => 0.0,
+            Some(p) => self.get_planning_time() / p.inner.len() as f64,
+        }
+    }
+
+    pub fn get_planning_success_rate(&self) -> f64 {
+        match self.inner.iter().find_map(|stat| {
+            if let OMPASStat::Planner(p) = stat {
+                Some(p)
+            } else {
+                None
+            }
+        }) {
+            None => 0.0,
+            Some(p) => {
+                let mut success = 0.0;
+                for p_stat in &p.inner {
+                    if p_stat.status == PlanningStatus::Sat {
+                        success += 1.0;
+                    }
+                }
+                success / p.inner.len() as f64
+            }
+        }
+    }
+
+    pub fn get_average_number_planning_solutions(&self) -> f64 {
+        match self.inner.iter().find_map(|stat| {
+            if let OMPASStat::Planner(p) = stat {
+                Some(p)
+            } else {
+                None
+            }
+        }) {
+            None => 0.0,
+            Some(p) => {
+                let mut solutions = 0;
+                for p_stat in &p.inner {
+                    solutions += p_stat.n_solution;
+                }
+                solutions as f64 / p.inner.len() as f64
+            }
+        }
+    }
+
     pub fn get_coverage(&self) -> f64 {
         let mut success = 0;
         let mut i = 0;
@@ -152,6 +258,32 @@ impl OMPASRunData {
             }
         }
         n_retries
+    }
+
+    pub fn get_planning_times(&self) -> Vec<f64> {
+        match self.inner.iter().find_map(|stat| {
+            if let OMPASStat::Planner(p) = stat {
+                Some(p)
+            } else {
+                None
+            }
+        }) {
+            None => vec![],
+            Some(p) => p.inner.iter().map(|run| run.duration.as_secs()).collect(),
+        }
+    }
+
+    pub fn get_planning_solutions(&self) -> Vec<f64> {
+        match self.inner.iter().find_map(|stat| {
+            if let OMPASStat::Planner(p) = stat {
+                Some(p)
+            } else {
+                None
+            }
+        }) {
+            None => vec![],
+            Some(p) => p.inner.iter().map(|run| run.n_solution as f64).collect(),
+        }
     }
 }
 

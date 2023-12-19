@@ -14,6 +14,10 @@
         (:params (?r1 room) (?d door) (?r2 room))
         (:result boolean))
 
+    (def-function min-distance
+        (:params (?r1 room) (?r2 room))
+        (:result int))
+
     ; New commands
     (def-command move (:params (?from room) (?to room) (?d door)))
     (def-command-pddl-model move

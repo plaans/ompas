@@ -12,7 +12,7 @@ pub const UPOM_C_DEFAULT: f64 = 2.0;
 pub enum SelectMode {
     Greedy,
     Random,
-    Score,
+    Cost,
     Planning(Planner),
 }
 
@@ -33,7 +33,7 @@ impl From<SelectMode> for SelectModeSerde {
         match value {
             SelectMode::Greedy => Self::Greedy,
             SelectMode::Random => Self::Random,
-            SelectMode::Score => Self::Score,
+            SelectMode::Cost => Self::Score,
             SelectMode::Planning(p) => match p {
                 Planner::Aries(aries) => match aries {
                     AriesConfig::Satisfactory => Self::Aries,
@@ -190,7 +190,7 @@ impl Display for SelectMode {
                 SelectMode::Greedy => GREEDY.to_string(),
                 SelectMode::Planning(p) => format!("{}", p),
                 SelectMode::Random => RANDOM.to_string(),
-                SelectMode::Score => SCORE.to_string(),
+                SelectMode::Cost => COST.to_string(),
             }
         )
     }

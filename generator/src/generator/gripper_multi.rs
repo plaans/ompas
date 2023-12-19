@@ -3,7 +3,9 @@ use crate::generator::gripper::GripperTask::Place;
 use crate::generator::gripper::{
     GripperConfig, GripperTask, Room, BALL, CARRY, EMPTY, LEFT, POS, RIGHT, ROOM,
 };
-use crate::generator::gripper_door::{export_connects, Door, GripperDoorConfig, DOOR, OPENED};
+use crate::generator::gripper_door::{
+    export_connects, export_min_distance, Door, GripperDoorConfig, DOOR, OPENED,
+};
 use crate::generator::gripper_multi::Object::{Ball, Robot};
 use crate::generator::{populate_topology, write_dot_to_file};
 use crate::{Generator, Problem, Task};
@@ -218,7 +220,9 @@ impl Problem for GripperMultiProblem {
     }
 
     fn get_static_facts(&self) -> Vec<(LValue, LValue)> {
-        export_connects(&self.graph)
+        let mut vec = export_connects(&self.graph);
+        vec.append(&mut export_min_distance(&self.graph));
+        vec
     }
 
     fn report(&self, path: PathBuf) -> PathBuf {

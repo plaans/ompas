@@ -58,6 +58,7 @@ pub struct SpecificDomain {
 #[serde(rename_all = "lowercase")]
 pub enum SelectConfig {
     Greedy,
+    Cost,
     Random,
     UPOM,
     Aries,

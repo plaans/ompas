@@ -21,20 +21,6 @@
                 (move ?ro ?a ?n ?d)
                 (go2 ?ro ?r))))
 
-;    (def-method open_and_move
-;        (:task go2)
-;        (:params (?ro robot) (?r room) (?a room) (?n room) (?d door))
-;        (:pre-conditions
-;            (= (at-rob ?ro) ?a)
-;            (!= ?a ?r)
-;            (connects ?a ?d ?n)
-;            (! (opened ?d)))
-;        (:body
-;            (do
-;                (t_open ?ro ?d ?a)
-;                (move ?ro ?a ?n ?d)
-;                (go2 ?ro ?r))))
-
     ;task with their methods
     (def-task place (:params (?o carriable) (?r room)))
     (def-method place_noop

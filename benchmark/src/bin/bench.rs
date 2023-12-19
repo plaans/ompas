@@ -317,6 +317,7 @@ fn generate_config(
         SelectConfig::UPOM => "upom",
         SelectConfig::Aries => "aries",
         SelectConfig::AriesOpt => "aries-opt",
+        SelectConfig::Cost => "cost",
     };
 
     let mut config_name = select.to_string();

@@ -89,7 +89,7 @@ impl InstanceRunData {
             } else {
                 let score = *run.get(&Field::Score).unwrap();
                 *run.get_mut(&Field::DistanceToBestScore).unwrap() =
-                    (score - best_score).abs() / best_score;
+                    (best_score - score).abs() / best_score;
             }
             if c == &c_exec_time {
                 *run.get_mut(&Field::BestExecutionTimeRatio).unwrap() = Stat::new(1.0);

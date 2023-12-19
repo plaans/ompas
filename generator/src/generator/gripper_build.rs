@@ -3,7 +3,9 @@ use crate::generator::gripper::{
     GripperConfig, GripperTask, Room, BALL, CARRY, EMPTY, LEFT, POS, RIGHT, ROOM,
 };
 use crate::generator::gripper_build::ToyPart::{Head, LeftArm, LeftLeg, RightArm, RightLeg, Torso};
-use crate::generator::gripper_door::{export_connects, Door, GripperDoorConfig, DOOR, OPENED};
+use crate::generator::gripper_door::{
+    export_connects, export_min_distance, Door, GripperDoorConfig, DOOR, OPENED,
+};
 use crate::generator::gripper_multi::{GripperMultiConfig, AT_ROB};
 use crate::generator::gripper_multi::{Object as OtherObject, ROBOT};
 use crate::generator::{populate_topology, write_dot_to_file};
@@ -449,8 +451,8 @@ impl Problem for GripperBuildProblem {
             })
         });
 
-        let mut connects_facts = export_connects(&self.graph);
-        facts.append(&mut connects_facts);
+        facts.append(&mut export_connects(&self.graph));
+        facts.append(&mut export_min_distance(&self.graph));
         facts
     }
 

@@ -5,22 +5,10 @@
     (load "../gripper/om.scm")
     (remove-method m_move)
 
-;    (def-method move_direct
-;        (:task go2)
-;        (:params (?r room) (?a room) (?n room) (?d door))
-;        (:pre-conditions
-;            (= (at-robby) ?a)
-;            (!= ?a ?r)
-;            (connects ?a ?d ?n)
-;            (opened ?d))
-;        (:body
-;            (do
-;                (move ?a ?n ?d)
-;                (go2 ?r))))
-
     (def-method m_move
         (:task go2)
         (:params (?r room) (?a room) (?n room) (?d door))
+        (:cost (+ 1 (min-distance ?n ?r)))
         (:pre-conditions
             (= (at-robby) ?a)
             (!= ?a ?r)
@@ -34,12 +22,14 @@
     (def-task t_open (:params (?r room) (?d door)))
     (def-method open_noop
         (:task t_open)
+        (:cost 0)
         (:params (?r room) (?d door))
         (:pre-conditions (opened ?d))
         (:body nil))
 
     (def-method open_direct
         (:task t_open)
+        (:cost 1)
         (:params (?r room) (?d door) (?g gripper))
         (:pre-conditions (= (carry ?g) empty) (! (opened ?d)))
         (:body
@@ -48,6 +38,7 @@
     (def-method drop_and_open
         (:task t_open)
         (:params (?r room) (?d door))
+        (:cost 3)
         (:pre-conditions
             (! (opened ?d))
             (forall

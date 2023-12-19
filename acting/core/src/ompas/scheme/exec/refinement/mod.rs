@@ -411,7 +411,7 @@ pub async fn select(
                 greedy_select(&candidates, &state, env)?
             }
             SelectMode::Random => random_select(&candidates, &state, env)?,
-            SelectMode::Score => score_select(&candidates, &state, env).await?,
+            SelectMode::Cost => cost_select(&candidates, &state, env).await?,
             SelectMode::Planning(Planner::Aries(aries_config)) => aries_select(
                 task_id,
                 &task,
@@ -567,7 +567,7 @@ pub async fn applicable(
     Ok(applicable_methods)
 }
 
-pub async fn score_select(
+pub async fn cost_select(
     candidates: &[LValue],
     state: &WorldStateSnapshot,
     env: &LEnv,
@@ -608,10 +608,11 @@ pub async fn score_select(
     }
 
     tuple.sort_by_key(|(_, s)| *s);
+    tuple.reverse();
 
     Ok(Selected::Generated(
         tuple.last().map(|e| e.0.clone()).unwrap(),
-        SelectMode::Score,
+        SelectMode::Cost,
     ))
 }
 

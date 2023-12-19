@@ -755,10 +755,9 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
     };
     method.lambda_pre_conditions = conds;
 
-    let score = match map.get(&SCORE.into()) {
+    let cost = match map.get(&COST.into()) {
         None => {
-            ctx.log
-                .warn(format!("{} is undefined for {}", SCORE, label));
+            ctx.log.warn(format!("{} is undefined for {}", COST, label));
             let expr = format!("(lambda {} 0)", method.parameters.get_params_as_lvalue(),);
             eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
         }
@@ -771,7 +770,7 @@ pub async fn add_method(env: &LEnv, map: im::HashMap<LValue, LValue>) -> Result<
             eval(&parse(&expr, &mut new_env).await?, &mut new_env, None).await?
         }
     };
-    method.model_collection.insert(score, ModelKind::CostModel);
+    method.model_collection.insert(cost, ModelKind::CostModel);
 
     let expr = format!(
         "(lambda {} (do {} {}))",
@@ -1410,7 +1409,7 @@ mod test {
             expression: "(def-method m_navigate_to (:task t_navigate_to)
             (:params (?r robot) (?x float) (?y float))
             (:pre-conditions (robot.available ?r) (< ?x 10) (< ?y 10))
-            (:score 0)
+            (:cost 0)
             (:body
             (begin
                 (navigate_to ?r ?x ?y))))",
@@ -1420,7 +1419,7 @@ mod test {
     (:task (t_navigate_to))
     (:params ((?r robot) (?x float) (?y float)))
     (:pre-conditions ((robot.available ?r) (< ?x 10) (< ?y 10)))
-    (:score (0))
+    (:cost (0))
     (:body
     ((begin
         (navigate_to ?r ?x ?y)))))))",

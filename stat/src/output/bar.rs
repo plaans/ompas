@@ -85,7 +85,7 @@ impl Bar {
         y_max *= 1.2;
 
         let x_label = "Configuration";
-        let y_label = "Time (s)";
+        let y_label = self.fields[0].to_string();
 
         let mut tex = format!(
             "\
@@ -98,6 +98,7 @@ impl Bar {
               ymajorgrids,
               ylabel={y_label},
               xlabel={x_label},
+              x label style={{anchor=south, below = 4em}},
               ymin = {y_min},
               ymax= {y_max},
               ybar=0pt,

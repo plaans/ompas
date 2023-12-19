@@ -6,6 +6,7 @@ use crate::generator::gripper::{
 };
 use crate::generator::{populate_topology, write_dot_to_file};
 use crate::{Generator, Problem, Task};
+use petgraph::algo::floyd_warshall;
 use petgraph::dot::Dot;
 use petgraph::{Graph, Undirected};
 use rand::prelude::{IteratorRandom, SliceRandom};
@@ -24,6 +25,7 @@ pub const DOOR: &str = "door";
 
 pub const CONNECTS: &str = "connects";
 pub const OPENED: &str = "opened";
+pub const MIN_DISTANCE: &str = "min-distance";
 
 #[derive(Default)]
 pub struct GripperDoorGenerator {}
@@ -193,7 +195,9 @@ impl Problem for GripperDoorProblem {
     }
 
     fn get_static_facts(&self) -> Vec<(LValue, LValue)> {
-        export_connects(&self.graph)
+        let mut vec = export_connects(&self.graph);
+        vec.append(&mut export_min_distance(&self.graph));
+        vec
     }
 
     fn report(&self, path: PathBuf) -> PathBuf {
@@ -220,6 +224,19 @@ impl Problem for GripperDoorProblem {
 
         write_dot_to_file(self, path, format!("{:?}", dot))
     }
+}
+
+pub fn export_min_distance<T: ToString>(
+    graph: &Graph<T, Door, Undirected>,
+) -> Vec<(LValue, LValue)> {
+    let mut facts = vec![];
+    let map = floyd_warshall(graph, |_| 1).unwrap();
+    for ((n1, n2), cost) in map {
+        let n1: LValue = graph.node_weight(n1).unwrap().to_string().into();
+        let n2: LValue = graph.node_weight(n2).unwrap().to_string().into();
+        facts.push((vec![MIN_DISTANCE.into(), n1, n2].into(), cost.into()))
+    }
+    facts
 }
 
 pub fn export_connects<T: ToString>(graph: &Graph<T, Door, Undirected>) -> Vec<(LValue, LValue)> {

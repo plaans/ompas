@@ -96,13 +96,14 @@ impl Plot {
         y_min *= 1.1;
         y_max *= 1.1;
         let mut x_tick = '{'.to_string();
-        for i in 0..instance {
-            if i % 5 == 0 {
-                if i > 0 {
-                    x_tick.push(',');
-                }
-                write!(x_tick, "{}", i).unwrap();
+        let n = instance / 10;
+        let n2 = n / 5 + 1;
+        for i in 0..11 {
+            if i > 0 {
+                x_tick.push(',');
             }
+            let i = i * n2 * 5;
+            write!(x_tick, "{}", i).unwrap();
         }
         x_tick.push('}');
 

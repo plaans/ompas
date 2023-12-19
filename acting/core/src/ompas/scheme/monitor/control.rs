@@ -623,6 +623,7 @@ pub async fn set_select(env: &LEnv, m: String) -> Result<(), LRuntimeError> {
     let select_mode = match m.as_str() {
         RANDOM => SelectMode::Random,
         GREEDY => SelectMode::Greedy,
+        COST => SelectMode::Cost,
         PLANNING | ARIES => SelectMode::Planning(Planner::Aries(AriesConfig::Satisfactory)),
         ARIES_OPT => {
             SelectMode::Planning(Planner::Aries(AriesConfig::Optimality(PMetric::Makespan)))

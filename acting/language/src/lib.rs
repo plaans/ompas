@@ -894,7 +894,6 @@ pub mod monitor {
         pub const MODEL_TYPE: &str = ":model-type";
         pub const EFFECTS: &str = ":effects";
         pub const RESULT: &str = ":result";
-        pub const SCORE: &str = ":score";
         pub const COST: &str = ":cost";
 
         pub const ONCE: &str = "once";
@@ -1113,7 +1112,7 @@ pub mod select {
     pub const HEURISTIC: &str = "heuristic";
     pub const LEARNING: &str = "learning";
     pub const RANDOM: &str = "random";
-    pub const SCORE: &str = "score";
+    pub const COST: &str = "cost";
     pub const ARIES: &str = "aries";
     pub const ARIES_OPT: &str = "aries-opt";
     pub const UPOM: &str = "upom";

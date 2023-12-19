@@ -207,7 +207,7 @@ impl ConfigRunData {
 
     fn get_score_stat(&self) -> Stat {
         let stat_1 = self.get_coverage_stat();
-        let stat_2: Stat = self.get_bench_min_time_stat();
+        let stat_2: Stat = self.get_bench_max_time_stat();
         let stat_3 = self.get_execution_time_stat();
         stat_1 * stat_2 / stat_3
     }
@@ -370,9 +370,9 @@ impl ConfigProblemStat {
             let info = match self.stat_map.get(field) {
                 Some(stat) => {
                     if stat.best {
-                        format!("\\textbf{{{:.1}}}", stat.mean)
+                        format!("\\textbf{{{:.3}}}", stat.mean)
                     } else {
-                        format!("{:.1}", stat.mean)
+                        format!("{:.3}", stat.mean)
                     }
                 }
                 None => "ND".to_string(),
@@ -385,19 +385,6 @@ impl ConfigProblemStat {
             }
         }
         cells
-        /*vec![
-            //Cell::start(format!("{:.1}", self.execution_time)),
-            //Cell::start(format!("{:.1}", self.deliberation_ratio * 100.0)),
-            // Cell::start(match self.planning_ratio {
-            //     Some(p) => format!("{:.1}", p * 100.0),
-            //     None => "None".to_string(),
-            // }),
-            Cell::start(format!("{:.1}", self.score)),
-            Cell::start(format!("{:.1}", self.virtual_best_ratio),
-                        Cell::start(format!("{:.1}", self.distance_to_best)),
-                        //Cell::start(format!("{:.1}", self.success_rate * 100.0)),
-                        //Cell::double(format!("{:.1}", self.number_failures)),
-        ]*/
     }
 }
 
@@ -407,55 +394,18 @@ impl From<&[ConfigInstanceStat]> for ConfigProblemStat {
 
         let mut config_problem_stat = ConfigProblemStat::default();
         for field in &fields {
-            let mut vec = vec![];
+            let mut new_stat = Stat::default();
+            let mut i = 0;
             for stat in stats {
                 if let Some(stat) = stat.stat_map.get(field) {
-                    vec.push(*stat);
+                    new_stat = new_stat + *stat;
+                    i += 1;
                 }
             }
-            let stat: Stat = vec.drain(..).fold(Stat::new(0.0), |prev, now| prev + now)
-                / Stat::new(vec.len() as f64);
-
-            config_problem_stat.stat_map.insert(*field, stat);
+            let new_stat = new_stat / Stat::new(i);
+            //println!("{}: {}", field, new_stat.mean);
+            config_problem_stat.stat_map.insert(*field, new_stat);
         }
-
-        // let stat = Self {
-        //     execution_time: (
-        //         stats
-        //             .iter()
-        //             .map(|stat| stat.execution_time.mean)
-        //             .sum::<f64>()
-        //             / n,
-        //         false,
-        //     ),
-        //     best_execution_time_ratio: stats
-        //         .iter()
-        //         .map(|stat| stat.best_config_execution_time_ratio)
-        //         .sum::<f64>()
-        //         / n,
-        //     distance_to_best_execution_time: stats
-        //         .iter()
-        //         .map(|stat| stat.distance_to_best_execution_time)
-        //         .sum::<f64>()
-        //         / n,
-        //     score: (stats.iter().map(|stat| stat.score).sum::<f64>() / n, false),
-        //     best_score_ratio: stats.iter().map(|stat| stat.best_score_ratio).sum::<f64>() / n,
-        //     deliberation_ratio: stats
-        //         .iter()
-        //         .map(|stat| stat.deliberation_ratio)
-        //         .sum::<f64>()
-        //         / n,
-        //     coverage: stats.iter().map(|stat| stat.coverage).sum::<f64>() / n,
-        //     number_failures: stats.iter().map(|stat| stat.number_failures).sum::<f64>() / n,
-        //     number_retries: stats.iter().map(|stat| stat.number_retries).sum::<f64>() / n,
-        //     continuous_planning_stat: None, //stats.iter().map(|stat| stat.number_retries).sum::<f64>() / n,
-        //     deliberation_time: stats.iter().map(|stat| stat.deliberation_time).sum::<f64>() / n,
-        //     distance_to_best_score: stats
-        //         .iter()
-        //         .map(|stat| stat.distance_to_best_score)
-        //         .sum::<f64>()
-        //         / n,
-        // };
 
         config_problem_stat
     }

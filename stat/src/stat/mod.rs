@@ -179,25 +179,25 @@ impl Field {
 
 pub const BENCH_MIN_TIME: &str = "Bench min. time";
 pub const BENCH_MAX_TIME: &str = "Bench max. time";
-pub const EXECUTION_TIME: &str = "T";
-pub const DISTANCE_TO_BEST_EXECUTION_TIME: &str = "D_{BT}";
-pub const BEST_EXECUTION_TIME_RATIO: &str = "R_{BT}";
-pub const DELIBERATION_TIME: &str = "T_D";
-pub const DELIBERATION_TIME_RATIO: &str = "R_D";
+pub const EXECUTION_TIME: &str = "ET";
+pub const DISTANCE_TO_BEST_EXECUTION_TIME: &str = "DBET";
+pub const BEST_EXECUTION_TIME_RATIO: &str = "RBET";
+pub const DELIBERATION_TIME: &str = "DT";
+pub const DELIBERATION_TIME_RATIO: &str = "DTR";
 pub const COVERAGE: &str = "SR";
 pub const SCORE: &str = "ES";
-pub const NUMBER_RETRIES: &str = "N_R";
-pub const NUMBER_FAILURES: &str = "N_F";
-pub const DISTANCE_TO_BEST_SCORE: &str = "D_{BES}";
-pub const BEST_SCORE_RATIO: &str = "R_{BES}";
-pub const PLANNING_TIME: &str = "T_P";
-pub const PLANNING_TIME_RATIO: &str = "R_P";
+pub const NUMBER_RETRIES: &str = "NR";
+pub const NUMBER_FAILURES: &str = "NF";
+pub const DISTANCE_TO_BEST_SCORE: &str = "DBES";
+pub const BEST_SCORE_RATIO: &str = "RBES";
+pub const PLANNING_TIME: &str = "PT";
+pub const PLANNING_TIME_RATIO: &str = "PTR";
 pub const NUMBER_PLANNING_INSTANCE: &str = "N_{PI}";
-pub const AVERAGE_PLANNING_TIME: &str = "EPT";
-pub const PLANNING_SUCCESS_RATE: &str = "SRP";
-pub const PLANNING_WAITING_TIME: &str = "TWP";
-pub const PLANNING_WAITING_TIME_RATIO: &str = "RWPT";
-pub const PLANNING_SOLUTIONS: &str = "N_{PS}";
+pub const AVERAGE_PLANNING_TIME: &str = "APT";
+pub const PLANNING_SUCCESS_RATE: &str = "PST";
+pub const PLANNING_WAITING_TIME: &str = "PWT";
+pub const PLANNING_WAITING_TIME_RATIO: &str = "PWTR";
+pub const PLANNING_SOLUTIONS: &str = "NPS";
 
 impl Field {
     pub fn to_latex(&self) -> String {

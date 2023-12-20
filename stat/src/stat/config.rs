@@ -4,6 +4,7 @@ use crate::stat::Field;
 use crate::stat::Field::*;
 use crate::stat::Stat;
 use ompas_core::ompas::interface::stat::OMPASRunData;
+use ompas_core::ompas::manager::acting::inner::ActingProcessKind;
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
@@ -32,7 +33,14 @@ impl ConfigName {
             "reactive" => "",
             t => t,
         };
-        format!("$OMPAS_{{{}}}^{{{}}}$", continuous_planning, default)
+        let mut name = "$\\textit{C}(".to_string();
+        write!(name, "{}", default).unwrap();
+        if continuous_planning != "" {
+            write!(name, "/{}", continuous_planning).unwrap();
+        }
+
+        name.push_str(")$");
+        name
     }
 }
 
@@ -68,7 +76,7 @@ impl ConfigRunData {
             self.get_deliberation_time_ratio_stat(),
         );
         map.insert(Coverage, self.get_coverage_stat());
-        map.insert(Score, self.get_score_stat());
+        map.insert(EfficiencyScore, self.get_score_stat());
         map.insert(BestScoreRatio, Default::default());
         map.insert(DistanceToBestScore, Default::default());
         map.insert(NumberFailures, self.get_n_failures());
@@ -89,6 +97,24 @@ impl ConfigRunData {
         map.insert(
             AveragePlanningSolutions,
             self.get_average_number_planning_solutions_stat(),
+        );
+
+        map.insert(
+            NumberCommands,
+            self.get_n_process(&ActingProcessKind::Command),
+        );
+        map.insert(NumberTasks, self.get_n_process(&ActingProcessKind::Task));
+        map.insert(
+            NumberMethods,
+            self.get_n_process(&ActingProcessKind::Method),
+        );
+        map.insert(
+            NumberAcquisitions,
+            self.get_n_process(&ActingProcessKind::Acquire),
+        );
+        map.insert(
+            NumberArbitraries,
+            self.get_n_process(&ActingProcessKind::Arbitrary),
         );
 
         ConfigInstanceStat { stat_map: map }
@@ -206,7 +232,7 @@ impl ConfigRunData {
     }
 
     fn get_score_stat(&self) -> Stat {
-        let stat_1 = self.get_coverage_stat();
+        let stat_1 = self.get_coverage_stat() / Stat::new(100.0);
         let stat_2: Stat = self.get_bench_max_time_stat();
         let stat_3 = self.get_execution_time_stat();
         stat_1 * stat_2 / stat_3
@@ -227,7 +253,7 @@ impl ConfigRunData {
             .iter()
             .map(|run| run.get_deliberation_time_ratio())
             .collect();
-        ratios.as_slice().into()
+        Stat::from(ratios.as_slice()) * Stat::new(100.0)
     }
 
     fn get_planning_waiting_time_stat(&self) -> Stat {
@@ -236,7 +262,9 @@ impl ConfigRunData {
             .iter()
             .map(|run| run.get_planning_waiting_time())
             .collect();
-        times.as_slice().into()
+        let stat: Stat = times.as_slice().into();
+        //println!("TWP = {}", stat.mean);
+        stat
     }
 
     fn get_planning_waiting_time_ratio_stat(&self) -> Stat {
@@ -245,7 +273,7 @@ impl ConfigRunData {
             .iter()
             .map(|run| run.get_planning_waiting_time_ratio())
             .collect();
-        times.as_slice().into()
+        Stat::from(times.as_slice()) * Stat::new(100.0)
     }
 
     fn get_planning_time_stat(&self) -> Stat {
@@ -263,7 +291,7 @@ impl ConfigRunData {
             .iter()
             .map(|run| run.get_planning_time_ratio())
             .collect();
-        times.as_slice().into()
+        Stat::from(times.as_slice()) * Stat::new(100.0)
     }
 
     fn get_number_planning_instance_stat(&self) -> Stat {
@@ -290,7 +318,7 @@ impl ConfigRunData {
             .iter()
             .map(|run| run.get_planning_success_rate())
             .collect();
-        srs.as_slice().into()
+        Stat::from(srs.as_slice()) * Stat::new(100.0)
     }
 
     fn get_average_number_planning_solutions_stat(&self) -> Stat {
@@ -304,7 +332,7 @@ impl ConfigRunData {
 
     fn get_coverage_stat(&self) -> Stat {
         let coverages: Vec<f64> = self.inner.iter().map(|run| run.get_coverage()).collect();
-        coverages.as_slice().into()
+        Stat::from(coverages.as_slice()) * Stat::new(100.0)
     }
 
     fn get_n_failures(&self) -> Stat {
@@ -315,6 +343,15 @@ impl ConfigRunData {
     fn get_n_retries(&self) -> Stat {
         let retries: Vec<_> = self.inner.iter().map(|run| run.get_n_retries()).collect();
         retries.as_slice().into()
+    }
+
+    fn get_n_process(&self, process_kind: &ActingProcessKind) -> Stat {
+        let processes: Vec<_> = self
+            .inner
+            .iter()
+            .map(|run| run.get_number_process(process_kind))
+            .collect();
+        processes.as_slice().into()
     }
 }
 
@@ -352,7 +389,7 @@ impl ConfigProblemStat {
         let mut cells = vec![];
         let last = fields.len() - 1;
         for (i, field) in fields.iter().enumerate() {
-            let info = field.to_latex();
+            let info = format!("{}({})", field.to_latex(), field.unit_short());
             if i == last {
                 cells.push(Cell::double(info))
             } else {
@@ -370,9 +407,9 @@ impl ConfigProblemStat {
             let info = match self.stat_map.get(field) {
                 Some(stat) => {
                     if stat.best {
-                        format!("\\textbf{{{:.3}}}", stat.mean)
+                        format!("\\textbf{{{:.1}}}", stat.mean)
                     } else {
-                        format!("{:.3}", stat.mean)
+                        format!("{:.1}", stat.mean)
                     }
                 }
                 None => "ND".to_string(),

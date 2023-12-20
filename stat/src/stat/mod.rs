@@ -114,15 +114,19 @@ where
 {
     fn from(value: &[T]) -> Self {
         let n = value.len();
-        let values: Vec<f64> = value.iter().map(|t| t.clone().into()).collect();
-        let mean = values.iter().sum::<f64>() / n as f64;
-        let standard_deviation =
-            (values.iter().map(|f| (f - mean).powi(2)).sum::<f64>() / n as f64).sqrt();
-        Self {
-            best: false,
-            mean,
-            sd: standard_deviation,
-            se: standard_deviation / (n as f64).sqrt(),
+        if n == 0 {
+            Self::default()
+        } else {
+            let values: Vec<f64> = value.iter().map(|t| t.clone().into()).collect();
+            let mean = values.iter().sum::<f64>() / n as f64;
+            let standard_deviation =
+                (values.iter().map(|f| (f - mean).powi(2)).sum::<f64>() / n as f64).sqrt();
+            Self {
+                best: false,
+                mean,
+                sd: standard_deviation,
+                se: standard_deviation / (n as f64).sqrt(),
+            }
         }
     }
 }
@@ -137,7 +141,7 @@ pub enum Field {
     DeliberationTime,
     DeliberationTimeRatio,
     Coverage,
-    Score,
+    EfficiencyScore,
     BestScoreRatio,
     DistanceToBestScore,
     NumberRetries,
@@ -150,6 +154,11 @@ pub enum Field {
     AveragePlanningSolutions,
     AveragePlanningTime,
     PlanningSuccessRate,
+    NumberTasks,
+    NumberMethods,
+    NumberCommands,
+    NumberAcquisitions,
+    NumberArbitraries,
 }
 
 impl Field {
@@ -163,16 +172,23 @@ impl Field {
             DeliberationTime,
             DeliberationTimeRatio,
             Coverage,
-            Score,
+            EfficiencyScore,
             BestScoreRatio,
             DistanceToBestScore,
             NumberRetries,
             NumberFailures,
+            PlanningWaitingTime,
+            PlanningWaitingTimeRatio,
             PlanningTime,
             PlanningTimeRatio,
             NumberPlanningInstance,
             AveragePlanningTime,
             PlanningSuccessRate,
+            NumberTasks,
+            NumberMethods,
+            NumberCommands,
+            NumberAcquisitions,
+            NumberArbitraries,
         ]
     }
 }
@@ -198,10 +214,97 @@ pub const PLANNING_SUCCESS_RATE: &str = "PST";
 pub const PLANNING_WAITING_TIME: &str = "PWT";
 pub const PLANNING_WAITING_TIME_RATIO: &str = "PWTR";
 pub const PLANNING_SOLUTIONS: &str = "NPS";
+pub const NUMBER_TASKS: &str = "NT";
+pub const NUMBER_COMMANDS: &str = "NC";
+pub const NUMBER_METHODS: &str = "NM";
+pub const NUMBER_ACQUISITIONS: &str = "NAcq";
+pub const NUMBER_ARBITRARIES: &str = "NArb";
 
 impl Field {
     pub fn to_latex(&self) -> String {
-        format!("${}$", self)
+        match self {
+            BenchMinTime => "$Min(BT)$",
+            BenchMaxTime => "$Max(BT)$",
+            ExecutionTime => "$T_E$",
+            BestExecutionTimeRatio => "$RT_E^{*}$",
+            DistanceToBestExecutionTime => "$DT_E^{*}$",
+            DeliberationTime => "$T_D$",
+            DeliberationTimeRatio => "$RT_D$",
+            Coverage => "\\textit{{Cov}}",
+            EfficiencyScore => "$E_S$",
+            BestScoreRatio => "$RE_S^{{*}}$",
+            DistanceToBestScore => "$DE^{*}_S$",
+            NumberRetries => "$N_R$",
+            NumberFailures => "N_F",
+            PlanningWaitingTime => "$T_{WP}$",
+            PlanningWaitingTimeRatio => "$RT_{WP}$",
+            PlanningTime => "$T_{P}$",
+            PlanningTimeRatio => "$RT_{P}$",
+            NumberPlanningInstance => "$N_{PI}$",
+            AveragePlanningSolutions => "$E_{PS}$",
+            AveragePlanningTime => "$ET_P$",
+            PlanningSuccessRate => "$SR_{P}$",
+            NumberTasks => "$N_T$",
+            NumberMethods => "$N_M$",
+            NumberCommands => "$N_C$",
+            NumberAcquisitions => "N_{Acq}",
+            NumberArbitraries => "N_{Arb}",
+        }
+        .to_string()
+    }
+
+    pub fn unit(&self) -> String {
+        match self {
+            BenchMinTime | BenchMaxTime | ExecutionTime | DeliberationTime
+            | PlanningWaitingTime | PlanningTime | AveragePlanningTime => "seconds",
+            BestExecutionTimeRatio
+            | DistanceToBestExecutionTime
+            | DeliberationTimeRatio
+            | Coverage
+            | BestScoreRatio
+            | DistanceToBestScore
+            | PlanningSuccessRate
+            | PlanningWaitingTimeRatio
+            | PlanningTimeRatio => "percentage",
+            EfficiencyScore => "tasks/seconds",
+            NumberRetries
+            | NumberFailures
+            | NumberPlanningInstance
+            | AveragePlanningSolutions
+            | NumberCommands
+            | NumberTasks
+            | NumberMethods
+            | NumberAcquisitions
+            | NumberArbitraries => "",
+        }
+        .to_string()
+    }
+
+    pub fn unit_short(&self) -> String {
+        match self {
+            BenchMinTime | BenchMaxTime | ExecutionTime | DeliberationTime
+            | PlanningWaitingTime | PlanningTime | AveragePlanningTime => "s",
+            BestExecutionTimeRatio
+            | DistanceToBestExecutionTime
+            | DeliberationTimeRatio
+            | Coverage
+            | BestScoreRatio
+            | DistanceToBestScore
+            | PlanningSuccessRate
+            | PlanningWaitingTimeRatio
+            | PlanningTimeRatio => "\\%",
+            EfficiencyScore => "T/s",
+            NumberRetries
+            | NumberFailures
+            | NumberPlanningInstance
+            | AveragePlanningSolutions
+            | NumberCommands
+            | NumberTasks
+            | NumberMethods
+            | NumberAcquisitions
+            | NumberArbitraries => "",
+        }
+        .to_string()
     }
 }
 
@@ -216,7 +319,7 @@ impl Display for Field {
                 DeliberationTime => DELIBERATION_TIME,
                 DeliberationTimeRatio => DELIBERATION_TIME_RATIO,
                 Coverage => COVERAGE,
-                Score => SCORE,
+                EfficiencyScore => SCORE,
                 DistanceToBestScore => DISTANCE_TO_BEST_SCORE,
                 NumberRetries => NUMBER_RETRIES,
                 NumberFailures => NUMBER_FAILURES,
@@ -232,6 +335,21 @@ impl Display for Field {
                 PlanningWaitingTime => PLANNING_WAITING_TIME,
                 PlanningWaitingTimeRatio => PLANNING_WAITING_TIME_RATIO,
                 AveragePlanningSolutions => PLANNING_SOLUTIONS,
+                NumberTasks => {
+                    NUMBER_TASKS
+                }
+                NumberMethods => {
+                    NUMBER_METHODS
+                }
+                NumberCommands => {
+                    NUMBER_COMMANDS
+                }
+                NumberAcquisitions => {
+                    NUMBER_ACQUISITIONS
+                }
+                NumberArbitraries => {
+                    NUMBER_ARBITRARIES
+                }
             }
         )
     }

@@ -59,19 +59,19 @@ impl InstanceRunData {
             .iter()
             .fold(None, |prev, (c, run)| match prev {
                 None => Some((
-                    (c.clone(), *run.get(&Field::Score).unwrap()),
+                    (c.clone(), *run.get(&Field::EfficiencyScore).unwrap()),
                     (c.clone(), *run.get(&Field::ExecutionTime).unwrap()),
                 )),
                 Some(((c_score, b_score), (c_exec_time, best_exec_time))) => {
-                    let run_score = run.get(&Field::Score).unwrap();
+                    let run_score = run.get(&Field::EfficiencyScore).unwrap();
                     let score = if run_score.mean > b_score.mean {
                         (c.clone(), *run_score)
                     } else {
                         (c_score, b_score)
                     };
 
-                    let run_exec_time = run.get(&Field::Score).unwrap();
-                    let exec_time = if run_exec_time.mean > best_exec_time.mean {
+                    let run_exec_time = run.get(&Field::EfficiencyScore).unwrap();
+                    let exec_time = if run_exec_time.mean < best_exec_time.mean {
                         (c.clone(), *run_exec_time)
                     } else {
                         (c_exec_time, best_exec_time)
@@ -87,17 +87,17 @@ impl InstanceRunData {
                 *run.get_mut(&Field::BestScoreRatio).unwrap() = Stat::new(1.0);
                 *run.get_mut(&Field::DistanceToBestScore).unwrap() = Stat::new(0.0);
             } else {
-                let score = *run.get(&Field::Score).unwrap();
+                let score = *run.get(&Field::EfficiencyScore).unwrap();
                 *run.get_mut(&Field::DistanceToBestScore).unwrap() =
-                    (best_score - score).abs() / best_score;
+                    (best_score - score).abs() * Stat::new(100.0) / best_score;
             }
             if c == &c_exec_time {
                 *run.get_mut(&Field::BestExecutionTimeRatio).unwrap() = Stat::new(1.0);
                 *run.get_mut(&Field::DistanceToBestExecutionTime).unwrap() = Stat::new(0.0);
             } else {
-                let exec_time = *run.get(&Field::Score).unwrap();
+                let exec_time = *run.get(&Field::EfficiencyScore).unwrap();
                 *run.get_mut(&Field::DistanceToBestExecutionTime).unwrap() =
-                    (exec_time - best_exec_time).abs() / best_exec_time;
+                    (exec_time - best_exec_time).abs() * Stat::new(100.0) / best_exec_time;
             }
         });
 

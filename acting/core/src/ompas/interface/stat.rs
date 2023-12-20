@@ -1,8 +1,11 @@
 use crate::ompas::manager::acting::acting_stat::ActingStat;
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Duration;
 use crate::ompas::manager::acting::process::process_stat::ActingProcessStat;
 use crate::ompas::manager::planning::planner_stat::{PlannerStat, PlanningStatus};
+use crate::ompas::scheme::monitor::debug_continuous_planning::plan;
 use serde::{Deserialize, Serialize};
+use std::f64::NAN;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct OMPASRunData {
@@ -122,10 +125,16 @@ impl OMPASRunData {
         let mut planning_waiting_time = 0.0;
         for stat in &self.inner {
             if let OMPASStat::Process(p) = stat {
-                planning_waiting_time += p.planning_waiting_time.mean.as_secs()
-                    * p.planning_waiting_time.instance as f64;
+                let mut pwt = p.planning_waiting_time.mean.as_secs();
+                if pwt.is_nan() {
+                    pwt = 0.0;
+                }
+                println!("twp {}", pwt);
+                let instance = p.planning_waiting_time.instance as f64;
+                planning_waiting_time += pwt * instance;
             }
         }
+
         planning_waiting_time
     }
 
@@ -307,6 +316,17 @@ impl OMPASRunData {
                 })
                 .collect(),
         }
+    }
+
+    pub fn get_number_process(&self, kind: &ActingProcessKind) -> f64 {
+        let mut n_process = 0;
+        for stat in &self.inner {
+            if let OMPASStat::Process(p) = stat {
+                n_process += p.number_subprocesses.get(kind).unwrap_or(&0)
+            }
+        }
+
+        n_process as f64
     }
 }
 

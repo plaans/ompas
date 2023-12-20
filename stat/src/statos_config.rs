@@ -12,6 +12,7 @@ pub struct StatosConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StatConfig {
     pub input_dirs: Vec<InputDir>,
+    pub output_dir: PathBuf,
     pub outputs: Vec<Tabular>,
     pub output_bars: Vec<Bar>,
     pub output_plots: Vec<Plot>,

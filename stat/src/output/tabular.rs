@@ -1,11 +1,7 @@
-use crate::stat::config::{ConfigName, ConfigProblemStat};
-use crate::stat::problem::ProblemName;
+use crate::stat::config::ConfigProblemStat;
 use crate::stat::system::SystemStat;
 use crate::stat::Field;
-use im::OrdMap;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Write};
 use std::path::PathBuf;
 
@@ -15,6 +11,9 @@ pub struct Tabular {
     pub latex_output: Option<PathBuf>,
     pub fields: Vec<Field>,
     pub configs: Vec<String>,
+    pub problems: Vec<String>,
+    pub no_problem: Option<bool>,
+    pub no_complexity: Option<bool>,
 }
 
 pub struct TabularOutput {
@@ -61,7 +60,7 @@ impl TabularOutput {
             }
         }
 
-        let mut string = format!("\\begin{{tabular}}{{|{}}}\n\\hline", columns);
+        let mut string = format!("\\begin{{tabular}}{{{}}}\n\\hline\n", columns);
         let mut multi_row: Option<usize> = None;
         for (l_i, line) in self.lines.iter().enumerate() {
             if let Some(row_span) = multi_row {
@@ -98,104 +97,159 @@ impl TabularOutput {
 
 impl Tabular {
     pub fn new_tabular_output(&self, value: &SystemStat) -> TabularOutput {
-        let mut configs: HashMap<&ConfigName, HashMap<&ProblemName, &ConfigProblemStat>> =
-            Default::default();
-        let mut config_order: OrdMap<usize, &ConfigName> = Default::default();
-        for (name, problem) in &value.problem_stats {
-            for (i, filter_config) in self.configs.iter().enumerate() {
-                for (config_name, config) in &problem.inner {
-                    if filter_config == &config_name.to_string() {
-                        match configs.entry(config_name) {
-                            Entry::Occupied(mut o) => {
-                                o.get_mut().insert(name, config);
-                            }
-                            Entry::Vacant(v) => {
-                                config_order.insert(i, config_name);
-                                let mut map = HashMap::default();
-                                map.insert(name, config);
-                                v.insert(map);
-                            }
-                        };
-                    }
-                }
-            }
-        }
+        // let mut configs: HashMap<&ConfigName, HashMap<&ProblemName, &ConfigProblemStat>> =
+        //     Default::default();
+        // let mut config_order: OrdMap<usize, &ConfigName> = Default::default();
+        // for (name, problem) in &value.problem_stats {
+        //     for (i, filter_config) in self.configs.iter().enumerate() {
+        //         for (config_name, config) in &problem.inner {
+        //             if filter_config == &config_name.to_string() {
+        //                 match configs.entry(config_name) {
+        //                     Entry::Occupied(mut o) => {
+        //                         o.get_mut().insert(name, config);
+        //                     }
+        //                     Entry::Vacant(v) => {
+        //                         config_order.insert(i, config_name);
+        //                         let mut map = HashMap::default();
+        //                         map.insert(name, config);
+        //                         v.insert(map);
+        //                     }
+        //                 };
+        //             }
+        //         }
+        //     }
+        // }
 
         let mut lines = vec![];
-        let mut first_line = vec![Cell {
-            column: 2,
-            row: 1,
-            pre_sep: Some('|'),
-            post_sep: Some('|'),
-            info: "".to_string(),
-        }];
-        let mut second_line = vec![
-            Cell::start("Problem".to_string()),
-            Cell::double("Complexity".to_string()),
-        ];
-        let header = ConfigProblemStat::header(&self.fields);
-        let header_len = header.len();
-        let mut empty_info = vec![Cell::start("ND".to_string()); header_len - 1];
-        empty_info.push(Cell::double("ND".to_string()));
-        for (_, config_name) in &config_order {
-            first_line.push(Cell {
-                info: config_name.format(),
-                column: header_len,
-                row: 1,
-                pre_sep: Some('|'),
-                post_sep: Some('|'),
-            });
-            second_line.append(&mut header.clone())
-        }
-        lines.push(first_line);
-        lines.push(second_line);
-
-        let mut names: Vec<_> = value.problem_stats.keys().collect();
-        names.sort();
-
-        let mut same_domain: Option<usize> = None;
-        for (l_i, problem_name) in names.iter().enumerate() {
-            let mut line = vec![];
-            if let Some(max_span) = same_domain {
-                if max_span < l_i {
-                    same_domain = None;
+        for filter_problem in &self.problems {
+            'loop_problem: for (name, problem) in &value.problem_stats {
+                //println!("problem: {}", name);
+                if !name
+                    .to_string()
+                    .to_ascii_lowercase()
+                    .contains(filter_problem)
+                {
+                    //println!("skip {}", name);
+                    continue 'loop_problem;
                 }
-            }
-            if same_domain.is_none() {
-                let mut n = 1;
-                while l_i + n < names.len() {
-                    if names[l_i + n].domain == problem_name.domain {
-                        n += 1;
-                    } else {
-                        break;
+                if !matches!(self.no_problem, Some(true)) {
+                    lines.push(vec![
+                        Cell::double("Problem".to_string()),
+                        Cell {
+                            info: name.domain.to_string(),
+                            column: self.fields.len(),
+                            row: 1,
+                            pre_sep: Some('|'),
+                            post_sep: Some('|'),
+                        },
+                    ]);
+                }
+                if !matches!(self.no_complexity, Some(true)) {
+                    lines.push(vec![
+                        Cell::double("Complexity".to_string()),
+                        Cell {
+                            info: name.difficulty.to_string(),
+                            column: self.fields.len(),
+                            row: 1,
+                            pre_sep: Some('|'),
+                            post_sep: Some('|'),
+                        },
+                    ]);
+                }
+                let mut header = vec![Cell::double("Config".to_string())];
+                header.append(&mut ConfigProblemStat::header(&self.fields));
+                let header_len = header.len() - 1;
+                let mut empty_info = vec![Cell::start("ND".to_string()); header_len - 1];
+                empty_info.push(Cell::double("ND".to_string()));
+                lines.push(header);
+                for filter_config in &self.configs {
+                    'loop_config: for (config_name, config) in &problem.inner {
+                        if !config_name.to_string().contains(filter_config) {
+                            continue 'loop_config;
+                        }
+
+                        let mut line = vec![Cell::double(config_name.format())];
+                        line.append(&mut config.to_formatted(&self.fields));
+                        lines.push(line);
                     }
                 }
-                line.push(Cell {
-                    info: problem_name.domain.to_string(),
-                    column: 1,
-                    row: n,
-                    pre_sep: Some('|'),
-                    post_sep: None,
-                });
-                let max_span = l_i + n - 1;
-                /*println!(
-                    "number of line for {}: {}, max_span = {}",
-                    problem_name.domain, n, max_span
-                );*/
-                same_domain = Some(max_span);
             }
-            line.push(Cell::double(problem_name.difficulty.to_string()));
-            for (_, config) in &config_order {
-                let config = configs.get(config).unwrap();
-                match config.get(problem_name) {
-                    None => {
-                        line.append(&mut empty_info.clone());
-                    }
-                    Some(config) => line.append(&mut config.to_formatted(&self.fields)),
-                }
-            }
-            lines.push(line);
         }
+
+        // let mut first_line = vec![Cell {
+        //     column: 2,
+        //     row: 1,
+        //     pre_sep: Some('|'),
+        //     post_sep: Some('|'),
+        //     info: "".to_string(),
+        // }];
+        // let mut second_line = vec![
+        //     Cell::start("Problem".to_string()),
+        //     Cell::double("Complexity".to_string()),
+        // ];
+        // let header = ConfigProblemStat::header(&self.fields);
+        // let header_len = header.len();
+        // let mut empty_info = vec![Cell::start("ND".to_string()); header_len - 1];
+        // empty_info.push(Cell::double("ND".to_string()));
+        // for (_, config_name) in &config_order {
+        //     first_line.push(Cell {
+        //         info: config_name.format(),
+        //         column: header_len,
+        //         row: 1,
+        //         pre_sep: Some('|'),
+        //         post_sep: Some('|'),
+        //     });
+        //     second_line.append(&mut header.clone())
+        // }
+        // lines.push(first_line);
+        // lines.push(second_line);
+        //
+        // let mut names: Vec<_> = value.problem_stats.keys().collect();
+        // names.sort();
+        //
+        // let mut same_domain: Option<usize> = None;
+        // for (l_i, problem_name) in names.iter().enumerate() {
+        //     let mut line = vec![];
+        //     if let Some(max_span) = same_domain {
+        //         if max_span < l_i {
+        //             same_domain = None;
+        //         }
+        //     }
+        //     if same_domain.is_none() {
+        //         let mut n = 1;
+        //         while l_i + n < names.len() {
+        //             if names[l_i + n].domain == problem_name.domain {
+        //                 n += 1;
+        //             } else {
+        //                 break;
+        //             }
+        //         }
+        //         line.push(Cell {
+        //             info: problem_name.domain.to_string(),
+        //             column: 1,
+        //             row: n,
+        //             pre_sep: Some('|'),
+        //             post_sep: None,
+        //         });
+        //         let max_span = l_i + n - 1;
+        //         /*println!(
+        //             "number of line for {}: {}, max_span = {}",
+        //             problem_name.domain, n, max_span
+        //         );*/
+        //         same_domain = Some(max_span);
+        //     }
+        //     line.push(Cell::double(problem_name.difficulty.to_string()));
+        //     for (_, config) in &config_order {
+        //         let config = configs.get(config).unwrap();
+        //         match config.get(problem_name) {
+        //             None => {
+        //                 line.append(&mut empty_info.clone());
+        //             }
+        //             Some(config) => line.append(&mut config.to_formatted(&self.fields)),
+        //         }
+        //     }
+        //     lines.push(line);
+        // }
         TabularOutput { lines }
     }
 }

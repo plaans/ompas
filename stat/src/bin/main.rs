@@ -27,6 +27,7 @@ pub fn main() {
     //println!("config: {:?}", config);
 
     for config in config.configs {
+        let output_dir = &config.output_dir;
         let time = SystemTime::now();
         let system_run = SystemRunData::new(&config);
         println!(
@@ -41,19 +42,23 @@ pub fn main() {
 
             let bar = output.to_latex(&system_run);
 
+            let mut path = output_dir.clone();
+            path.push(&bar.output_dat);
             let mut file = OpenOptions::new()
                 .create(true)
                 .write(true)
                 .truncate(true)
-                .open(&bar.output_dat)
+                .open(path)
                 .unwrap();
             file.write_all(bar.dat.as_bytes()).unwrap();
 
+            let mut path = output_dir.clone();
+            path.push(&bar.output_tex);
             let mut file = OpenOptions::new()
                 .create(true)
                 .write(true)
                 .truncate(true)
-                .open(&bar.output_tex)
+                .open(path)
                 .unwrap();
             file.write_all(bar.tex.as_bytes()).unwrap();
 
@@ -69,20 +74,25 @@ pub fn main() {
             let bar = output.to_latex(&system_run);
 
             for dat in &bar.dats {
+                let mut path = output_dir.clone();
+                path.push(&dat.path);
                 let mut file = OpenOptions::new()
                     .create(true)
                     .write(true)
                     .truncate(true)
-                    .open(&dat.path)
+                    .open(path)
                     .unwrap();
                 file.write_all(dat.content.as_bytes()).unwrap();
             }
+
+            let mut path = output_dir.clone();
+            path.push(&output.output_tex);
 
             let mut file = OpenOptions::new()
                 .create(true)
                 .write(true)
                 .truncate(true)
-                .open(&bar.output_tex)
+                .open(path)
                 .unwrap();
             file.write_all(bar.tex.as_bytes()).unwrap();
 
@@ -107,25 +117,31 @@ pub fn main() {
             if let Some(csv_output) = &output.csv_output {
                 let csv = formatter.to_csv();
 
+                let mut path = output_dir.clone();
+                path.push(csv_output);
                 let mut file = OpenOptions::new()
                     .create(true)
                     .write(true)
                     .truncate(true)
-                    .open(&csv_output)
+                    .open(path)
                     .unwrap();
                 file.write_all(csv.as_bytes()).unwrap();
             }
 
             if let Some(latex_output) = &output.latex_output {
-                let csv = formatter.to_latex();
-
+                let latex = formatter.to_latex();
+                let path: PathBuf =
+                    format!("{}{}", output_dir.display(), latex_output.display()).into();
+                let path = path.canonicalize().unwrap();
+                //let path = latex_output;
+                println!("path: {}", path.display());
                 let mut file = OpenOptions::new()
                     .create(true)
                     .write(true)
                     .truncate(true)
-                    .open(&latex_output)
+                    .open(&path)
                     .unwrap();
-                file.write_all(csv.as_bytes()).unwrap();
+                file.write_all(latex.as_bytes()).unwrap();
             }
         }
     }

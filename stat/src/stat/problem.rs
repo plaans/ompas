@@ -144,7 +144,9 @@ impl ProblemRunData {
                 None,
                 |prev: Option<&mut ConfigProblemStat>, (_, stat)| match prev {
                     Some(prev) => {
-                        if prev.get(&Score).unwrap().mean > stat.get(&Score).unwrap().mean {
+                        if prev.get(&EfficiencyScore).unwrap().mean
+                            > stat.get(&EfficiencyScore).unwrap().mean
+                        {
                             Some(prev)
                         } else {
                             Some(stat)
@@ -154,7 +156,7 @@ impl ProblemRunData {
                 },
             )
             .unwrap()
-            .get_mut(&Score)
+            .get_mut(&EfficiencyScore)
             .unwrap()
             .best = true;
 
@@ -166,7 +168,7 @@ impl ProblemRunData {
                 |prev: Option<&mut ConfigProblemStat>, (_, stat)| match prev {
                     Some(prev) => {
                         if prev.get(&ExecutionTime).unwrap().mean
-                            > stat.get(&ExecutionTime).unwrap().mean
+                            < stat.get(&ExecutionTime).unwrap().mean
                         {
                             Some(prev)
                         } else {

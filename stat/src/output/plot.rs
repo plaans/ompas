@@ -38,10 +38,10 @@ impl Plot {
         let instance_run_data = run
             .inner
             .get(&problem_name)
-            .unwrap()
+            .unwrap_or_else(|| panic!("Missing problem {problem_name} in data."))
             .inner
             .get(&instance_name)
-            .unwrap();
+            .unwrap_or_else(|| panic!("Missing instance {instance_name} in data."));
         let stat = instance_run_data.get_planning_stat();
 
         let mut instance = 0;
@@ -108,7 +108,7 @@ impl Plot {
         x_tick.push('}');
 
         let x_label = "Instance";
-        let y_label = "Time (s)";
+        let y_label = format!("{} ({})", self.fields[0].to_latex(), self.fields[0].unit());
 
         let mut tex = format!(
             "\
@@ -155,13 +155,12 @@ impl Plot {
                 x=Instance,
                 y={},
                 y error={}E]{{{}}};
-            \\addlegendentry{{{}\\_{}}}
+            \\addlegendentry{{{}}}
                 ",
                     field,
                     field,
                     dat.path.display(),
                     dat.name,
-                    field.to_latex(),
                 )
                 .unwrap();
             }

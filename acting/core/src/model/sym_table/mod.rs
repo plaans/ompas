@@ -226,31 +226,38 @@ impl SymTable {
 
 // New functions
 impl SymTable {
-    pub fn new_variable(&mut self, sym: impl Display, domain: impl Into<Domain>) -> VarId {
+    pub fn new_variable(
+        &mut self,
+        symbol: impl Display,
+        label: impl Display,
+        domain: impl Into<Domain>,
+    ) -> VarId {
         let domain_id = self.domains.new_node(VarDomain::new(domain));
-        let id = self.variables.new_node(Variable::new(sym, domain_id));
+        let id = self
+            .variables
+            .new_node(Variable::new(symbol, label, domain_id));
         self.add_var_to_domain(domain_id, id);
         id
     }
 
     pub fn new_bool(&mut self, b: bool) -> VarId {
-        self.new_variable(b, b)
+        self.new_variable(b, b, b)
     }
 
     pub fn new_nil(&mut self) -> VarId {
-        self.new_variable(NIL, BasicType::Nil)
+        self.new_variable(NIL, NIL, BasicType::Nil)
     }
 
     pub fn new_err(&mut self) -> VarId {
-        self.new_variable(ERR, BasicType::Err)
+        self.new_variable(ERR, ERR, BasicType::Err)
     }
 
     pub fn new_int(&mut self, i: i64) -> VarId {
-        self.new_variable(i, i)
+        self.new_variable(i, i, i)
     }
 
     pub fn new_float(&mut self, f: f64) -> VarId {
-        self.new_variable(f, f)
+        self.new_variable(f, f, f)
     }
 
     pub fn new_number(&mut self, n: &LNumber) -> VarId {
@@ -278,7 +285,7 @@ impl SymTable {
     pub fn new_result(&mut self) -> VarId {
         let index = self.meta_data.new_result_index();
         let sym = format!("{RESULT_PREFIX}{index}");
-        let id = self.new_variable(&sym, Domain::any());
+        let id = self.new_variable(&sym, &sym, Domain::any());
         self.ids.insert(&sym, &id);
         id
     }
@@ -286,7 +293,7 @@ impl SymTable {
     pub fn new_timepoint(&mut self) -> VarId {
         let index = self.meta_data.new_timepoint_index();
         let sym = format!("{TIMEPOINT_PREFIX}{index}");
-        let id = self.new_variable(&sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
+        let id = self.new_variable(&sym, &sym, self.get_type_as_domain(TYPE_TIMEPOINT).unwrap());
         self.ids.insert(&sym, &id);
         id
     }
@@ -334,6 +341,7 @@ impl SymTable {
         let sym_if = &format!("{IF_PREFIX}{index}");
         let id_if = self.new_variable(
             sym_if,
+            sym_if,
             Domain::Cst(
                 Box::new(self.get_type_as_domain(TYPE_TASK).unwrap()),
                 cst::Cst::Symbol(sym_if.to_string()),
@@ -344,6 +352,7 @@ impl SymTable {
         let sym_m_true = &format!("m_{}_true", sym_if);
         let id_m_true = self.new_variable(
             sym_m_true,
+            sym_m_true,
             Domain::Cst(
                 Box::new(self.get_type_as_domain(TYPE_METHOD).unwrap()),
                 cst::Cst::Symbol(sym_m_true.to_string()),
@@ -353,6 +362,7 @@ impl SymTable {
 
         let sym_m_false = &format!("m_{}_false", sym_if);
         let id_m_false = self.new_variable(
+            sym_m_false,
             sym_m_false,
             Domain::Cst(
                 Box::new(self.get_type_as_domain(TYPE_METHOD).unwrap()),
@@ -367,7 +377,7 @@ impl SymTable {
     pub fn new_handle(&mut self) -> VarId {
         let index = self.meta_data.new_handle_index();
         let sym = &format!("{HANDLE_PREFIX}{index}");
-        let id = self.new_variable(sym, Domain::composed(Handle as usize, vec![Any]));
+        let id = self.new_variable(sym, sym, Domain::composed(Handle as usize, vec![Any]));
         self.ids.insert(sym, &id);
         id
     }
@@ -392,7 +402,7 @@ impl SymTable {
     pub fn new_arbitrary(&mut self) -> VarId {
         let index = self.meta_data.new_arbitrary_index();
         let sym = &format!("{ARBITRARY_PREFIX}{index}");
-        let id = self.new_variable(sym, Domain::any());
+        let id = self.new_variable(sym, sym, Domain::any());
         self.ids.insert(sym, &id);
         id
     }
@@ -403,7 +413,7 @@ impl SymTable {
             self.get_sym_id(sym).unwrap()
         } else {
             let sym: &String = &sym.to_string();
-            let id = self.new_variable(sym, sym.as_str());
+            let id = self.new_variable(sym, sym, sym.as_str());
             self.ids.insert(sym, &id);
             id
         }
@@ -416,6 +426,7 @@ impl SymTable {
         } else {
             let sym: &String = &sym.to_string();
             let id = self.new_variable(
+                sym,
                 sym,
                 Domain::Cst(Box::new(domain.into()), Cst::Symbol(sym.to_string())),
             );
@@ -432,11 +443,11 @@ impl SymTable {
     ) -> VarId {
         let symbol = symbol.to_string();
         let version = self.ids.version(&symbol);
-        let sym = format!("{symbol}_{version}");
+        let label = format!("{symbol}_{version}");
         let domain_id = self.domains.new_node(VarDomain::new(domain));
         let id = self
             .variables
-            .new_node(Variable::new_parameter(sym, domain_id));
+            .new_node(Variable::new_parameter(&symbol, label, domain_id));
         self.add_var_to_domain(domain_id, id);
         self.ids.insert(&symbol, &id);
         self.set_declaration(id, declaration);
@@ -465,6 +476,7 @@ impl SymTable {
             domain: domain_id,
             parameter: variable.parameter,
             label: sym,
+            symbol: symbol.clone(),
             declaration: None,
             drop: None,
         };
@@ -516,6 +528,10 @@ impl SymTable {
         };
 
         self.variables[id].label.as_str()
+    }
+
+    pub fn get_symbol(&self, id: VarId) -> String {
+        self.variables[id].symbol.to_string()
     }
 
     pub fn get_domain_of_var(&mut self, v: VarId) -> &Domain {

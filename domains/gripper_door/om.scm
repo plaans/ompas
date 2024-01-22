@@ -5,6 +5,10 @@
     (load "../gripper/om.scm")
     (remove-method m_move)
 
+    (def-function min-distance
+        (:params (?r1 room) (?r2 room))
+        (:result int))
+
     (def-method m_move
         (:task go2)
         (:params (?r room) (?a room) (?n room) (?d door))

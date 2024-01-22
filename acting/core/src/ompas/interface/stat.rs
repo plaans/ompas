@@ -3,13 +3,11 @@ use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Duration;
 use crate::ompas::manager::acting::process::process_stat::ActingProcessStat;
 use crate::ompas::manager::planning::planner_stat::{PlannerStat, PlanningStatus};
-use crate::ompas::scheme::monitor::debug_continuous_planning::plan;
 use serde::{Deserialize, Serialize};
-use std::f64::NAN;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct OMPASRunData {
-    inner: Vec<OMPASStat>,
+    pub inner: Vec<OMPASStat>,
 }
 
 impl OMPASRunData {
@@ -113,8 +111,9 @@ impl OMPASRunData {
         let mut i = 0;
         for stat in &self.inner {
             if let OMPASStat::Process(p) = stat {
-                deliberation_time +=
-                    p.deliberation_time.mean.as_secs() * p.deliberation_time.instance as f64;
+                deliberation_time += p.deliberation_time.mean.as_secs()
+                    * p.deliberation_time.instance as f64
+                    / p.duration.as_secs();
                 i += 1;
             }
         }
@@ -129,7 +128,6 @@ impl OMPASRunData {
                 if pwt.is_nan() {
                     pwt = 0.0;
                 }
-                println!("twp {}", pwt);
                 let instance = p.planning_waiting_time.instance as f64;
                 planning_waiting_time += pwt * instance;
             }
@@ -143,8 +141,13 @@ impl OMPASRunData {
         let mut i = 0;
         for stat in &self.inner {
             if let OMPASStat::Process(p) = stat {
-                planning_waiting_time += p.planning_waiting_time.mean.as_secs()
-                    * p.planning_waiting_time.instance as f64;
+                let mut pwt = p.planning_waiting_time.mean.as_secs();
+                if pwt.is_nan() {
+                    pwt = 0.0;
+                }
+                let instance = p.planning_waiting_time.instance as f64;
+                planning_waiting_time += pwt * instance
+                    / (p.deliberation_time.mean.as_secs() * (p.deliberation_time.instance as f64));
                 i += 1;
             }
         }

@@ -14,6 +14,14 @@ impl PlanningField {
     pub fn to_latex(&self) -> String {
         format!("${}$", self)
     }
+    pub fn unit(&self) -> String {
+        match self {
+            PlanningField::PlanningTimes => "seconds",
+            PlanningField::PlanningSolutions => "",
+            PlanningField::PlanningSuccesses => "percentage",
+        }
+        .to_string()
+    }
 }
 
 impl Display for PlanningField {
@@ -23,13 +31,13 @@ impl Display for PlanningField {
             "{}",
             match self {
                 PlanningField::PlanningTimes => {
-                    "PT"
+                    "T_P"
                 }
                 PlanningField::PlanningSolutions => {
-                    "PS"
+                    "S_P"
                 }
                 PlanningField::PlanningSuccesses => {
-                    "PSR"
+                    "Cov_P"
                 }
             }
         )

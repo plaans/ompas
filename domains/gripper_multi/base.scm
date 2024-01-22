@@ -20,8 +20,8 @@
 
     ; Additional state functions
     (remove-state-function at-robby)
-    (def-state-function at-rob (:params (?r robot)) (:result room))
-    (def-state-function carry (:params (?r robot) (?g gripper)) (:result carriable))
+    (def-state-function at-rob (:params (?ro robot)) (:result room))
+    (def-state-function carry (:params (?ro robot) (?g gripper)) (:result carriable))
 
     ; New commands
     (def-command move (:params (?r robot) (?from room) (?to room) (?d door)))

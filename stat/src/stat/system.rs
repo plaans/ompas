@@ -39,7 +39,7 @@ impl SystemRunData {
                 if let Some(escapes) = &input_dir.escapes {
                     for escape in escapes {
                         if format!("{}", file.display()).contains(escape) {
-                            println!("escape file: {}", file.display());
+                            //println!("escape file: {}", file.display());
                             continue 'loop_file;
                         }
                     }
@@ -51,7 +51,7 @@ impl SystemRunData {
                 if let Some(escapes) = &input_dir.escapes {
                     for escape in escapes {
                         if format!("{}", file.display()).contains(escape) {
-                            println!("escape file: {}", file.display());
+                            //println!("escape file: {}", file.display());
                             continue 'loop_file;
                         }
                     }

@@ -40,7 +40,7 @@ pub fn propagate(
                 let id = st.get_var_parent(id);
                 let domain_id = st.get_domain_id(id);
                 //println!("Subtract({id}, {})", graph.sym_table.format_domain(&d));
-                let emptys = st.substract_to_domain(domain_id, d);
+                let emptys = st.subtract_to_domain(domain_id, d);
                 if let EmptyDomains::Some(emptys) = emptys {
                     //println!("[Subtract] Domains of {:?} are empty.", emptys);
                     for e in &emptys {

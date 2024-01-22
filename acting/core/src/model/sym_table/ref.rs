@@ -122,6 +122,10 @@ impl RefSymTable {
         self.0.write().unwrap().get_label(id, parent).to_string()
     }
 
+    pub fn get_symbol(&self, id: VarId) -> String {
+        self.0.read().unwrap().get_symbol(id)
+    }
+
     pub fn get_var_parent(&self, v: VarId) -> VarId {
         self.0.write().unwrap().get_var_parent(v)
     }
@@ -225,7 +229,7 @@ impl RefSymTable {
         self.0.read().unwrap().union(d1, d2)
     }
 
-    pub fn substract(&self, d1: &Domain, d2: &Domain) -> Domain {
+    pub fn subtract(&self, d1: &Domain, d2: &Domain) -> Domain {
         self.0.read().unwrap().substract(d1, d2)
     }
 
@@ -237,7 +241,7 @@ impl RefSymTable {
         self.0.write().unwrap().union_domains(id_d1, id_d2)
     }
 
-    pub fn substract_domains(&self, id_d1: DomainId, id_d2: DomainId) -> Domain {
+    pub fn subtract_domains(&self, id_d1: DomainId, id_d2: DomainId) -> Domain {
         self.0.write().unwrap().substract_domains(id_d1, id_d2)
     }
 
@@ -245,7 +249,7 @@ impl RefSymTable {
         self.0.write().unwrap().meet_to_domain(id_d1, domain)
     }
 
-    pub fn substract_to_domain(&self, id_d1: DomainId, domain: impl Into<Domain>) -> EmptyDomains {
+    pub fn subtract_to_domain(&self, id_d1: DomainId, domain: impl Into<Domain>) -> EmptyDomains {
         self.0.write().unwrap().subtract_to_domain(id_d1, domain)
     }
 

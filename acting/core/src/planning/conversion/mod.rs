@@ -14,6 +14,7 @@ use crate::planning::conversion::flow_graph::algo::p_eval::p_eval;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
 use crate::planning::conversion::flow_graph::algo::post_processing::flow_graph_post_processing;
 use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processing;
+use crate::planning::conversion::flow_graph::define_table::DefineTable;
 use crate::planning::conversion::flow_graph::graph::FlowGraph;
 use crate::planning::planner::problem::PlanningDomain;
 use crate::{ChronicleDebug, OMPAS_CHRONICLE_DEBUG};
@@ -119,6 +120,16 @@ pub fn _convert(
 ) -> Result<Chronicle, LRuntimeError> {
     let time = SystemTime::now();
     let n_conversion = N_CONVERSION.fetch_add(1, Ordering::Relaxed);
+    let mut define_table: DefineTable = Default::default();
+    if let Some(ch) = &ch {
+        for param in &ch.get_name()[1..] {
+            let sym = st.get_symbol(*param);
+            //if sym == "?r" {
+            println!("{sym}");
+            //}
+            define_table.insert(sym, *param);
+        }
+    }
     let mut graph = FlowGraph::new(st);
 
     if OMPAS_CHRONICLE_DEBUG.get() >= ChronicleDebug::Full {
@@ -128,7 +139,8 @@ pub fn _convert(
             lv.format(0)
         );
     }
-    let flow = convert_lv(lv, &mut graph, &mut Default::default())?;
+
+    let flow = convert_lv(lv, &mut graph, &mut define_table)?;
     graph.flow = flow;
 
     #[cfg(feature = "conversion_data")]

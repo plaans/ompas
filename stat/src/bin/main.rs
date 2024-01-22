@@ -1,7 +1,7 @@
 use ompas_stat::stat::system::SystemRunData;
 use ompas_stat::statos_config::StatosConfig;
 use std::fs;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -132,9 +132,11 @@ pub fn main() {
                 let latex = formatter.to_latex();
                 let path: PathBuf =
                     format!("{}{}", output_dir.display(), latex_output.display()).into();
-                let path = path.canonicalize().unwrap();
+                println!("path: {}", path.display());
+                //let path = path.canonicalize().unwrap();
                 //let path = latex_output;
                 println!("path: {}", path.display());
+                let _ = File::create(&path).unwrap();
                 let mut file = OpenOptions::new()
                     .create(true)
                     .write(true)

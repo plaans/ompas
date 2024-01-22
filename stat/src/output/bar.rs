@@ -33,10 +33,10 @@ impl Bar {
         let instance_run_data = run
             .inner
             .get(&problem_name)
-            .unwrap()
+            .unwrap_or_else(|| panic!("Missing problem {problem_name} in data."))
             .inner
             .get(&instance_name)
-            .unwrap();
+            .unwrap_or_else(|| panic!("Missing instance {instance_name} in data."));
         let stat = instance_run_data.get_stat();
         let mut dat = "Config".to_string();
         for field in &self.fields {
@@ -47,45 +47,40 @@ impl Bar {
         let mut x_tick_labels = "{".to_string();
         let mut y_min: f64 = 0.0;
         let mut y_max: f64 = 0.0;
-        for (i, (config_name, config_stat)) in stat
-            .inner
-            .iter()
-            .filter(|(name, _)| {
-                let name = name.to_string();
-                for c in &self.configs {
-                    if name.contains(c) {
-                        return true;
+        let mut i = 0;
+        for config in &self.configs {
+            'loop_config: for (config_name, config_stat) in &stat.inner {
+                if !config_name.to_string().contains(config) {
+                    continue 'loop_config;
+                }
+                if i > 0 {
+                    x_tick.push(',');
+                    x_tick_labels.push(',');
+                }
+                write!(x_tick, "{}", i).unwrap();
+                write!(x_tick_labels, "{}", config_name.format()).unwrap();
+                write!(dat, "{}", i).unwrap();
+                for field in &self.fields {
+                    if let Some(stat) = config_stat.get(&field) {
+                        write!(dat, " {} {}", stat.mean, stat.se).unwrap();
+                        y_min = y_min.min(stat.mean - stat.se);
+                        y_max = y_max.max(stat.mean + stat.se);
+                    } else {
+                        write!(dat, " 0 0").unwrap();
                     }
                 }
-                false
-            })
-            .enumerate()
-        {
-            if i > 0 {
-                x_tick.push(',');
-                x_tick_labels.push(',');
+                dat.push('\n');
+                i += 1;
             }
-            write!(x_tick, "{}", i).unwrap();
-            write!(x_tick_labels, "{}", config_name.format()).unwrap();
-            write!(dat, "{}", i).unwrap();
-            for field in &self.fields {
-                if let Some(stat) = config_stat.get(&field) {
-                    write!(dat, " {} {}", stat.mean, stat.se).unwrap();
-                    y_min = y_min.min(stat.mean - stat.se);
-                    y_max = y_max.max(stat.mean + stat.se);
-                } else {
-                    write!(dat, " 0 0").unwrap();
-                }
-            }
-            dat.push('\n');
         }
+
         x_tick.push('}');
         x_tick_labels.push('}');
         y_min *= 1.1;
         y_max *= 1.2;
 
         let x_label = "Configuration";
-        let y_label = self.fields[0].to_string();
+        let y_label = format!("{} ({})", self.fields[0].to_latex(), self.fields[0].unit());
 
         let mut tex = format!(
             "\
@@ -120,13 +115,14 @@ impl Bar {
               legend style={{font = \\footnotesize}},
               ]"
         );
-
-        for field in &self.fields {
+        let bar_start: i64 = -6 * (self.fields.len() as i64 - 1);
+        for (i, field) in self.fields.iter().enumerate() {
+            let bar_shift = bar_start + i as i64 * 12;
             write!(
                 tex,
                 "
             \\addplot+[
-            bar shift = 0pt,
+            bar shift = {bar_shift}pt,
             error bars/.cd,
             y dir=both,
             y explicit

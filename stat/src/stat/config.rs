@@ -3,7 +3,7 @@ use crate::stat::planning::{ConfigPlanningStat, PlanningField};
 use crate::stat::Field;
 use crate::stat::Field::*;
 use crate::stat::Stat;
-use ompas_core::ompas::interface::stat::OMPASRunData;
+use ompas_core::ompas::interface::stat::{OMPASRunData, OMPASStat};
 use ompas_core::ompas::manager::acting::inner::ActingProcessKind;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -18,15 +18,15 @@ pub struct ConfigName {
 
 impl ConfigName {
     pub fn format(&self) -> String {
-        let mut default = match self.select_heuristic.as_str() {
+        let default = match self.select_heuristic.as_str() {
             "random" => "R".to_string(),
             "upom" => "U".to_string(),
             "aries" => "A".to_string(),
+            "cost" => "C".to_string(),
+            "greedy" => "G".to_string(),
             t => t.to_string(),
         };
-        for o in &self.other {
-            write!(default, "+{}", o).unwrap();
-        }
+
         let continuous_planning = match self.continuous_planning_config.as_str() {
             "satisfactory" => "Sat",
             "optimality" => "Opt",
@@ -59,7 +59,14 @@ pub struct ConfigRunData {
 }
 
 impl ConfigRunData {
-    pub fn add_run(&mut self, run_stat: OMPASRunData) {
+    pub fn add_run(&mut self, mut run_stat: OMPASRunData) {
+        run_stat.inner.retain(|stat| {
+            if let OMPASStat::Process(p) = stat {
+                !p.label.contains("charge")
+            } else {
+                true
+            }
+        });
         self.inner.push(run_stat);
     }
 
@@ -248,12 +255,7 @@ impl ConfigRunData {
     }
 
     fn get_deliberation_time_ratio_stat(&self) -> Stat {
-        let ratios: Vec<f64> = self
-            .inner
-            .iter()
-            .map(|run| run.get_deliberation_time_ratio())
-            .collect();
-        Stat::from(ratios.as_slice()) * Stat::new(100.0)
+        self.get_deliberation_time_stat() * Stat::new(100.0) / self.get_execution_time_stat()
     }
 
     fn get_planning_waiting_time_stat(&self) -> Stat {
@@ -263,17 +265,11 @@ impl ConfigRunData {
             .map(|run| run.get_planning_waiting_time())
             .collect();
         let stat: Stat = times.as_slice().into();
-        //println!("TWP = {}", stat.mean);
         stat
     }
 
     fn get_planning_waiting_time_ratio_stat(&self) -> Stat {
-        let times: Vec<f64> = self
-            .inner
-            .iter()
-            .map(|run| run.get_planning_waiting_time_ratio())
-            .collect();
-        Stat::from(times.as_slice()) * Stat::new(100.0)
+        self.get_planning_waiting_time_stat() * Stat::new(100.0) / self.get_deliberation_time_stat()
     }
 
     fn get_planning_time_stat(&self) -> Stat {
@@ -389,7 +385,11 @@ impl ConfigProblemStat {
         let mut cells = vec![];
         let last = fields.len() - 1;
         for (i, field) in fields.iter().enumerate() {
-            let info = format!("{}({})", field.to_latex(), field.unit_short());
+            let mut info = field.to_latex();
+            let unit = field.unit_short();
+            if unit != "" {
+                write!(info, "({})", unit).unwrap();
+            }
             if i == last {
                 cells.push(Cell::double(info))
             } else {
@@ -440,7 +440,6 @@ impl From<&[ConfigInstanceStat]> for ConfigProblemStat {
                 }
             }
             let new_stat = new_stat / Stat::new(i);
-            //println!("{}: {}", field, new_stat.mean);
             config_problem_stat.stat_map.insert(*field, new_stat);
         }
 

@@ -1,5 +1,5 @@
 (begin
-    (def-function gripper_of (:params (?r robot) (?g gripper)) (:result object))
+    (def-function gripper_of (:params (?ro robot) (?g gripper)) (:result object))
 
     (def-task go2 (:params (?ro robot) (?r room)))
     (def-method go2_noop
@@ -60,8 +60,6 @@
                 (go2 ?ro ?r)
                 (drop ?ro ?o ?r ?g))))
 
-
-
     (def-task t_open (:params (?ro robot) (?d door) (?r room)))
     (def-method open_noop
         (:task t_open)
@@ -71,7 +69,7 @@
 
     (def-method open_direct
         (:task t_open)
-        (:params  (?ro robot) (?d door) (?r room) (?g gripper))
+        (:params (?ro robot) (?d door) (?r room) (?g gripper))
         (:pre-conditions
             (! (opened ?d))
             (= (carry ?ro ?g) empty)
@@ -80,6 +78,13 @@
             (do
                 (go2 ?ro ?r)
                 (open ?ro ?d ?r ?g))))
+
+;    (def-task test (?ro robot) (?r room))
+;    (def-method m_test
+;        (:params (?ro robot) (?r room))
+;        (:pre-conditions )
+;        (:body nil))
+
 
     (def-method drop_and_open
         (:task t_open)

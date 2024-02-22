@@ -1,0 +1,524 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Scheme - OMPAS Documentation</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../../favicon.svg">
+        <link rel="shortcut icon" href="../../favicon.png">
+        <link rel="stylesheet" href="../../css/variables.css">
+        <link rel="stylesheet" href="../../css/general.css">
+        <link rel="stylesheet" href="../../css/chrome.css">
+        <link rel="stylesheet" href="../../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../highlight.css">
+        <link rel="stylesheet" href="../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <!-- MathJax -->
+        <script async type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../../ompas.html"><strong aria-hidden="true">1.</strong> Operational Model Planning and Acting System (OMPAS)</a></li><li class="chapter-item expanded "><a href="../../run.html"><strong aria-hidden="true">2.</strong> How to run the system</a></li><li class="chapter-item expanded "><a href="../../system/intro.html"><strong aria-hidden="true">3.</strong> Acting System</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../system/repl.html"><strong aria-hidden="true">3.1.</strong> Interacting with the REPL</a></li><li class="chapter-item expanded "><a href="../../system/configuration.html"><strong aria-hidden="true">3.2.</strong> Configuring OMPAS</a></li></ol></li><li class="chapter-item expanded "><a href="../../language/al.html"><strong aria-hidden="true">4.</strong> Acting Language</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../language/scheme/intro.html" class="active"><strong aria-hidden="true">4.1.</strong> Scheme</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../language/scheme/modules/intro.html"><strong aria-hidden="true">4.1.1.</strong> Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../language/scheme/modules/module-io.html"><strong aria-hidden="true">4.1.1.1.</strong> Module IO</a></li><li class="chapter-item expanded "><a href="../../language/scheme/modules/module-string.html"><strong aria-hidden="true">4.1.1.2.</strong> Module String</a></li><li class="chapter-item expanded "><a href="../../language/scheme/modules/module-utils.html"><strong aria-hidden="true">4.1.1.3.</strong> Module Utils</a></li><li class="chapter-item expanded "><a href="../../language/scheme/modules/module-advanced-math.html"><strong aria-hidden="true">4.1.1.4.</strong> Module Advanced math</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../../language/primitives.html"><strong aria-hidden="true">4.2.</strong> Acting primitives</a></li><li class="chapter-item expanded "><a href="../../language/resources.html"><strong aria-hidden="true">4.3.</strong> Resource management</a></li><li class="chapter-item expanded "><a href="../../language/advanced.html"><strong aria-hidden="true">4.4.</strong> Advanced acting functions</a></li></ol></li><li class="chapter-item expanded "><a href="../../gobot-sim/intro.html"><strong aria-hidden="true">5.</strong> Gobot-Sim</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">OMPAS Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="scheme"><a class="header" href="#scheme">Scheme</a></h1>
+<p>Scheme is derived from the functional language Lisp.
+Peter Norvig made a tutorial to implement a basic version in Python available at <a href="https://norvig.com/lispy.html">https://norvig.com/lispy.html</a> and <a href="https://norvig.com/lispy2.html">https://norvig.com/lispy2.html</a>.
+The Rust implementation is inspired by Lis.py and Lispy.py (the second version integrates advanced features) but differs on several aspects.</p>
+<h2 id="introduction-to-scheme"><a class="header" href="#introduction-to-scheme">Introduction to Scheme.</a></h2>
+<p>Scheme is a Lisp dialect that is based on the recursive evaluation of expressions that we call <em>LValue</em>. An <em>LValue</em> is either an Atom (symbol, boolean, number, function) or a list of expressions.
+A particularity of the language is that the boolean <em>false</em> is represented by the <em>LValue</em> <em>Nil</em> that represents also the empty list.
+An expression is evaluated in an environment, in which some symbols can be bound to LValues.
+Each expression is a new scope, which means that a new binding only lives in the scope it has been defined in, which makes the language way more simple.</p>
+<h2 id="core-language"><a class="header" href="#core-language">Core language</a></h2>
+<p>The core of the Scheme implementation has been both simplified, and extended for concurrency.
+The core language is composed of the following functions:</p>
+<ul>
+<li><code>begin</code> evaluates a list of expressions and returns the result of the last expression.</li>
+<li><code>define</code> defines in the current scope a new binding for a symbol.</li>
+<li><code>if</code> takes as argument an evaluation that returns a boolean <em>b</em>.
+In function of the value of <em>b</em>, either the second expression of the third will be executed.
+The result of the <em>if</em> expression is the result of the evaluated expression.</li>
+<li><code>lambda</code> creates a closure.
+A closure is defined by parameters and a body.
+The valid kind of parameters for a lambda are <em>nil</em> for no parameters, a simple symbol for an arbitrary number of parameters or a list of symbol for a defined number of parameters.</li>
+<li><code>quote</code> or <code>'</code> avoids the evaluation of an expression and returns the raw expression as result.</li>
+<li><code>quasiquote</code> (or `) and <code>unquote</code> (or <code>,</code>) are used to partially evaluate an expression. Those functions can be viewed as macros for the formatting of expressions using <em>quote</em> and <em>cons</em>.</li>
+<li><code>eval</code> evaluates an expression.</li>
+<li><code>parse</code> takes as input a string and returns the parsed and expanded expression.</li>
+<li><code>expand</code> expanses an expression.</li>
+<li><code>enr</code> evaluates an expression without evaluating the sub expressions.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (eval (cons zip (list (list 2 3) (list 4 5))))
+LI&gt;&gt; error: In eval, 2: Got int, expected fn
+&gt;&gt; (enr (cons zip (list (list 2 3) (list 4 5))))
+LI&gt;&gt; ((2 4) (3 5))
+</code></pre>
+<h3 id="errors"><a class="header" href="#errors">Errors</a></h3>
+<p>A specific <em>Err</em> <em>LValue</em> as been added in the current implementation for special cases were an err as result would escape the evaluation of an expression.</p>
+<ul>
+<li><code>do</code> similar to begin, but stops at the first err returned.
+The result of the expression is <em>err</em>.</li>
+<li><code>check</code> takes as argument a boolean.
+It returns true if the boolean is true, an <em>err</em> otherwise</li>
+</ul>
+<p>From those two functions, some interesting constructs can be programmed for code that should not return errors.</p>
+<h3 id="concurrency-and-interruption"><a class="header" href="#concurrency-and-interruption">Concurrency and interruption</a></h3>
+<p>To handle concurrency, we implemented an extension to Scheme inspired by asynchronous code from C++ and rust, using schedulers and futures.
+In addition, we define a new <em>LValue</em> named <em>handle</em> that represents an asynchronous evaluation.
+A handle can be manipulated with the following functions: </p>
+<ul>
+<li><code>async</code> takes as argument an expression, starts the evaluation in a new asynchronous process and returns a handle.</li>
+<li><code>await</code> takes as parameter a handle and returns the result of the expression evaluated in the asynchronous process.</li>
+<li><code>interrupt</code> takes as argument a handle, and sends an interruption signal to the asynchronous evaluation.
+The interruption signal is propagated recursively to all sub-expressions.</li>
+</ul>
+<p>In addition to those primitives, it is possible to define the interruptibility of an expression, by avoiding the interruption of some expressions with the keyword <em>uninterruptible</em>.
+Here is an example of such code:</p>
+<pre><code class="language-lisp">(begin
+    (define h
+    (async 
+        (begin
+        (uninterruptible (begin
+            (exec pick ?r ?o)
+            (exec move ?r ?l)
+            (exec drop ?r ?o)))
+        (exec inspect ?r ?o))))
+    (race 
+        (await h)
+        (begin
+            (sleep 10)
+            (interrupt h))))
+</code></pre>
+<h2 id="standard-library"><a class="header" href="#standard-library">Standard library</a></h2>
+<h3 id="functions-to-get-informations-on-the-environment"><a class="header" href="#functions-to-get-informations-on-the-environment">Functions to get informations on the environment</a></h3>
+<ul>
+<li><code>help</code> returns the list of functions defined in the environment along their documentation.
+An extended documentation can be given by giving as parameter a specific function to <code>help</code>.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (help)
+LI&gt;&gt; ¤ * : Takes 2+ arguments. Ret...
+¤ + : Takes 2+ arguments. Return t...
+¤ - : Takes 2 arguments. Return th...
+
+&gt;&gt; (help write)
+LI&gt;&gt; Write a LValue to a file
+Takes two arguments: the name of the file and the LValue
+Note: The path of the file is relative to the path of the executable
+
+</code></pre>
+<ul>
+<li><code>get_keys</code> returns the list of all elements defined in the environment.</li>
+<li><code>get_macros</code> returns the list of macros.</li>
+<li><code>get_macro</code> returns the expression of a given macro.</li>
+<li><code>get_contexts</code> returns the list of all contexts defined in the environment.</li>
+</ul>
+<h3 id="get-and-set-functions"><a class="header" href="#get-and-set-functions">Get and set functions</a></h3>
+<ul>
+<li><code>get</code> returns an element either from a list or a map. You can also use directly <code>get-list</code> and <code>get-map</code>.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (get (list 1 2 3) 1)
+LI&gt;&gt; 2
+&gt;&gt; (get (map '((ten 10) (twenty 20))) twenty)
+LI&gt;&gt; 20
+</code></pre>
+<ul>
+<li><code>set</code>: function to set an element in a list or a map</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (set (list 1 2 3) 1 1)
+LI&gt;&gt; 2
+&gt;&gt; (set (map '((ten 10) (twenty 20))) '(twenty twenty))
+LI&gt;&gt; twenty: twenty
+ten: 10
+</code></pre>
+<h3 id="functions-on-list"><a class="header" href="#functions-on-list">Functions on list</a></h3>
+<ul>
+<li><code>list</code>: constructs a list.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(list 1 2 3)
+LI&gt;&gt;(1 2 3)
+</code></pre>
+<ul>
+<li><code>car</code>: returns the first element of a list, nil if the list is empty.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(car '(3 4 5))
+LI&gt;&gt; 3
+</code></pre>
+<ul>
+<li><code>cdr</code>: returns list without the first element, nil if the list has one element.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(cdr '(3 4 5))
+LI&gt;&gt;(4 5)
+</code></pre>
+<ul>
+<li><code>first</code>: returns the first element of a list (same as <strong>car</strong>)</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(first (list 1 2 3))
+LI&gt;&gt; 1
+</code></pre>
+<ul>
+<li><code>second</code>: returns the second element of a list</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(second (list 1 2 3))
+LI&gt;&gt; 2
+</code></pre>
+<ul>
+<li><code>third</code>: returns the third element of a list</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(second (list 1 2 3))
+LI&gt;&gt; 3
+</code></pre>
+<ul>
+<li><code>rest</code>: returns the rest of a list (same as cdr)</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (rest '(1 2 3))
+LI&gt;&gt; (2 3)
+</code></pre>
+<ul>
+<li><code>last</code>: returns the last element of a list.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(last '(3 4 5))
+LI&gt;&gt;5
+</code></pre>
+<ul>
+<li><code>cons</code>: creates a cons of two elements</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (cons 3 nil)
+LI&gt;&gt; (3)
+&gt;&gt; (cons nil 3)
+LI&gt;&gt; (nil 3)
+&gt;&gt; (cons 4 '(3))
+LI&gt;&gt; (4 3)
+&gt;&gt; (cons '(4) '(3))
+LI&gt;&gt; ((4) 3)
+</code></pre>
+<ul>
+<li><code>len</code>: returns the length of a list of a map</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(len '(1 2 3))
+LI&gt;&gt; 3
+</code></pre>
+<ul>
+<li><code>empty</code>: returns true is a list or a map is empty</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (empty '())
+LI&gt;&gt; true
+</code></pre>
+<ul>
+<li><code>get-list</code> : get the element of the list at the given index (starts at 0). The first argument is a list, and the second the index</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (get-list (list 1 2 3) 1)
+LI&gt;&gt; 2
+</code></pre>
+<ul>
+<li><code>set-list</code> : set the element of the list at the given index (starts at 0).
+The first argument is a list, the second the value, and the third the index.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (set (list 1 2 3) 1 1)
+LI&gt;&gt; 2
+</code></pre>
+<ul>
+<li><code>append</code> : append two lists together</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (append (list 1 2 3) '(4 5))
+LI&gt;&gt; (1 2 3 4 5)
+</code></pre>
+<ul>
+<li><code>member</code> : It takes two arguments of which the second must be a list,
+if the first argument is a member of the second argument, and then it returns the remainder of the list beginning with the first argument.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (member 3 '(1 2 3 4 5))
+LI&gt;&gt; (3 4 5)
+</code></pre>
+<ul>
+<li><code>reverse</code> : reverse a list</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (reverse '(1 2 3 4 5))
+LI&gt;&gt; (5 4 3 2 1)
+</code></pre>
+<ul>
+<li><code>intersection</code> returns a list containing all elements present in all the lists passed as arguments.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (intersection '(1 2 3 4 5) '(1 2 3) '(3 4 2))
+LI&gt;&gt; (2 3)
+</code></pre>
+<h3 id="functions-on-map"><a class="header" href="#functions-on-map">Functions on map</a></h3>
+<ul>
+<li><code>map</code>: constructs a map.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (map '((ten 10) (twenty 20)))
+LI&gt;&gt; twenty: 20
+ten: 10
+</code></pre>
+<ul>
+<li><code>get-map</code>: get the value inside a map</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define m1 (map '((test . 10))))
+&gt;&gt; (get m1)
+LI&gt;&gt; test: 10
+&gt;&gt; (get-map m1 test)
+LI&gt;&gt; 10
+</code></pre>
+<ul>
+<li><code>set-map</code>: returns a map with the new value inserted.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define m1 (set-map m1 '(twenty . 20)))
+&gt;&gt; (get m1)
+LI&gt;&gt; twenty: 20
+test: 10
+</code></pre>
+<ul>
+<li><code>union-map</code> : unifies two maps</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define map1 (map '((ten 10) (twenty 20))))
+LI&gt;&gt; nil
+&gt;&gt; map1
+LI&gt;&gt; ten: 10
+twenty: 20
+
+&gt;&gt; (define map2 (map '((thirty 30) (fourty 40))))
+LI&gt;&gt; nil
+&gt;&gt; map2
+LI&gt;&gt; thirty: 30
+fourty: 40
+
+&gt;&gt; (define map3 (union-map map1 map2))
+LI&gt;&gt; nil
+&gt;&gt; map3
+LI&gt;&gt; thirty: 30
+twenty: 20
+fourty: 40
+ten: 10
+</code></pre>
+<ul>
+<li>̀<code>remove-map</code> : remove from the map an entry. The first argument is a map, and the second the key.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define map1 (map '((ten 10) (twenty 20))))
+LI&gt;&gt; nil
+&gt;&gt; (define map2 (map '((thirty 30) (fourty 40))))
+LI&gt;&gt; nil
+&gt;&gt; (define map3 (union-map map1 map2))
+LI&gt;&gt; nil
+&gt;&gt; (define map4 (remove-map map3 twenty))
+LI&gt;&gt; nil
+&gt;&gt; map4
+LI&gt;&gt; thirty: 30
+fourty: 40
+ten: 10
+</code></pre>
+<ul>
+<li><code>remove-key-value-map</code> : remove a key-value binding if it exists.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define map1 (map '((ten 10) (twenty 20))))
+LI&gt;&gt; nil
+&gt;&gt; (define map2 (remove-key-value-map map1 '(twenty 20)))
+LI&gt;&gt; nil
+&gt;&gt; map2
+LI&gt;&gt; ten: 10
+&gt;&gt; (define map2 (remove-key-value-map map1 '(ten 1)))
+LI&gt;&gt; error: In remove-key-value-map, map does not have key value (ten:1)
+</code></pre>
+<h3 id="mathematical-functions"><a class="header" href="#mathematical-functions">Mathematical functions</a></h3>
+<ul>
+<li>basic math functions:
+<ul>
+<li>not (!)</li>
+<li>add (+)</li>
+<li>sub (-)</li>
+<li>div (/)</li>
+<li>mul (*)</li>
+<li>eq (=)</li>
+<li>gt (&gt;)</li>
+<li>ge (&gt;=)</li>
+<li>lt (&lt;)</li>
+<li>le (&lt;=)</li>
+</ul>
+</li>
+</ul>
+<h3 id="type-verification"><a class="header" href="#type-verification">Type verification</a></h3>
+<ul>
+<li><code>lambda?</code> : returns true if the LValue is a lambda.</li>
+<li><code>integer?</code>: returns true if the LValue is an integer.</li>
+<li><code>float?</code>: returns true if the LValue is a float.</li>
+<li><code>nil?</code>: returns true if the LValue is nil.</li>
+<li><code>bool?</code>: returns true if the LValue is a boolean.</li>
+<li><code>symbol?</code>: returns true if the LValue is a symbol.</li>
+<li><code>fn?</code>: returns true if the LValue is a function.</li>
+<li><code>mut-fn?</code>: returns true if the LValue is a mutable function.</li>
+<li><code>quote?</code>: returns true if the LValue is a quote.</li>
+<li><code>map?</code>: returns true if the LValue is a map.</li>
+<li><code>list?</code>: returns true if the LValue is a list.</li>
+<li><code>pair?</code>: returns true if the LValue is a list with at least one element.</li>
+</ul>
+<p>All above functions are defined in the <em>root</em> environment.</p>
+<h2 id="error"><a class="header" href="#error">Error</a></h2>
+<ul>
+<li><code>err</code> construct an err value from a <em>LValue</em></li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (err test)
+LI&gt;&gt; (err (test))
+</code></pre>
+<ul>
+<li><code>err?</code> returns true if the <em>LValue</em> is a (Err &lt;lvalue&gt;), false if it is a (Ok &lt;lvalue&gt;)</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (err? (err test))
+LI&gt;&gt; true
+</code></pre>
+<ul>
+<li><code>interrupted?</code> returns true is the <em>LValue</em> is an err coming from an interruption. </li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../language/al.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../../language/scheme/modules/intro.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../language/al.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../../language/scheme/modules/intro.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+    </body>
+</html>

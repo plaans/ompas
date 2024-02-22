@@ -1,0 +1,9 @@
+[submodule "aries"]
+	path = aries
+	url = https://github.com/plaans/aries.git
+[submodule "craft-bots"]
+	path = craft-bots
+	url = https://github.com/Yirmandias/craft-bots.git
+[submodule "ompas-gobot-sim/gobot-sim"]
+	path = ompas-gobot-sim/gobot-sim
+	url = https://github.com/plaans/gobot-sim.git

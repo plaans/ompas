@@ -1,0 +1,16 @@
+target/
+.gradle/
+.idea/
+*.fb
+*.txt
+venv/
+lisp_logs/
+rae_logs/
+Cargo.lock
+*.log
+*.yml
+gobot-bin
+ompas_config_local.bash
+playground.bash
+benchmark.bash
+draft.scm

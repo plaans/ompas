@@ -1583,10 +1583,11 @@ impl InnerActingManager {
         let acquire = process.inner.as_mut_acquire().unwrap();
 
         match status {
-            ProcessStatus::Pending => {
+            ProcessStatus::Pending | ProcessStatus::Planned => {
                 if let Some(wa) = acquire.move_reservation() {
                     self.resource_manager.remove_waiter(wa).await
                 }
+                //println!("reserve");
                 acquire.set_reservation(
                     self.resource_manager
                         .reserve(&resource, quantity, priority)

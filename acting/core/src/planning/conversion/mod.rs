@@ -125,7 +125,7 @@ pub fn _convert(
         for param in &ch.get_name()[1..] {
             let sym = st.get_symbol(*param);
             //if sym == "?r" {
-            println!("{sym}");
+            //println!("{sym}");
             //}
             define_table.insert(sym, *param);
         }

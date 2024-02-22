@@ -268,7 +268,10 @@ pub async fn run_planner(
                 }
                 SolverResult::Sol((fp, (ass, cost))) => {
                     if let Some(cost) = cost {
-                        best_cost = cost
+                        best_cost = cost;
+                        if let Some(dd) = &debug_date {
+                            dd.print_msg(format!("Best cost = {}", best_cost))
+                        }
                     }
                     if OMPAS_PLANNER_OUTPUT.get() {
                         if let Some(dd) = &debug_date {
@@ -313,9 +316,9 @@ pub async fn run_planner(
             if last {
                 return r;
             } else {
-                if let Some(sender) = intermediate_sender.as_ref() {
+                /*if let Some(sender) = intermediate_sender.as_ref() {
                     let _ = sender.send(r);
-                }
+                }*/
             }
         }
 

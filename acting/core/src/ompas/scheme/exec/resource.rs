@@ -356,7 +356,7 @@ pub async fn __acquire_in_list__(
     let parent = acting_manager.get_id(pr.clone()).await.unwrap();
 
     let mut ids = vec![];
-    for _ in 0..resources.len() - 1 {
+    for _ in 0..resources.len() {
         let label_id = acting_manager.get_number_acquire(parent).await;
         ids.push(
             acting_manager
@@ -368,6 +368,7 @@ pub async fn __acquire_in_list__(
                 .await,
         );
     }
+
     let receivers: Vec<(LEnv, Vec<LValue>, usize)> = resources
         .iter_mut()
         .zip(ids)

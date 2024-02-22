@@ -9,7 +9,7 @@ pub mod planning;
 pub mod problem;
 pub mod system;
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct Stat {
     pub best: bool,
     pub mean: f64,
@@ -143,6 +143,8 @@ pub enum Field {
     Coverage,
     EfficiencyScore,
     BestScoreRatio,
+    MaxPlanningWaitingTime,
+    OptimalSolutionRatio,
     DistanceToBestScore,
     NumberRetries,
     NumberFailures,
@@ -174,6 +176,8 @@ impl Field {
             Coverage,
             EfficiencyScore,
             BestScoreRatio,
+            MaxPlanningWaitingTime,
+            OptimalSolutionRatio,
             DistanceToBestScore,
             NumberRetries,
             NumberFailures,
@@ -214,6 +218,8 @@ pub const PLANNING_SUCCESS_RATE: &str = "PST";
 pub const PLANNING_WAITING_TIME: &str = "PWT";
 pub const PLANNING_WAITING_TIME_RATIO: &str = "PWTR";
 pub const PLANNING_SOLUTIONS: &str = "NPS";
+pub const RATIO_OPTIMAL_SOLUTION: &str = "ROpt";
+pub const MAX_DELIBERATION_WAITING_TIME: &str = "Max DWT";
 pub const NUMBER_TASKS: &str = "NT";
 pub const NUMBER_COMMANDS: &str = "NC";
 pub const NUMBER_METHODS: &str = "NM";
@@ -247,16 +253,24 @@ impl Field {
             NumberTasks => "$N_T$",
             NumberMethods => "$N_M$",
             NumberCommands => "$N_C$",
-            NumberAcquisitions => "N_{Acq}",
-            NumberArbitraries => "N_{Arb}",
+            NumberAcquisitions => "$N_{Acq}$",
+            NumberArbitraries => "$N_{Arb}$",
+            MaxPlanningWaitingTime => "$Max(T_{WP})$",
+            OptimalSolutionRatio => "$R_{Opt}$",
         }
         .to_string()
     }
 
     pub fn unit(&self) -> String {
         match self {
-            BenchMinTime | BenchMaxTime | ExecutionTime | DeliberationTime
-            | PlanningWaitingTime | PlanningTime | AveragePlanningTime => "seconds",
+            BenchMinTime
+            | BenchMaxTime
+            | ExecutionTime
+            | DeliberationTime
+            | PlanningWaitingTime
+            | PlanningTime
+            | AveragePlanningTime
+            | MaxPlanningWaitingTime => "seconds",
             BestExecutionTimeRatio
             | DistanceToBestExecutionTime
             | DeliberationTimeRatio
@@ -265,7 +279,8 @@ impl Field {
             | DistanceToBestScore
             | PlanningSuccessRate
             | PlanningWaitingTimeRatio
-            | PlanningTimeRatio => "percentage",
+            | PlanningTimeRatio
+            | OptimalSolutionRatio => "percentage",
             EfficiencyScore => "tasks/seconds",
             NumberRetries
             | NumberFailures
@@ -282,8 +297,14 @@ impl Field {
 
     pub fn unit_short(&self) -> String {
         match self {
-            BenchMinTime | BenchMaxTime | ExecutionTime | DeliberationTime
-            | PlanningWaitingTime | PlanningTime | AveragePlanningTime => "s",
+            BenchMinTime
+            | BenchMaxTime
+            | ExecutionTime
+            | DeliberationTime
+            | PlanningWaitingTime
+            | PlanningTime
+            | AveragePlanningTime
+            | MaxPlanningWaitingTime => "s",
             BestExecutionTimeRatio
             | DistanceToBestExecutionTime
             | DeliberationTimeRatio
@@ -292,7 +313,8 @@ impl Field {
             | DistanceToBestScore
             | PlanningSuccessRate
             | PlanningWaitingTimeRatio
-            | PlanningTimeRatio => "\\%",
+            | PlanningTimeRatio
+            | OptimalSolutionRatio => "\\%",
             EfficiencyScore => "T/s",
             NumberRetries
             | NumberFailures
@@ -349,6 +371,12 @@ impl Display for Field {
                 }
                 NumberArbitraries => {
                     NUMBER_ARBITRARIES
+                }
+                MaxPlanningWaitingTime => {
+                    MAX_DELIBERATION_WAITING_TIME
+                }
+                OptimalSolutionRatio => {
+                    RATIO_OPTIMAL_SOLUTION
                 }
             }
         )

@@ -496,7 +496,7 @@ impl TypeLattice {
                 }
             }
             (Application(_, _, _), Application(_, _, _)) => {
-                println!("meet({}, {})", t1.format(&self), t2.format(&self));
+                //println!("meet({}, {})", t1.format(&self), t2.format(&self));
                 todo!()
             }
             (Application(t_app, params, r), Simple(t2))
@@ -508,8 +508,8 @@ impl TypeLattice {
                     Application(Box::new(t), params.clone(), r.clone())
                 }
             }
-            (t1, t2) => {
-                println!("meet({}, {})", t1.format(&self), t2.format(&self));
+            (_, _) => {
+                //println!("meet({}, {})", t1.format(&self), t2.format(&self));
                 todo!()
             }
         }

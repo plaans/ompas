@@ -1,4 +1,5 @@
 use crate::output::bar::Bar;
+use crate::output::gaussian::Gaussian;
 use crate::output::plot::Plot;
 use crate::output::tabular::Tabular;
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,7 @@ pub struct StatConfig {
     pub outputs: Vec<Tabular>,
     pub output_bars: Vec<Bar>,
     pub output_plots: Vec<Plot>,
+    pub output_gaussians: Vec<Gaussian>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -2,7 +2,7 @@ use crate::ompas::manager::acting::acting_stat::ActingStat;
 use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Duration;
 use crate::ompas::manager::acting::process::process_stat::ActingProcessStat;
-use crate::ompas::manager::planning::planner_stat::{PlannerStat, PlanningStatus};
+use crate::ompas::manager::planning::planner_stat::{PlannerMode, PlannerStat, PlanningStatus};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -136,6 +136,22 @@ impl OMPASRunData {
         planning_waiting_time
     }
 
+    pub fn get_max_planning_waiting_time(&self) -> f64 {
+        let mut max_planning_waiting_time = 0.0;
+        for stat in &self.inner {
+            if let OMPASStat::Process(p) = stat {
+                let mut pwt = p.planning_waiting_time.max.as_secs();
+                if pwt.is_nan() {
+                    pwt = 0.0;
+                }
+                max_planning_waiting_time = f64::max(max_planning_waiting_time, pwt)
+            }
+        }
+        //println!("max_planning_waiting_time: {}", max_planning_waiting_time);
+
+        max_planning_waiting_time
+    }
+
     pub fn get_planning_waiting_time_ratio(&self) -> f64 {
         let mut planning_waiting_time = 0.0;
         let mut i = 0;
@@ -236,6 +252,31 @@ impl OMPASRunData {
         }
     }
 
+    pub fn get_planning_optimal_solution_ratio(&self) -> f64 {
+        match self.inner.iter().find_map(|stat| {
+            if let OMPASStat::Planner(p) = stat {
+                Some(p)
+            } else {
+                None
+            }
+        }) {
+            None => 0.0,
+            Some(p) => {
+                let mut optimal = 0;
+                let mut n_instance = 0;
+                for p_stat in &p.inner {
+                    if p_stat.planner_mode == PlannerMode::Optimality
+                        && p_stat.status == PlanningStatus::Sat
+                    {
+                        optimal += 1;
+                    }
+                    n_instance += 1;
+                }
+                optimal as f64 / n_instance as f64
+            }
+        }
+    }
+
     pub fn get_coverage(&self) -> f64 {
         let mut success = 0;
         let mut i = 0;
@@ -247,7 +288,11 @@ impl OMPASRunData {
                 i += 1;
             }
         }
-        success as f64 / i as f64
+        success as f64 / i as f64 * 100.0
+    }
+
+    pub fn get_score(&self) -> f64 {
+        (self.get_coverage() / 100.0) * self.get_bench_max_time() / self.get_execution_time()
     }
 
     pub fn get_n_failures(&self) -> u32 {

@@ -93,6 +93,10 @@ impl ConfigRunData {
             PlanningWaitingTimeRatio,
             self.get_planning_waiting_time_ratio_stat(),
         );
+        map.insert(
+            MaxPlanningWaitingTime,
+            self.get_max_planning_waiting_time_stat(),
+        );
         map.insert(PlanningTime, self.get_planning_time_stat());
         map.insert(PlanningTimeRatio, self.get_planning_time_ratio_stat());
         map.insert(
@@ -104,6 +108,10 @@ impl ConfigRunData {
         map.insert(
             AveragePlanningSolutions,
             self.get_average_number_planning_solutions_stat(),
+        );
+        map.insert(
+            OptimalSolutionRatio,
+            self.get_planning_optimal_solution_ratio_stat(),
         );
 
         map.insert(
@@ -125,6 +133,26 @@ impl ConfigRunData {
         );
 
         ConfigInstanceStat { stat_map: map }
+    }
+
+    pub fn get_max_planning_waiting_time_stat(&self) -> Stat {
+        let times: Vec<f64> = self
+            .inner
+            .iter()
+            .map(|run| run.get_max_planning_waiting_time())
+            .collect();
+        let stat: Stat = times.as_slice().into();
+        //println!("stat: {stat:?}");
+        stat
+    }
+
+    pub fn get_planning_optimal_solution_ratio_stat(&self) -> Stat {
+        let times: Vec<f64> = self
+            .inner
+            .iter()
+            .map(|run| run.get_planning_optimal_solution_ratio())
+            .collect();
+        Stat::from(times.as_slice()) * Stat::new(100.0)
     }
 
     pub fn get_config_instance_planning_stat(&self) -> ConfigPlanningStat {
@@ -238,11 +266,30 @@ impl ConfigRunData {
         times.as_slice().into()
     }
 
+    pub fn get_field_per_instance(&self, field: &Field) -> Vec<f64> {
+        self.inner
+            .iter()
+            .map(|run| match field {
+                EfficiencyScore => run.get_score(),
+                ExecutionTime => run.get_execution_time(),
+                _ => {
+                    todo!()
+                }
+            })
+            .collect()
+    }
+
     fn get_score_stat(&self) -> Stat {
-        let stat_1 = self.get_coverage_stat() / Stat::new(100.0);
-        let stat_2: Stat = self.get_bench_max_time_stat();
-        let stat_3 = self.get_execution_time_stat();
-        stat_1 * stat_2 / stat_3
+        // let stat_1 = self.get_coverage_stat() / Stat::new(100.0);
+        // let stat_2: Stat = self.get_bench_max_time_stat();
+        // let stat_3 = self.get_execution_time_stat();
+        // stat_1 * stat_2 / stat_3
+        self.inner
+            .iter()
+            .map(|run| run.get_score())
+            .collect::<Vec<_>>()
+            .as_slice()
+            .into()
     }
 
     fn get_deliberation_time_stat(&self) -> Stat {
@@ -328,7 +375,7 @@ impl ConfigRunData {
 
     fn get_coverage_stat(&self) -> Stat {
         let coverages: Vec<f64> = self.inner.iter().map(|run| run.get_coverage()).collect();
-        Stat::from(coverages.as_slice()) * Stat::new(100.0)
+        Stat::from(coverages.as_slice())
     }
 
     fn get_n_failures(&self) -> Stat {

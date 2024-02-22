@@ -490,6 +490,34 @@ pub fn read_chronicle(
         prez
     };
 
+    if ch.meta_data.kind == ChronicleKind::Root {
+        table.add_binding(
+            ch.get_interval().get_start(),
+            Variable::try_from(Atom::from(ctx.origin()))?,
+        );
+        table.add_binding(
+            ch.get_interval().get_end(),
+            Variable::try_from(Atom::from(ctx.horizon()))?,
+        );
+    } else {
+        let start = ctx.model.new_optional_fvar(
+            INT_CST_MIN,
+            INT_CST_MAX,
+            TIME_SCALE.get(), //Not sure of that
+            prez,
+            container / VarType::ChronicleStart,
+        );
+        let end = ctx.model.new_optional_fvar(
+            INT_CST_MIN,
+            INT_CST_MAX,
+            TIME_SCALE.get(), //Not sure of that
+            prez,
+            container / VarType::ChronicleEnd,
+        );
+        table.add_binding(ch.get_interval().get_start(), start.into());
+        table.add_binding(ch.get_interval().get_end(), end.into());
+    }
+
     //print!("init params...");
     //TODO: handle case where some parameters are already instantiated.
     for var in &ch.get_variables() {
@@ -754,8 +782,10 @@ pub fn read_chronicle(
         subtasks.push(st);
     }
 
-    let start: FAtom = get_atom(&ch.get_interval().get_start(), ctx).try_into()?;
-    let end: FAtom = get_atom(&ch.get_interval().get_end(), ctx).try_into()?;
+    let (start, end): (FAtom, FAtom) = (
+        get_atom(&ch.get_interval().get_start(), ctx).try_into()?,
+        get_atom(&ch.get_interval().get_end(), ctx).try_into()?,
+    );
 
     let mut name: Vec<aAtom> = vec![get_atom(&ch.get_result(), ctx)];
     ch.get_name()

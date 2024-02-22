@@ -1,3 +1,3 @@
-#cargo run --bin statos -- -c config_gobot_sim.yml
-#cargo run --bin statos -- -c config_gripper_door.yml
-cargo run --bin statos -- -c config_gripper_multi.yml
+#cargo run --bin statos -- -c config_cs_presentation.yml
+#cargo run --bin statos -- -c config_jobshop_presentation.yml
+cargo run --bin statos -- -c config_cs_presentation_extended.yml

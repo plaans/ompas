@@ -89,7 +89,7 @@ impl Bar {
               /pgf/number format/.cd,
                   use comma,
               height = 6cm,
-              width = \\linewidth,
+              width = 0.5\\linewidth,
               ymajorgrids,
               ylabel={y_label},
               xlabel={x_label},
@@ -110,7 +110,7 @@ impl Bar {
               xticklabels={x_tick_labels},
               x tick label style={{rotate=45,anchor=east}},
               legend cell align = {{left}},
-              legend pos = north west,
+              legend pos = north east,
               legend image post style={{scale=0.4}},
               legend style={{font = \\footnotesize}},
               ]"

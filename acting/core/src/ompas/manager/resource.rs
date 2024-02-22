@@ -13,6 +13,7 @@ use sompas_structs::lvalue::LValue;
 use sompas_structs::lvalues::LValueS;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use std::mem;
 use std::sync::atomic::AtomicUsize;
@@ -146,6 +147,32 @@ impl Display for WaiterPriority {
     }
 }
 
+impl Display for Resource {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut debug = format!("{}: ", self.label);
+        for ticket in &self.queue {
+            let client = &self.clients[ticket];
+            write!(
+                debug,
+                "[{},{},{}]",
+                client.kind, client.quantity, client.priority
+            )
+            .unwrap();
+        }
+        debug.push_str("||");
+        for ticket in &self.in_service {
+            let client = &self.clients[ticket];
+            write!(
+                debug,
+                "[{},{},{}]",
+                client.kind, client.quantity, client.priority
+            )
+            .unwrap();
+        }
+        write!(f, "{debug}")
+    }
+}
+
 impl Resource {
     pub fn new_ticket(
         &mut self,
@@ -209,6 +236,7 @@ impl Resource {
             })
             .map(|(id, _)| *id)
             .collect();
+        println!("queue update: {}", self)
     }
 
     pub async fn check_queue(&mut self) {
@@ -220,7 +248,10 @@ impl Resource {
                 let acquire: ResourceHandler = self.add_acquire(&ticket_id);
                 let waiter = self.clients.get(&ticket_id).unwrap();
                 match waiter.tx.send(acquire).await {
-                    Ok(()) => break,
+                    Ok(()) => {
+                        println!("acquisition: {}", self);
+                        break;
+                    }
                     Err(_) => {
                         self._remove_client(&ticket_id);
                         self.update_remaining_capacity().expect("");
@@ -343,10 +374,22 @@ impl Resource {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum TicketKind {
     Direct,
     Reservation,
+}
+impl Display for TicketKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Direct => "direct",
+                Self::Reservation => "reservation",
+            }
+        )
+    }
 }
 
 pub struct Client {

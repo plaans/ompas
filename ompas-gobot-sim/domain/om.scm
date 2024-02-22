@@ -11,7 +11,30 @@
     (def-task t_carry_to_machine (:params (?r robot) (?p package) (?m machine)))
     (def-task-om-model t_carry_to_machine
         (:params (?r robot) (?p package) (?m machine))
-        (:body (sleep 10)))
+        (:body (sleep 15)))
+
+;    (def-task-om-model t_carry_to_machine
+;      (:params (?r robot) (?p package) (?m machine))
+;      (:body
+;        ;(robot_move ?r (package.location ?p))
+;        ;(robot_move ?r (machine.input_belt ?m))
+;        (begin
+;          (define d1 (package.location ?p))
+;          (robot_move ?r d1)
+;          (assert 'package.location ?p ?r)
+;          (define d2 (machine.input_belt ?m))
+;          (robot_move ?r d2)
+;          (assert 'package.location ?p d2))))
+;
+;    (def-task robot_move (:params (?r robot) (?dest location)))
+;    (def-task-om-model robot_move
+;      (:params (?r robot) (?dest location))
+;      (:body
+;        (begin
+;          (define t_r (robot.location ?r))
+;          (define time (travel-time t_r ?dest))
+;          (durative-effect time 'robot.location ?r ?dest)
+;          )))
 
     (def-method m_carry_to_machine
             (:task t_carry_to_machine)

@@ -37,6 +37,40 @@ pub fn main() {
         );
         let stat = system_run.compute_stat();
 
+        for output in &config.output_gaussians {
+            let time = SystemTime::now();
+
+            let bar = output.to_latex(&system_run);
+
+            for dat in &bar.dats {
+                let mut path = output_dir.clone();
+                path.push(&dat.path);
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(path)
+                    .unwrap();
+                file.write_all(dat.content.as_bytes()).unwrap();
+            }
+
+            let mut path = output_dir.clone();
+            path.push(&output.output_tex);
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(path)
+                .unwrap();
+            file.write_all(bar.tex.as_bytes()).unwrap();
+
+            println!(
+                "time to compute stat : {:.3} ms",
+                time.elapsed().unwrap().as_secs_f32() * 1000.0
+            );
+        }
+
         for output in &config.output_bars {
             let time = SystemTime::now();
 

@@ -1,4 +1,4 @@
-use crate::model::chronicle::acting_binding::ActingBinding;
+use crate::model::chronicle::acting_process_model::{ActingProcessModel, ActingProcessModelLabel};
 use crate::model::process_ref::ProcessRef;
 use crate::model::sym_table::r#trait::FormatWithSymTable;
 use crate::ompas::manager::acting::acting_var::AsCst;
@@ -94,14 +94,14 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
         let lv: Vec<LValue> = chronicle
             .get_name()
             .iter()
-            .map(|var_id| st.get_domain_of_var(var_id).as_cst().unwrap().into())
+            .map(|var_id| st.get_domain_of_var(*var_id).as_cst().unwrap().into())
             .collect();
         let lv = lv.into();
 
         let interval = chronicle.interval;
 
         let start = st
-            .get_domain_of_var(&interval.get_start())
+            .get_domain_of_var(interval.get_start())
             .as_cst()
             .unwrap()
             .as_float()
@@ -111,7 +111,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             TIME_SCALE.get() as u64,
         );
         let end = st
-            .get_domain_of_var(&interval.get_end())
+            .get_domain_of_var(interval.get_end())
             .as_cst()
             .unwrap()
             .as_float()
@@ -128,29 +128,33 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
             RawChoice::Refinement(RawRefinement { lv, interval }),
         );
 
-        'choice: for (label, binding) in &chronicle.bindings.inner {
+        'choice: for (label, binding) in chronicle.get_all_acting_process_models() {
             let mut pr = pr.clone();
+            let ActingProcessModelLabel::Label(label) = label else {
+                todo!()
+            };
             pr.push(*label);
             let choice: RawChoice = match binding {
-                ActingBinding::Arbitrary(a) => {
+                ActingProcessModel::Arbitrary(a) => {
                     let lv: LValue = st
-                        .get_domain_of_var(&a.var_id)
+                        .get_domain_of_var(a.var_id)
                         .as_cst()
                         .unwrap()
                         .clone()
                         .into();
                     RawChoice::Arbitrary(RawArbitrary { lv })
                 }
-                ActingBinding::Action(s) => {
+                ActingProcessModel::Action(s) => {
                     let lv: Vec<LValue> = s
+                        .task
                         .name
                         .iter()
-                        .map(|var_id| st.get_domain_of_var(var_id).as_cst().unwrap().into())
+                        .map(|var_id| st.get_domain_of_var(*var_id).as_cst().unwrap().into())
                         .collect();
                     let lv = lv.into();
 
                     let start = st
-                        .get_domain_of_var(&s.interval.get_start())
+                        .get_domain_of_var(s.task.interval.get_start())
                         .as_cst()
                         .unwrap()
                         .as_float()
@@ -160,7 +164,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                         TIME_SCALE.get() as u64,
                     );
                     let end = st
-                        .get_domain_of_var(&s.interval.get_end())
+                        .get_domain_of_var(s.task.interval.get_end())
                         .as_cst()
                         .unwrap()
                         .as_float()
@@ -174,16 +178,16 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
 
                     RawChoice::SubTask(RawSubTask { lv, interval })
                 }
-                ActingBinding::Acquire(a) => {
+                ActingProcessModel::Resource(a) => {
                     let resource: String = a.resource.format(st, true);
                     let quantity: usize = st
-                        .get_domain_of_var(&a.quantity)
+                        .get_domain_of_var(a.quantity)
                         .as_cst()
                         .unwrap()
                         .as_int()
                         .unwrap() as usize;
                     let request = st
-                        .get_domain_of_var(&a.request)
+                        .get_domain_of_var(a.request)
                         .as_cst()
                         .unwrap()
                         .as_float()
@@ -194,7 +198,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                     );
 
                     let start_acquisition = st
-                        .get_domain_of_var(&a.acquisition.get_start())
+                        .get_domain_of_var(a.acquisition.get_start())
                         .as_cst()
                         .unwrap()
                         .as_float()
@@ -205,7 +209,7 @@ pub fn extract_raw_plan(instances: &[ChronicleInstance]) -> RawPlan {
                     );
 
                     let end_acq = st
-                        .get_domain_of_var(&a.acquisition.get_end())
+                        .get_domain_of_var(a.acquisition.get_end())
                         .as_cst()
                         .unwrap()
                         .as_float()

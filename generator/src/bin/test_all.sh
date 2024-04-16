@@ -1,0 +1,1 @@
+cargo run --bin generator -- -c config/all.yml

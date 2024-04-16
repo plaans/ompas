@@ -3,12 +3,13 @@ use crate::documentation::{Doc, DocCollection};
 use crate::function::{
     AsyncNativeFn, AsyncNativeMutFn, LAsyncFn, LAsyncMutFn, LFn, LMutFn, NativeFn, NativeMutFn,
 };
+use crate::lenv::ImportType;
 use crate::lvalue::LValue;
 use crate::purefonction::PureFonctionCollection;
 use std::any::Any;
 use std::fmt::Display;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct InitScheme(Vec<String>);
 
 impl<T: ToString> From<Vec<T>> for InitScheme {
@@ -39,7 +40,7 @@ pub struct LModule {
     pub(crate) label: String,
     pub(crate) documentation: DocCollection,
     pub(crate) pure_fonctions: PureFonctionCollection,
-    pub(crate) submodules: Vec<LModule>,
+    pub(crate) submodules: Vec<(LModule, ImportType)>,
     pub(crate) subcontexts: Vec<(Context, Doc)>,
 }
 
@@ -154,7 +155,7 @@ impl LModule {
         self.add_doc(label, doc, "Macro");
     }
 
-    pub fn add_submodule(&mut self, module: impl Into<LModule>) {
+    pub fn add_submodule(&mut self, module: impl Into<LModule>, import_type: ImportType) {
         let module: LModule = module.into();
         self.documentation
             .get_mut(&self.label)
@@ -163,7 +164,7 @@ impl LModule {
             .as_mut()
             .unwrap()
             .push_str(format!("- [Module] {}\n", module.label).as_str());
-        self.submodules.push(module)
+        self.submodules.push((module, import_type))
     }
 
     pub fn add_subcontext(&mut self, context: impl Into<Context>, doc: impl Into<Doc>) {

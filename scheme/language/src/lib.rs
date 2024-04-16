@@ -214,6 +214,9 @@ pub mod env {
     pub const GET_PROCESS_HIERARCHY: &str = "get_process_hierarchy";
     pub const DOC_GET_PROCESS_HIERARCHY: &str =
         "Return the list of processes and process topics along their dependencies.";
+
+    pub const EXIT: &str = "exit";
+    pub const DOC_EXIT: &str = "Exit the program.";
 }
 
 pub mod utils {
@@ -509,7 +512,7 @@ pub mod utils {
     pub const LAMBDA_PAR: &str = "(lambda _list_
         (begin
             (define _n_ (len _list_))
-            (define _handle_symbols_ (mapf (lambda (_n_) (string::concatenate _h _n_ _)) (range 0 (- _n_ 1))))
+            (define _handle_symbols_ (mapf (lambda (_n_) (concatenate _h _n_ _)) (range 0 (- _n_ 1))))
             (define _tasks_ (mapf (lambda (_t_ _h_) `(define ,_h_ (async ,_t_))) _list_ _handle_symbols_))
             (define _awaits_ (mapf (lambda (_h_) `(await ,_h_)) _handle_symbols_))
             (eval (cons begin (append _tasks_ _awaits_))))
@@ -633,8 +636,8 @@ pub mod set {
     pub const GET: &str = "get";
     pub const DOC_GET: &str= "Get an element in a list or a map. See get-list and get-map for specific behavior documentation.";
 
-    pub const EMPTY: &str = "empty";
-    pub const DOC_EMPTY: &str = "Return true if the a list or map is empty.";
+    pub const IS_EMPTY: &str = "empty?";
+    pub const DOC_IS_EMPTY: &str = "Return true if the a list or map is empty.";
 
     pub const LEN: &str = "len";
     pub const DOC_LEN: &str = "Return the number of element in a list or a map.";
@@ -700,6 +703,10 @@ pub mod error {
 
     pub const CHECK: &str = "check";
     pub const LAMBDA_CHECK: &str = "(lambda (a) (if a nil (err nil)))";
+    pub const MACRO_CHECK: &str = "(lambda (a)
+	`(if ,a
+	    nil
+	    (err (,a \" is false\"))))";
     pub const DOC_CHECK: &str = "Return an LValue::Err if the LValue if false";
 
     pub const DO_T: &str = "do_t";
@@ -749,11 +756,11 @@ pub mod map {
     pub const SET_MAP: &str = "set-map";
     pub const DOC_SET_MAP: &str = "Takes a map and and a list of pairs (key . value) to set in the map. Return a new map with the new bindings";
     pub const DOC_SET_MAP_VERBOSE: &str = "Example: Here is an example in the repl\n\
-                                 \t>> (define m (map (quote ((ten . 10) (twenty . 20)))))\n\
+                                 \t>> (define m (map '(ten 10) '(twenty 20)))\n\
                                  \t>> (get m)\n\
                                  \tLI>> ten: 10 \n\
                                  \ttwenty: 20 \n\
-                                 \t>> (define m (set-map m (three . 3 )))\n\
+                                 \t>> (define m (set-map m (three 3 )))\n\
                                  \tLI>> (get m)\n\
                                  \tLI>> ten: 10 \n\
                                  \tthree: 3\n\
@@ -767,6 +774,11 @@ pub mod map {
 
     pub const UNION_MAP: &str = "union-map";
     pub const DOC_UNION_MAP: &str = "Return the union of two maps.";
+
+    pub const MAP_AS_LIST: &str = "map-as-list";
+    pub const DOC_MAP_AS_LIST: &str = "Takes a map and return a list of key value pairs";
+    pub const DOC_MAP_AS_LIST_VERBOSE: &str = "(map-as-list (map '((one 1) (two 2))))\
+    \n=> ((one 1)(two 2))";
 }
 /// Set of keywords and documentations for predicated on the kind of LValues.
 pub mod predicate {
@@ -929,9 +941,9 @@ pub mod io {
     pub const DOC_PRINT: &str = "Print in stdout a LValue.";
     pub const DOC_PRINT_VERBOSE: &str = "Takes a list of arguments and print them in stdout.";
 
-    pub const __READ__: &str = "__read__";
-    pub const DOC___READ__: &str = "Read a file an evaluate it";
-    pub const DOC___READ___VERBOSE: &str = "Takes the name of the file as argument.\n\
+    pub const READ: &str = "read";
+    pub const DOC_READ: &str = "Read a file an evaluate it";
+    pub const DOC_READ_VERBOSE: &str = "Takes the name of the file as argument.\n\
                                 Note: The file path is relative to the path of the executable.\n\
                                 Return an error if the file is not found or there is a problem while parsing and evaluation.";
     pub const WRITE: &str = "write";
@@ -939,10 +951,10 @@ pub mod io {
     pub const DOC_WRITE_VERBOSE: &str = "Takes two arguments: the name of the file and the LValue\n\
                                  Note: The path of the file is relative to the path of the executable";
 
-    pub const READ: &str = "read";
-    pub const DOC_READ: &str = "Wrapper around __read__";
-    pub const MACRO_READ: &str = "(lambda (x)\
-        `(eval (parse (__read__ ,x))))";
+    pub const LOAD: &str = "load";
+    pub const DOC_LOAD: &str = "Read and evaluate the file.";
+    pub const MACRO_LOAD: &str = "(lambda (x)\
+        `(eval (parse (read ,x))))";
 
     pub const GET_CURRENT_DIR: &str = "get-current-dir";
     pub const DOC_GET_CURRENT_DIR: &str = "Returns the current working dir.";
@@ -952,6 +964,26 @@ pub mod io {
 
     pub const GET_ENV_VAR: &str = "get-env-var";
     pub const DOC_GET_ENV_VAR: &str = "Get the current value of an environment variable.";
+}
+
+pub mod first_order_logic {
+    pub const MOD_FIRST_ORDER_LOGIC: &str = "first_order_logic";
+    pub const DOC_MOD_FIRST_ORDER_LOGIC: &str = "Module that proposes first order algebra";
+
+    pub const EXISTS: &str = "exists";
+    pub const LAMBDA_EXISTS: &str = "(lambda (set f)
+    (eval (cons 'or (mapf (lambda (?i) (list f ?i)) set))))";
+    pub const DOC_EXISTS: &str ="Takes as argument a set and a lambda. Return true if the lambda is true for at least one of the element of the list.";
+
+    pub const FORALL: &str = "forall";
+    pub const LAMBDA_FORALL: &str = "(lambda (set f)
+    (eval (cons 'and (mapf (lambda (?i) (list f ?i)) set))))";
+    pub const DOC_FORALL: &str= "Takes as argument a set and a lambda. Return true if the lambda is true all elements of the set.";
+}
+
+pub mod extended_std {
+    pub const MOD_EXTENDED_STD: &str = "mod-extended-std";
+    pub const DOC_MOD_EXTENDED_STD: &str = "Contains all modules of the extended standard std.";
 }
 
 pub const PROCESS_TOPIC_INTERPRETER: &str = "__PROCESS_TOPIC_INTERPRETER__";

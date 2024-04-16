@@ -41,7 +41,7 @@ message CommandRequest {
 }
 
 message CommandExecutionRequest {
-  repeated Expression arguments = 1;
+  repeated Atom arguments = 1;
   uint64 command_id = 2;
 }
 
@@ -88,6 +88,7 @@ message Event {
   oneof event {
     Instance instance = 1;
     Resource resource = 2;
+    Task task = 3;
   }
 }
 
@@ -100,6 +101,10 @@ message Resource {
   string label = 1;
   ResourceKind resource_kind = 2;
   uint64 quantity = 3;
+}
+
+message Task {
+  repeated Atom arguments = 1;
 }
 
 enum ResourceKind {

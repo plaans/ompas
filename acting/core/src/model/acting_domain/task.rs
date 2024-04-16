@@ -65,8 +65,12 @@ impl Task {
         self.parameters = parameters
     }
 
-    pub fn add_method(&mut self, method_label: String) {
-        self.methods.push(method_label)
+    pub fn add_method(&mut self, method_label: &str) {
+        self.methods.push(method_label.to_string())
+    }
+
+    pub fn remove_method(&mut self, method_label: &str) {
+        self.methods.retain(|m| m != method_label);
     }
 
     pub fn set_label(&mut self, label: String) {

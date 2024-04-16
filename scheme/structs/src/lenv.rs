@@ -10,10 +10,11 @@ use im::{hashmap, HashSet};
 use ompas_middleware::logger::LogClient;
 use std::any::Any;
 use std::fmt::{Display, Formatter};
+use std::mem;
 use std::ops::Deref;
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LEnvSymbols {
     inner: im::HashMap<String, LValue>,
     outer: Arc<Option<LEnvSymbols>>,
@@ -110,6 +111,12 @@ pub struct LEnv {
     pub log: LogClient,
 }
 
+//
+// pub enum LEnv {
+//     Root(Arc<RootLEnv>),
+//     Light(LEnvSymbols)
+// }
+
 impl LEnv {
     /*pub fn set_outer(&mut self, env: LEnv) {
         self.outer = Some(Arc::new(env))
@@ -130,8 +137,8 @@ impl LEnv {
         &self.pfc
     }
 
-    pub fn get_init(&self) -> &InitScheme {
-        &self.init
+    pub fn get_init(&mut self) -> InitScheme {
+        mem::take(&mut self.init)
     }
 }
 
@@ -163,9 +170,9 @@ impl LEnv {
     pub fn import_module(&mut self, ctx: impl Into<LModule>, import_type: ImportType) {
         let module: LModule = ctx.into();
 
-        let mut queue = vec![module];
+        let mut queue = vec![(module, import_type)];
 
-        while let Some(mut module) = queue.pop() {
+        while let Some((mut module, import_type)) = queue.pop() {
             self.add_documentation(module.documentation);
             self.add_pure_functions(module.pure_fonctions);
             self.add_context(module.ctx);
@@ -262,7 +269,12 @@ impl Display for LEnv {
 
 impl PartialEq for LEnv {
     fn eq(&self, other: &Self) -> bool {
-        self == other
+        self.log == other.log
+            && self.init == other.init
+            && self.pfc == other.pfc
+            && self.documentation == other.documentation
+            && self.macro_table == other.macro_table
+            && self.symbols == other.symbols
     }
 }
 

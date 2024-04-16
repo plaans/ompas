@@ -214,6 +214,8 @@ pub enum PCoreOperatorFrame {
     Expand,
     Parse,
     Async,
+    Interrupt,
+    Race,
     Interruptible,
     Uninterruptible,
 }
@@ -285,6 +287,12 @@ impl PUnstack for PCoreOperatorFrame {
                     LPrimitive::Uninterruptible.into(),
                     results.pop().unwrap().lvalue
                 )
+            }
+            PCoreOperatorFrame::Interrupt => {
+                list!(LPrimitive::Interrupt.into(), results.pop().unwrap().lvalue)
+            }
+            PCoreOperatorFrame::Race => {
+                list!(LPrimitive::Race.into(), results.pop().unwrap().lvalue)
             }
         })
     }
@@ -465,15 +473,14 @@ impl PLDebug {
         self.inner.pop();
     }
 
-    pub async fn log_last_result(&mut self, results: &PResults) {
+    pub fn log_last_result(&mut self, results: &PResults) {
         //if get_debug() {
-        self.log
-            .trace(format!(
-                "{} => {}",
-                self.inner.pop().unwrap(),
-                results.last().unwrap()
-            ))
-            .await
+        self.log.trace(format!(
+            "{} => {}",
+            self.inner.pop().unwrap(),
+            results.last().unwrap()
+        ))
+
         //}
     }
 }

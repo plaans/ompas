@@ -1,11 +1,9 @@
 use crate::model::chronicle::interval::Interval;
-use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::HashSet;
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Condition {
     pub interval: Interval,
     pub sv: Vec<VarId>,
@@ -45,7 +43,7 @@ impl FlatBindings for Condition {
 }
 
 impl GetVariables for Condition {
-    fn get_variables(&self) -> HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         let mut hashset = self.interval.get_variables();
         hashset.insert(self.value);
         self.sv.iter().for_each(|a| {
@@ -53,18 +51,10 @@ impl GetVariables for Condition {
         });
         hashset
     }
-
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
-        self.get_variables()
-            .iter()
-            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
-            .cloned()
-            .collect()
-    }
 }
 
 impl Replace for Condition {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.sv.replace(old, new);
         self.value.replace(old, new);
         self.interval.replace(old, new);

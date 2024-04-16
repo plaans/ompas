@@ -17,7 +17,7 @@ impl From<ModSet> for LModule {
         let mut module = LModule::new(m, MOD_SET, DOC_MOD_SET);
         module.add_fn(SET, set, DOC_SET, true);
         module.add_fn(GET, get, DOC_GET, true);
-        module.add_fn(EMPTY, empty, DOC_EMPTY, true);
+        module.add_fn(IS_EMPTY, empty, DOC_IS_EMPTY, true);
         module.add_fn(LEN, len, DOC_LEN, true);
         module
     }
@@ -68,7 +68,7 @@ pub fn empty(lv: &LValue) -> Result<bool, LRuntimeError> {
         LValue::Map(m) => Ok(m.is_empty()),
         LValue::Nil => Ok(true),
         lv => Err(LRuntimeError::not_in_list_of_expected_types(
-            EMPTY,
+            IS_EMPTY,
             lv,
             vec![KindLValue::List, KindLValue::Map, KindLValue::Nil],
         )),

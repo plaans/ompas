@@ -7,8 +7,14 @@ edition = "2021"
 
 [dependencies]
 ompas-utils = {path = "../utils"}
-lazy_static = "1.4.0"
-chrono = "0.4.19"
-tokio = { version = "1.17.0", features = ["full", "time"] }
+
+env_param = {path = "../aries/env_param"}
+
+chrono = {workspace = true}
+tokio = { workspace = true }
+map-macro = {workspace = true}
+serde = {workspace = true}
+
+
 log =  { version = "0.4.16", features = ["std"] }
-map-macro = "0.2.4"
+lazy_static = "1.4.0"

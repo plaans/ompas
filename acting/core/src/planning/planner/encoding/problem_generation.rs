@@ -6,7 +6,6 @@ use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
 use crate::planning::conversion::convert;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, PLEnv, PLValue};
-use crate::planning::planner::problem::ChronicleInstance;
 use aries_planning::chronicles::ChronicleOrigin;
 use function_name::named;
 use sompas_structs::lenv::LEnv;
@@ -40,196 +39,16 @@ pub struct PAction {
     pub pr: ProcessRef,
 }
 
-/*
-pub async fn finite_problem(
-    mut goal_actions: Vec<PAction>,
-    context: &ConversionContext,
-) -> Result<PlanningProblem, LRuntimeError> {
-    let st = context.st.clone();
-    let high_level_actions: Vec<LValueS> = goal_actions
-        .iter()
-        .map(|action| LValueS::List(action.args.iter().map(|tp| tp.lvalues().clone()).collect()))
-        .collect();
-
-    let mut tasks: HashSet<String> = Default::default();
-    let mut methods: HashSet<String> = Default::default();
-    let mut commands: HashSet<String> = Default::default();
-    let mut sf_labels: HashSet<String> = Default::default();
-    let mut instances: Vec<ChronicleInstance> = vec![];
-
-    let mut update_domain =
-        |tasks: &mut Vec<PAction>, instance: &ChronicleInstance, instance_n: usize| {
-            let chronicle = instance.am.chronicle.as_ref().unwrap();
-            for (id, subtask) in chronicle.get_subtasks().iter().enumerate() {
-                let mut value: Vec<ActionParam> = vec![];
-                for e in &subtask.name {
-                    let domain = st.get_domain_of_var(&e);
-
-                    let val = match domain.as_cst() {
-                        Some(cst) => ActionParam::Instantiated(cst.clone().into()),
-                        None => ActionParam::Uninstantiated(st.format_variable(&e).into()),
-                    };
-                    value.push(val)
-                }
-
-                let mut pr = instance.pr.clone();
-                pr.push(subtask.label.unwrap());
-
-                tasks.insert(
-                    0,
-                    PAction {
-                        args: value,
-                        origin: ChronicleOrigin::Refinement {
-                            instance_id: instance_n,
-                            task_id: id,
-                        },
-                        pr,
-                    },
-                )
-            }
-
-            for effect in chronicle.get_effects() {
-                sf_labels.insert(effect.sv[0].format(&st, true));
-            }
-
-            for condition in chronicle.get_conditions() {
-                sf_labels.insert(condition.sv[0].format(&st, true));
-            }
-        };
-
-    while let Some(action) = goal_actions.pop() {
-        let tps = &action.args;
-        let instance_n = instances.len() + 1;
-        if let Some(task) = context
-            .domain
-            .tasks
-            .get(tps[0].lvalues().to_string().as_str())
-        {
-            tasks.insert(task.get_label().to_string());
-
-            let params = task.get_parameters().get_labels();
-            assert_eq!(params.len(), tps.len() - 1);
-
-            match task.get_model() {
-                Some(model) => {
-                    let model_lambda: LLambda = model.try_into().expect("");
-
-                    let mut instance: ChronicleInstance = convert_into_chronicle_instance(
-                        &model_lambda,
-                        action,
-                        None,
-                        task.get_parameters(),
-                        &context,
-                        ChronicleKind::Task,
-                    )
-                    .await?;
-                    instance.pr.push(Label::Refinement(None));
-                    update_domain(&mut goal_actions, &instance, instance_n);
-
-                    instances.push(instance)
-                }
-                None => {
-                    for (_, m_label) in task.get_methods().iter().enumerate() {
-                        methods.insert(m_label.to_string());
-                        let method = context.domain.get_methods().get(m_label).unwrap();
-                        let method_lambda: LLambda = method.get_body().try_into().expect("");
-
-                        let mut p_method: PAction = action.clone();
-                        p_method.args[0] = ActionParam::Instantiated(m_label.clone().into());
-                        for param in
-                            &method.parameters.get_labels()[task.get_parameters().inner().len()..]
-                        {
-                            p_method
-                                .args
-                                .push(ActionParam::Uninstantiated(param.to_string().into()))
-                        }
-                        let mut instance: ChronicleInstance = convert_into_chronicle_instance(
-                            &method_lambda,
-                            p_method,
-                            Some(&action.args),
-                            method.get_parameters(),
-                            &st,
-                            env,
-                            ChronicleKind::Method,
-                        )
-                        .await?;
-                        instance.pr.push(Label::Refinement(None));
-                        update_domain(&mut goal_actions, &instance, instance_n);
-
-                        instances.push(instance);
-                    }
-                }
-            }
-        } else if let Some(command) = context
-            .domain
-            .commands
-            .get(action.args[0].lvalues().to_string().as_str())
-        {
-            commands.insert(command.get_label().to_string());
-
-            let model_lambda: LLambda = command.get_model().try_into().expect("");
-
-            let instance: ChronicleInstance = convert_into_chronicle_instance(
-                &model_lambda,
-                action,
-                None,
-                command.get_parameters(),
-                &context,
-                ChronicleKind::Command,
-            )
-            .await?;
-            update_domain(&mut goal_actions, &instance, instance_n);
-
-            instances.push(instance)
-        } else {
-        }
-    }
-
-    let sf = context
-        .domain
-        .get_state_functions()
-        .iter()
-        .filter_map(|(k, v)| {
-            if sf_labels.contains(k) {
-                Some(v.clone())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    Ok(PlanningProblem {
-        domain: PlanningDomain {
-            sf,
-            methods: methods.drain().collect(),
-            tasks: tasks.drain().collect(),
-            commands: commands.drain().collect(),
-            templates: vec![],
-            st: st.clone(),
-        },
-        instance: PlanningInstance {
-            state: context.state.clone(),
-            tasks: high_level_actions,
-            instances,
-        },
-        st,
-    })
-}*/
-
 #[named]
-pub async fn convert_into_chronicle_instance(
-    lambda: &LLambda,
-    p_action: PAction,
+pub fn new_chronicle_for_action(
+    pc: &mut PConfig,
+    action: &[ActionParam],
     task: Option<&[ActionParam]>,
-    parameters: &Parameters,
+    action_params: &Parameters,
+    lambda_params: LambdaArgs,
     st: &RefSymTable,
-    env: &LEnv,
     kind: ChronicleKind,
-) -> Result<ChronicleInstance, LRuntimeError> {
-    let mut pc = PConfig::default();
-
-    let action = &p_action.args;
-
+) -> Result<Chronicle, LRuntimeError> {
     let label = action[0].lvalues().to_string();
     let params = &action[1..];
 
@@ -237,22 +56,23 @@ pub async fn convert_into_chronicle_instance(
 
     let mut ch = Chronicle::new(label.to_string(), kind, st.clone());
     let mut name: Vec<VarId> = vec![symbol_id];
-    if let LambdaArgs::List(l) = lambda.get_params() {
-        if l.len() != parameters.get_number() {
+    if let LambdaArgs::List(ref l) = lambda_params {
+        if l.len() != action_params.get_number() {
             return Err(lruntimeerror!(
                 function_name!(),
                 format!(
                     "for {}: definition of parameters are different({} != {})",
-                    label,
-                    lambda.get_params(),
-                    parameters
+                    label, lambda_params, action_params
                 )
             ));
         }
 
         for (lambda_param, ((_, pt), task_param)) in
-            l.iter().zip(parameters.inner().iter().zip(params))
+            l.iter().zip(action_params.inner().iter().zip(params))
         {
+            let str = lambda_param.to_string();
+            let domain = pt.get_domain().clone();
+            let declaration = ch.interval.get_start();
             let id = match task_param {
                 ActionParam::Instantiated(lv) => {
                     pc.p_table
@@ -266,10 +86,9 @@ pub async fn convert_into_chronicle_instance(
                     }
                 }
                 ActionParam::Uninstantiated(_) => {
-                    let str = lambda_param.to_string();
                     pc.p_table
                         .add(str.to_string(), PLValue::unpure(str.to_string().into()));
-                    let id = st.new_parameter(str, pt.get_domain().clone());
+                    let id = st.new_parameter(str, domain, declaration);
                     ch.add_var(id);
                     id
                 }
@@ -280,31 +99,68 @@ pub async fn convert_into_chronicle_instance(
     ch.set_name(name.clone());
     ch.set_task(match task {
         Some(task) => {
-            let mut task_name = name;
+            let mut task_name: Vec<VarId> = name[0..task.len()].to_vec();
             task_name[0] = st.get_sym_id(&task[0].lvalues().to_string()).unwrap();
             task_name
         }
         None => name,
     });
+    Ok(ch)
+}
 
-    //Enforce presence of the chronicle
-    /*let presence = *ch.get_presence();
-    ch.replace(&presence, &st.new_bool(true));*/
+pub async fn generate_acting_model(
+    lambda: &LLambda,
+    action: &[ActionParam],
+    task: Option<&[ActionParam]>,
+    parameters: &Parameters,
+    st: &RefSymTable,
+    env: &LEnv,
+    kind: ChronicleKind,
+) -> Result<ActingModel, LRuntimeError> {
+    let mut pc = PConfig::default();
+
+    let ch = new_chronicle_for_action(
+        &mut pc,
+        action,
+        task,
+        parameters,
+        lambda.get_params(),
+        st,
+        kind,
+    )?;
 
     let lv = lambda.get_body();
 
-    let mut p_env = PLEnv {
+    let p_env = PLEnv {
         env: env.clone(),
         unpure_bindings: Default::default(),
         pc: pc.clone(),
     };
 
-    let om: ActingModel = convert(Some(ch), lv, &mut p_env, st.clone()).await?;
+    convert(Some(ch), lv, p_env, st.clone()).await
+}
 
-    Ok(ChronicleInstance {
-        generated: true,
-        origin: p_action.origin,
-        am: om,
-        pr: p_action.pr,
-    })
+pub async fn generate_acting_model_or_empty(
+    lambda: &LLambda,
+    args: &[ActionParam],
+    task: Option<&[ActionParam]>,
+    parameters: &Parameters,
+    st: &RefSymTable,
+    env: &LEnv,
+    kind: ChronicleKind,
+) -> Result<ActingModel, LRuntimeError> {
+    let mut am = generate_acting_model(lambda, args, task, parameters, st, env, kind).await?;
+    if am.chronicle.is_none() {
+        am.chronicle = Some(new_chronicle_for_action(
+            &mut PConfig::default(),
+            args,
+            task,
+            parameters,
+            lambda.get_params(),
+            st,
+            kind,
+        )?)
+    }
+
+    Ok(am)
 }

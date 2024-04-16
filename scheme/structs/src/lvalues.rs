@@ -196,6 +196,12 @@ impl From<f64> for LValueS {
     }
 }
 
+impl From<usize> for LValueS {
+    fn from(value: usize) -> Self {
+        LValueS::Int(value as i64)
+    }
+}
+
 impl From<bool> for LValueS {
     fn from(b: bool) -> Self {
         LValueS::Bool(b)
@@ -223,6 +229,12 @@ impl From<&str> for LValueS {
 impl From<&LValueS> for LValue {
     fn from(lvs: &LValueS) -> Self {
         lvs.clone().into()
+    }
+}
+
+impl From<&LValueS> for LValueS {
+    fn from(lvs: &LValueS) -> Self {
+        lvs.clone()
     }
 }
 

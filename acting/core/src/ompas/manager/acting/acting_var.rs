@@ -2,20 +2,24 @@ use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::VarId;
 use crate::ompas::manager::acting::interval::Timepoint;
 use crate::ompas::manager::acting::AMId;
+use sompas_structs::contextcollection::AsyncLTrait;
 use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
+use sompas_structs::lvalues::LValueS;
+use std::any::Any;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
 
 pub type ActingVarId = usize;
 
-#[derive(Copy, Clone, Hash, PartialEq, Eq)]
-pub struct ActingVarRef {
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct PlanVarRef {
     pub(in crate::ompas::manager::acting) var_id: VarId,
     pub(in crate::ompas::manager::acting) am_id: AMId,
 }
 
-impl From<VarId> for ActingVarRef {
+impl From<VarId> for PlanVarRef {
     fn from(value: VarId) -> Self {
         Self {
             var_id: value,
@@ -24,13 +28,13 @@ impl From<VarId> for ActingVarRef {
     }
 }
 
-impl From<&VarId> for ActingVarRef {
+impl From<&VarId> for PlanVarRef {
     fn from(value: &VarId) -> Self {
         Self::from(*value)
     }
 }
 
-impl ActingVarRef {
+impl PlanVarRef {
     pub fn new(var_id: VarId, am_id: AMId) -> Self {
         Self { var_id, am_id }
     }
@@ -44,48 +48,74 @@ impl ActingVarRef {
     }
 }
 
-#[derive(Clone)]
 pub struct ActingVar {
-    refs: Vec<ActingVarRef>,
+    refs: Vec<PlanVarRef>,
     value: ActingVal,
+    val_t: Option<Box<AsyncLTrait>>,
 }
 
 impl Display for ActingVar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.value {
-            ActingVal::Execution(e) => write!(f, "{e}"),
-            ActingVal::Planned(p) => write!(f, "~{p}"),
+            ActingVal::Execution(e) => write!(f, "{}", e),
+            ActingVal::Planned(p) => write!(f, "~{}", p),
             ActingVal::None => write!(f, ""),
         }
     }
 }
 
 impl ActingVar {
-    pub fn new(refs: Vec<ActingVarRef>) -> Self {
+    pub fn new<T: Clone + AsCst + Any + PartialEq + Display + Debug + Sync + Send>(
+        refs: Vec<PlanVarRef>,
+    ) -> Self {
         Self {
             refs,
             value: ActingVal::None,
+            val_t: None,
         }
     }
 
-    pub fn refs(&self) -> &Vec<ActingVarRef> {
+    pub fn refs(&self) -> &Vec<PlanVarRef> {
         &self.refs
     }
 
     pub fn add_ref(&mut self, var_id: VarId, am_id: AMId) {
-        self.refs.push(ActingVarRef { var_id, am_id })
+        self.refs.push(PlanVarRef { var_id, am_id })
     }
 
-    pub fn set_execution_val(&mut self, val: Cst) {
-        self.value = ActingVal::Execution(val)
+    pub fn set_execution_val<T: Clone + AsCst + Any + Send + Sync + PartialEq + Display + Debug>(
+        &mut self,
+        val: T,
+    ) {
+        match &self.val_t {
+            None => {
+                self.value = ActingVal::Execution(val.as_cst().unwrap());
+                self.val_t = Some(Box::new(val));
+            }
+            Some(v) => {
+                let v: T = v.downcast_ref::<T>().cloned().unwrap();
+                assert_eq!(v, val)
+            }
+        }
     }
 
-    pub fn get_val(&self) -> &ActingVal {
+    pub fn get_acting_val(&self) -> &ActingVal {
         &self.value
     }
 
+    pub fn get_val<T: Clone + AsCst + Any + Send + Sync + PartialEq + Display + Debug>(
+        &self,
+    ) -> Option<T> {
+        self.val_t
+            .as_ref()
+            .map(|t| t.downcast_ref::<T>().cloned().unwrap())
+    }
+
     pub fn set_planned_val(&mut self, val: Cst) {
-        self.value = ActingVal::Planned(val)
+        match self.value {
+            ActingVal::None | ActingVal::Planned(_) => self.value = ActingVal::Planned(val),
+            ActingVal::Execution(_) => {}
+        }
     }
 }
 
@@ -96,15 +126,25 @@ pub enum ActingVal {
     None,
 }
 
+impl AsCst for ActingVal {
+    fn as_cst(&self) -> Option<Cst> {
+        match self {
+            ActingVal::Execution(c) => Some(c.clone()),
+            ActingVal::Planned(c) => Some(c.clone()),
+            ActingVal::None => None,
+        }
+    }
+}
+
 pub struct ActingValUpdate {
-    pub(crate) plan_var_id: ActingVarId,
+    pub(crate) acting_var_id: ActingVarId,
     pub(crate) val: Cst,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct ExecutionVar<T: Display + Clone + AsCst> {
-    pub(crate) plan_var_id: Option<ActingVarId>,
-    pub(crate) val: Option<T>,
+pub struct ActingVarRef<T: Any + Send + Sync + AsCst + Display + Debug + PartialEq> {
+    pub id: ActingVarId,
+    phantom: PhantomData<T>,
 }
 
 pub trait AsCst {
@@ -114,53 +154,6 @@ pub trait AsCst {
 impl AsCst for Cst {
     fn as_cst(&self) -> Option<Cst> {
         Some(self.clone())
-    }
-}
-
-impl<T: Display + Clone + AsCst> ExecutionVar<T> {
-    pub fn new() -> Self {
-        Self {
-            plan_var_id: None,
-            val: None,
-        }
-    }
-    pub fn new_with_ref(plan_var_id: ActingVarId) -> Self {
-        Self {
-            plan_var_id: Some(plan_var_id),
-            val: None,
-        }
-    }
-
-    pub fn get_plan_var_id(&self) -> &Option<ActingVarId> {
-        &self.plan_var_id
-    }
-
-    pub fn set_val(&mut self, val: T) -> Option<ActingValUpdate> {
-        if self.val.is_none() {
-            let cst = val.as_cst().unwrap();
-            self.val = Some(val);
-            self.plan_var_id
-                .as_ref()
-                .map(|&plan_var_id| ActingValUpdate {
-                    plan_var_id,
-                    val: cst.clone(),
-                })
-        } else {
-            None
-        }
-    }
-
-    pub fn get_val(&self) -> &Option<T> {
-        &self.val
-    }
-}
-
-impl<T: Display + Clone + AsCst> Display for ExecutionVar<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self.val {
-            Some(val) => write!(f, "{}", val),
-            None => write!(f, ""),
-        }
     }
 }
 
@@ -175,6 +168,18 @@ impl AsCst for LValue {
             LValue::True => Cst::Bool(true),
             LValue::Nil => Cst::Bool(false),
             lv => panic!("{} cannot be converted as cst", lv),
+        })
+    }
+}
+
+impl AsCst for LValueS {
+    fn as_cst(&self) -> Option<Cst> {
+        Some(match self {
+            LValueS::Symbol(s) => Cst::Symbol(s.to_string()),
+            LValueS::Int(i) => Cst::Int(*i),
+            LValueS::Float(f) => Cst::Float(*f),
+            LValueS::Bool(b) => Cst::Bool(*b),
+            lvs => panic!("{} cannot be converted as cst", lvs),
         })
     }
 }
@@ -200,36 +205,83 @@ impl AsCst for String {
 
 #[derive(Default)]
 pub struct ActingVarCollection {
-    pub(crate) plan_vars: Vec<ActingVar>,
-    pub(crate) map_ref: HashMap<ActingVarRef, ActingVarId>,
+    pub(crate) acting_vars: Vec<ActingVar>,
+    pub(crate) map_ref: HashMap<PlanVarRef, ActingVarId>,
 }
 
 impl ActingVarCollection {
-    pub fn new_acting_var(&mut self, var_ref: ActingVarRef) -> ActingVarId {
-        let id = self.plan_vars.len();
-        self.plan_vars.push(ActingVar::new(vec![var_ref]));
-        self.map_ref.insert(var_ref, id);
-
+    pub fn new_acting_var_with_ref<
+        T: Any + Send + Sync + AsCst + Display + Debug + PartialEq + Clone,
+    >(
+        &mut self,
+        var_ref: PlanVarRef,
+    ) -> ActingVarRef<T> {
+        let id = self.new_acting_var::<T>();
+        self.add_new_plan_var_ref(&id.id, var_ref);
         id
     }
 
+    pub fn new_acting_var<T: Any + Send + Sync + AsCst + Display + Debug + PartialEq + Clone>(
+        &mut self,
+    ) -> ActingVarRef<T> {
+        let id = self.acting_vars.len();
+        self.acting_vars.push(ActingVar::new::<T>(vec![]));
+
+        ActingVarRef {
+            id,
+            phantom: Default::default(),
+        }
+    }
+
+    pub(crate) fn add_new_plan_var_ref(
+        &mut self,
+        acting_var_id: &ActingVarId,
+        plan_var_ref: PlanVarRef,
+    ) {
+        self.acting_vars
+            .get_mut(*acting_var_id)
+            .unwrap()
+            .refs
+            .push(plan_var_ref);
+        self.map_ref.insert(plan_var_ref, *acting_var_id);
+    }
+
+    pub(crate) fn set_execution_val<
+        T: Clone + AsCst + Any + Send + Sync + PartialEq + Display + Debug,
+    >(
+        &mut self,
+        acting_var_ref: &ActingVarRef<T>,
+        val: T,
+    ) -> Vec<PlanVarRef> {
+        let var = self.acting_vars.get_mut(acting_var_ref.id).unwrap();
+        var.set_execution_val::<T>(val);
+        var.refs.clone()
+    }
+
+    pub fn set_planned_val(&mut self, update: ActingValUpdate) {
+        self.acting_vars
+            .get_mut(update.acting_var_id)
+            .unwrap()
+            .set_planned_val(update.val);
+    }
+
     pub fn get_var(&self, id: &ActingVarId) -> Option<&ActingVar> {
-        self.plan_vars.get(*id)
+        self.acting_vars.get(*id)
     }
 
     pub fn get_mut_var(&mut self, id: &ActingVarId) -> Option<&mut ActingVar> {
-        self.plan_vars.get_mut(*id)
+        self.acting_vars.get_mut(*id)
     }
 
-    pub fn get_id(&self, var_ref: &ActingVarRef) -> Option<&ActingVarId> {
+    pub fn get_id(&self, var_ref: &PlanVarRef) -> Option<&ActingVarId> {
         self.map_ref.get(var_ref)
     }
 
-    pub fn get_var_by_ref(&self, var_ref: &ActingVarRef) -> Option<&ActingVar> {
+    pub fn get_var_by_ref(&self, var_ref: &PlanVarRef) -> Option<&ActingVar> {
         self.get_id(var_ref).and_then(|id| self.get_var(id))
     }
 
-    pub fn get_mut_var_by_ref(&mut self, var_ref: &ActingVarRef) -> Option<&mut ActingVar> {
+    pub fn get_mut_var_by_ref(&mut self, var_ref: &PlanVarRef) -> Option<&mut ActingVar> {
         if let Some(&id) = self.get_id(var_ref) {
             self.get_mut_var(&id)
         } else {
@@ -237,21 +289,47 @@ impl ActingVarCollection {
         }
     }
 
-    pub fn format_execution_var<T: Display + Clone + AsCst>(
+    pub fn get_val<T: Any + Sync + Send + Display + Clone + AsCst + PartialEq + std::fmt::Debug>(
         &self,
-        execution_var: &ExecutionVar<T>,
+        r: &ActingVarRef<T>,
+    ) -> Option<T> {
+        self.acting_vars[r.id].get_val()
+    }
+
+    pub fn get_acting_val(&self, r: &ActingVarId) -> &ActingVal {
+        self.acting_vars[*r].get_acting_val()
+    }
+
+    pub fn format_acting_var<
+        T: Any + Sync + Send + Display + Clone + AsCst + PartialEq + std::fmt::Debug,
+    >(
+        &self,
+        acting_var_ref: &ActingVarRef<T>,
     ) -> String {
-        if let Some(val) = &execution_var.val {
-            val.as_cst().unwrap().to_string()
-        } else if let Some(var) = &execution_var.plan_var_id {
-            self.plan_vars[*var].to_string()
-        } else {
-            "".to_string()
+        let var = &self.acting_vars[acting_var_ref.id];
+        var.to_string()
+    }
+
+    pub fn format_slice_acting_var<
+        T: Any + Sync + Send + Display + Clone + AsCst + PartialEq + std::fmt::Debug,
+    >(
+        &self,
+        slice: &[ActingVarRef<T>],
+    ) -> String {
+        let mut out = "".to_string();
+        for (i, var) in slice.iter().enumerate() {
+            if i != 0 {
+                out.push(' ');
+            }
+            let var = &self.acting_vars[var.id];
+            out.push_str(var.to_string().as_str());
         }
+
+        out
     }
 
     pub async fn clear(&mut self) {
-        self.plan_vars.clear();
+        self.acting_vars.clear();
         self.map_ref.clear();
     }
 }

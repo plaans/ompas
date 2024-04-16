@@ -1,15 +1,10 @@
-use chrono::{DateTime, Utc};
-use std::fs;
-use std::path::PathBuf;
-
 use ompas_middleware::logger::FileDescriptor;
 use ompas_middleware::{LogLevel, Master};
-use sompas_modules::advanced_math::ModAdvancedMath;
-use sompas_modules::io::{LogOutput, ModIO};
-use sompas_modules::string::ModString;
-use sompas_modules::time::ModTime;
-use sompas_modules::utils::ModUtils;
+use sompas_modules::io::LogOutput;
+use sompas_modules::ModExtendedStd;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
+use std::fs;
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -32,7 +27,7 @@ async fn main() {
     let opt: Opt = Opt::from_args();
     println!("{:?}", opt);
     if opt.debug {
-        Master::set_log_level(LogLevel::Debug).await
+        Master::set_log_level(LogLevel::Trace).await
     }
 
     //test_lib_model(&opt);
@@ -43,29 +38,15 @@ pub async fn lisp_interpreter(log: Option<PathBuf>, root: bool) {
     let mut li = LispInterpreter::new().await;
 
     if !root {
-        let mut ctx_io = ModIO::default();
-
-        let ctx_math = ModAdvancedMath::default();
-        let ctx_utils = ModUtils::default();
-        let ctx_string = ModString::default();
-
-        let ctx_time: ModTime = ModTime::new(2);
-
+        let mut mod_extended_std = ModExtendedStd::default();
         //Add the sender of the channel.
         if let Some(pb) = &log {
-            let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-            let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
             let mut file_pb = pb.clone();
-            file_pb.push(format!("log_{}.txt", string_date));
-            ctx_io.set_log_output(LogOutput::File(file_pb));
+            file_pb.push(format!("log_{}.txt", Master::get_string_date()));
+            mod_extended_std.set_log_output(LogOutput::File(file_pb));
         }
 
-        li.import_namespace(ctx_utils);
-        li.import_namespace(ctx_io);
-        li.import_namespace(ctx_math);
-
-        li.import_namespace(ctx_string);
-        li.import_namespace(ctx_time);
+        li.import_namespace(mod_extended_std);
     }
 
     li.set_config(LispInterpreterConfig::new(true));

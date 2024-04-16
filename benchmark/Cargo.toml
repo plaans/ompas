@@ -8,30 +8,22 @@ default-run = "bench"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sompas-modules = {path = "../scheme/modules"}
-sompas-repl = {path = "../scheme/repl"}
-ompas-core = {path = "../acting/core"}
-ompas-gobotsim = {path = "../ompas-gobot-sim"}
-ompas-language = {path = "../acting/language"}
 ompas-middleware = {path = "../middleware"}
-ompas-interface = {path = "../acting/interface"}
-chrono = "0.4.24"
+ompas-core= {path = "../acting/core"}
+ompas-language= {path = "../acting/language"}
 
+structopt = { workspace = true}
+serde_yaml = {workspace = true}
+serde = { workspace = true }
+tokio = {workspace = true }
+chrono = {workspace = true}
 
-tokio = { version = "1.17.0", features = ["full", "time"] }
-lettre = "0.10"
-yaml-rust = "0.4"
-structopt = { version = "0.3", default-features = false }
-indicatif = "0.17.0"
-colored = "2.0.0"
-
-[[bin]]
-name = "bench-sim"
-path = "src/bin/bench_sim.rs"
-
-[[bin]]
-name = "bench-gobot-sim"
-path = "src/bin/bench_gobot.rs"
+lettre = "0.11.1"
+lettre_email = "0.9.4"
+mime = "0.3.17"
+indicatif = "0.17.7"
+colored = "2.0.4"
+zip_archive = "1.2.2"
 
 [[bin]]
 name = "bench"

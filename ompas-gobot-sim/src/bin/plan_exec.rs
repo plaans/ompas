@@ -1,21 +1,15 @@
-use std::fs;
-//use ompas_gobotsim::mod_godot::CtxGodot;
-use env_param::EnvParam;
-use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
+use ompas_core::ompas::manager::platform::scheme_domain::SchemeDomain;
 use ompas_core::ompas::scheme::monitor::ModMonitor;
-use ompas_core::{OMPAS_DEBUG, OMPAS_LOG_ON};
+use ompas_core::{OMPAS_DEBUG, OMPAS_LOG};
 use ompas_gobotsim::default_gobot_sim_plan_exec_domain;
 use ompas_gobotsim::platform::PlatformGobotSim;
 use ompas_language::interface::{LOG_TOPIC_PLATFORM, PLATFORM_CLIENT};
 use ompas_language::process::LOG_TOPIC_OMPAS;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::{LogLevel, Master};
-use sompas_modules::advanced_math::ModAdvancedMath;
-use sompas_modules::io::ModIO;
-use sompas_modules::string::ModString;
-use sompas_modules::time::ModTime;
-use sompas_modules::utils::ModUtils;
+use sompas_modules::ModExtendedStd;
 use sompas_repl::lisp_interpreter::{LispInterpreter, LispInterpreterConfig};
+use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -40,7 +34,7 @@ async fn main() {
     println!("{:?}", opt);
     Master::set_log_level(LOG_LEVEL).await;
 
-    if EnvParam::new(OMPAS_DEBUG, "0").get() {
+    if OMPAS_DEBUG.get() {
         Master::set_log_level(LogLevel::Trace).await;
     }
 
@@ -51,27 +45,19 @@ async fn main() {
 async fn lisp_interpreter(opt: Opt) {
     let mut li = LispInterpreter::new().await;
 
-    let mut ctx_io = ModIO::default();
-    let ctx_math = ModAdvancedMath::default();
-    let ctx_utils = ModUtils::default();
-    let ctx_string = ModString::default();
-
+    let mut mod_extended_std = ModExtendedStd::default();
     //Insert the doc for the different contexts.
 
     //Add the sender of the channel.
     if let Some(pb) = &opt.log {
-        ctx_io.set_log_output(pb.clone().into());
+        mod_extended_std.set_log_output(pb.clone().into());
     }
 
-    li.import_namespace(ctx_utils);
-    li.import_namespace(ctx_io);
-    li.import_namespace(ctx_math);
-    li.import_namespace(ctx_string);
-    li.import_namespace(ModTime::new(2));
+    li.import_namespace(mod_extended_std);
 
     let ctx_rae = ModMonitor::new(
         PlatformGobotSim::new(
-            LispDomain::File(
+            SchemeDomain::File(
                 opt.domain
                     .unwrap_or(default_gobot_sim_plan_exec_domain().into()),
             ),
@@ -83,7 +69,7 @@ async fn lisp_interpreter(opt: Opt) {
     .await;
     li.import_namespace(ctx_rae);
 
-    if OMPAS_LOG_ON.get() {
+    if OMPAS_LOG.get() {
         Master::start_display_log_topic(LOG_TOPIC_OMPAS).await;
     }
 

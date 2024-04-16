@@ -1,38 +1,33 @@
-use crate::TOKIO_CHANNEL_SIZE;
-use chrono::{DateTime, Utc};
 use im::HashMap;
 use ompas_middleware::logger::{FileDescriptor, LogClient};
 use ompas_middleware::{Master, ProcessInterface, PROCESS_TOPIC_ALL};
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::DefaultEditor;
 use sompas_core::{eval, eval_init, get_root_env, parse};
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_language::PROCESS_TOPIC_INTERPRETER;
 use sompas_structs::lenv::{ImportType, LEnv};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::PathBuf;
-use std::{env, fs};
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::SendError;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 
 const PROCESS_INTERPRETER: &str = "__PROCESS_INTERPRETER__";
 const PROCESS_REPL: &str = "__PROCESS_REPL__";
-const PROCESS_LOG: &str = "__PROCESS_LOG__";
+
 #[derive(Debug)]
 pub struct LispInterpreterChannel {
-    sender: Sender<String>,
-    receiver: Receiver<String>,
-    subscribers: HashMap<usize, Sender<LResult>>,
+    sender: UnboundedSender<String>,
+    receiver: UnboundedReceiver<String>,
+    subscribers: HashMap<usize, UnboundedSender<LResult>>,
     next_id: usize,
 }
 
 impl Default for LispInterpreterChannel {
     fn default() -> Self {
-        let (sender, receiver) = channel(TOKIO_CHANNEL_SIZE);
+        let (sender, receiver) = mpsc::unbounded_channel();
 
         Self {
             sender,
@@ -48,7 +43,7 @@ impl LispInterpreterChannel {
         let id = self.next_id;
         self.next_id += 1;
 
-        let (tx, rx) = tokio::sync::mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         self.subscribers.insert(id, tx);
 
         ChannelToLispInterpreter {
@@ -62,25 +57,24 @@ impl LispInterpreterChannel {
         self.receiver.recv().await
     }
 
-    pub async fn send(&mut self, id: &usize, result: LResult) -> Result<(), SendError<LResult>> {
+    pub fn send(&mut self, id: &usize, result: LResult) -> Result<(), SendError<LResult>> {
         self.subscribers
             .get(id)
             .expect("error getting subscriber's sender")
             .send(result)
-            .await
     }
 }
 #[derive(Debug)]
 pub struct ChannelToLispInterpreter {
-    sender: Sender<String>,
-    receiver: Receiver<LResult>,
+    sender: UnboundedSender<String>,
+    receiver: UnboundedReceiver<LResult>,
     id: usize,
 }
 
 impl ChannelToLispInterpreter {
     pub async fn send(&self, msg: String) -> Result<(), SendError<String>> {
-        self.sender.send(self.id.to_string()).await?;
-        self.sender.send(msg).await?;
+        self.sender.send(self.id.to_string())?;
+        self.sender.send(msg)?;
         Ok(())
     }
 
@@ -145,7 +139,7 @@ impl LispInterpreter {
         )
         .await;
 
-        process_interface.log_info("initiate interpreter").await;
+        process_interface.log_info("initiate interpreter");
 
         eval_init(&mut self.env).await;
 
@@ -168,7 +162,7 @@ impl LispInterpreter {
                 id_subscriber = self.recv() => {
                     let id_subscriber: usize = match id_subscriber {
                         None => {
-                            process_interface.log_error("Error in the interpretor").await;
+                            process_interface.log_error("Error in the interpretor");
                             continue;
                         }
                         Some(id) => {
@@ -177,7 +171,7 @@ impl LispInterpreter {
                     };
                     let str_lvalue = match self.recv().await {
                         None => {
-                            process_interface.log_error("Error in the interpretor").await;
+                            process_interface.log_error("Error in the interpretor");
                             continue;
                         }
                         Some(str) => {
@@ -186,7 +180,7 @@ impl LispInterpreter {
                     };
 
                     if str_lvalue == *"exit" {
-                        process_interface.kill(PROCESS_TOPIC_ALL).await;
+                        process_interface.kill(PROCESS_TOPIC_ALL);
                         break;
                     }
 
@@ -196,18 +190,16 @@ impl LispInterpreter {
                             process_interface.log_trace(format!("{} => {}", str_lvalue, match result.clone() {
                                 Ok(lv) => lv.to_string(),
                                 Err(e) => e.to_string(),
-                            })).await;
+                            }));
                             self.li_channel
                                 .send(&id_subscriber, result)
-                                .await
                                 .expect("error on channel to stdout");
                         }
                         Err(e) => {
-                            process_interface.log_trace(format!("{} => {}", str_lvalue, e)).await;
+                            process_interface.log_trace(format!("{} => {}", str_lvalue, e));
 
                             self.li_channel
                                 .send(&id_subscriber, Err(e))
-                                .await
                                 .expect("error on channel to stdout");
                         }
                     };
@@ -245,87 +237,6 @@ pub async fn spawn_repl(communication: ChannelToLispInterpreter) -> JoinHandle<(
     tokio::spawn(async move { repl(communication).await })
 }
 
-/// Spawn the log task
-pub async fn spawn_log(com: ChannelToLispInterpreter, log_path: Option<PathBuf>) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        log(com, log_path).await;
-    })
-}
-
-async fn log(mut com: ChannelToLispInterpreter, working_dir: Option<PathBuf>) {
-    let mut process_interface = ProcessInterface::new(
-        PROCESS_LOG,
-        PROCESS_TOPIC_INTERPRETER,
-        LOG_TOPIC_INTERPRETER,
-    )
-    .await;
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-
-    let dir_path: PathBuf = match working_dir {
-        Some(wd) => {
-            let mut dir_path = wd;
-            dir_path.push("lisp_logs");
-            dir_path
-        }
-        None => format!(
-            "{}/ompas/lisp_logs",
-            match env::var("HOME") {
-                Ok(val) => val,
-                Err(_) => ".".to_string(),
-            }
-        )
-        .into(),
-    };
-
-    fs::create_dir_all(&dir_path).expect("could not create logs directory");
-    let mut file_path = dir_path.clone();
-    file_path.push(format!("log_{}", string_date));
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(&file_path)
-        .expect("error creating log file");
-
-    loop {
-        tokio::select! {
-            buffer = com.recv() => {
-                let buffer = match buffer {
-                    None => {
-                        eprintln!("log task stopped working");
-                        break;
-                    }
-                    Some(Ok(lv)) => lv.to_string(),
-                    Some(Err(e)) => e.to_string()
-                };
-
-                file.write_all(format!("{}\n", buffer).as_bytes())
-                    .expect("could not write to log file");
-                }
-            _ = process_interface.recv() => {
-                com.close();
-                break;
-            }
-        }
-    }
-    println!("Draining log queue...");
-    while let Some(msg) = com.recv().await {
-        file.write_all(
-            format!(
-                "{}\n",
-                match msg {
-                    Ok(lv) => lv.to_string(),
-                    Err(e) => e.to_string(),
-                }
-            )
-            .as_bytes(),
-        )
-        .expect("could not write to log file");
-    }
-    println!("log task ended");
-}
-
 /// Function to handle the repl.
 /// ### functioning:
 /// loop waiting for an object on *stdin*
@@ -340,7 +251,7 @@ async fn repl(mut com: ChannelToLispInterpreter) {
         LOG_TOPIC_INTERPRETER,
     )
     .await;
-    let mut rl = Editor::<()>::new();
+    let mut rl = DefaultEditor::new().unwrap();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
@@ -351,7 +262,7 @@ async fn repl(mut com: ChannelToLispInterpreter) {
 
             match readline {
                 Ok(string) => {
-                    rl.add_history_entry(string.clone());
+                    rl.add_history_entry(string.clone()).unwrap();
                     com.send(string).await.expect("couldn't send lisp command");
                     let buffer = match com.recv_string().await {
                         None => {
@@ -388,7 +299,7 @@ async fn repl(mut com: ChannelToLispInterpreter) {
 
     tokio::select! {
         _ = l => {
-            process_interface.kill(PROCESS_TOPIC_ALL).await
+            process_interface.kill(PROCESS_TOPIC_ALL)
         }
         _ = process_interface.recv() => {
 

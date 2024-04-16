@@ -4,41 +4,55 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = []
+conversion_data = []
 
 [dependencies]
 sompas-structs = {path = "../../scheme/structs"}
 sompas-modules = {path = "../../scheme/modules"}
-sompas-core = {path = "../../scheme/core"}
+sompas-core = {path = "../../scheme/core", default-features = false}
 sompas-language = {path = "../../scheme/language"}
 sompas-macros = {path = "../../scheme/macros"}
 
 ompas-utils = {path= "../../utils" }
 ompas-interface = {path = "../interface"}
 ompas-language = {path = "../language"}
-tokio = { version = "1.17.0", features = ["full", "time"] }
-im = "15.0.0"
-chrono = "0.4.19"
-macro_rules_attribute = "0.0.2"
-async-trait = "0.1.51"
+ompas-middleware = {path = "../../middleware"}
+
 aries_planning = {path = "../../aries/planning/planning"}
 aries_planners = {path = "../../aries/planning/planners"}
-aries = {path = "../../aries/solver"}
+aries = {path = "../../aries/solver", features = ["cpu_cycles"]}
 env_param = {path = "../../aries/env_param"}
-rand = "0.8.5"
-itertools = { default-features = false, version = "0.10" }
-futures = "0.3.17"
-ompas-middleware = {path = "../../middleware"}
-map-macro = "0.2.4"
+
+tokio = { workspace = true }
+im = {workspace = true}
+chrono = {workspace = true}
+anyhow = {workspace = true}
+rand = {workspace = true}
+itertools = { workspace = true }
+
+macro_rules_attribute = {workspace = true}
+async-trait = {workspace = true}
+
+tonic = {workspace = true}
+async-stream = {workspace = true}
+map-macro =  {workspace = true}
+tokio-stream = { workspace = true }
+async-recursion = {workspace = true}
+serde_json = {workspace = true}
+serde_yaml = {workspace = true}
+
+
+futures = "0.3.28"
 function_name = "0.3.0"
 debug_print = "1.0.0"
-anyhow = "1.0.69"
-
-# prost = { default-features = false, version = "0.11" }
-tonic = "0.8"
-async-stream = "0.3.3"
-
-tokio-stream = { default-features = false, version = "0.1" }
-async-recursion = "1.0.4"
 cli-table = "0.4.7"
 num-integer = "0.1.45"
-# map-macro = "0.2.4"
+csv = { version = "1.3.0", features = [] }
+serde = { version = "1.0.188", features = ["derive"] }
+new_type = "0.4.1"
+atomic_float = "0.1.0"
+lazy_static = { version = "1.4.0", features = [] }
+log = "0.4.17"
+

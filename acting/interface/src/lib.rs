@@ -2,7 +2,7 @@ use crate::platform_interface::atom::Kind;
 use crate::platform_interface::{
     atom, command_response, event, platform_update, Atom, CommandAccepted, CommandCancelled,
     CommandProgress, CommandRejected, CommandResponse, CommandResult, Event, Expression, Instance,
-    PlatformUpdate, Resource, StateUpdate,
+    PlatformUpdate, Resource, StateUpdate, Task,
 };
 use sompas_structs::lvalues::LValueS;
 use std::fmt::{Display, Formatter};
@@ -206,6 +206,16 @@ impl From<StateUpdate> for PlatformUpdate {
     fn from(su: StateUpdate) -> Self {
         PlatformUpdate {
             update: Some(platform_update::Update::State(su)),
+        }
+    }
+}
+
+impl From<Task> for PlatformUpdate {
+    fn from(task: Task) -> Self {
+        PlatformUpdate {
+            update: Some(platform_update::Update::Event(Event {
+                event: Some(event::Event::Task(task)),
+            })),
         }
     }
 }

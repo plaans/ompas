@@ -8,7 +8,7 @@ pub struct Command {
     label: String,
     parameters: Parameters,
     body: LValue,
-    models: ModelCollection,
+    pub model_collection: ModelCollection,
 }
 
 impl Command {
@@ -16,13 +16,13 @@ impl Command {
         label: impl Display,
         parameters: Parameters,
         body: LValue,
-        models: ModelCollection,
+        model_collection: ModelCollection,
     ) -> Self {
         Self {
             label: label.to_string(),
             parameters,
             body,
-            models,
+            model_collection,
         }
     }
 
@@ -39,7 +39,7 @@ impl Command {
     }
 
     pub fn get_model(&self, kind: &ModelKind) -> Option<LValue> {
-        self.models.get(kind)
+        self.model_collection.get(kind)
     }
 
     pub fn get_label(&self) -> &String {
@@ -47,7 +47,7 @@ impl Command {
     }
 
     pub fn get_cost(&self) -> Option<LValue> {
-        self.models.get(&ModelKind::CostModel)
+        self.model_collection.get(&ModelKind::CostModel)
     }
 
     /*
@@ -63,7 +63,7 @@ impl Command {
     }
 
     pub fn set_model(&mut self, model: LValue, kind: ModelKind) {
-        self.models.insert(model, kind);
+        self.model_collection.insert(model, kind);
     }
 
     pub fn set_label(&mut self, label: String) {
@@ -71,7 +71,7 @@ impl Command {
     }
 
     pub fn set_cost(&mut self, cost: LValue) {
-        self.models.insert(cost, ModelKind::CostModel)
+        self.model_collection.insert(cost, ModelKind::CostModel)
     }
 }
 
@@ -83,7 +83,7 @@ impl Display for Command {
             self.label,
             self.parameters,
             self.body.format("exec: ".len()),
-            self.models,
+            self.model_collection,
         )
     }
 }

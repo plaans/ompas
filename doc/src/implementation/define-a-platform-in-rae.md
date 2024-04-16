@@ -20,4 +20,4 @@ _RAE_ needs a platform to execute commands and get the new state resulting from 
 * `set_status(&self, action_id: usize, status: Status)`: Set the status of an action.
 * `domain(&self) -> &'static str`: Provides the a lisp expression that enable RAE to load the domain. We propose two ways.
   * The first one is to declare the domain as an str that will be compile in the binary.
-  * The other one is to write the domain in a file, and load it with the command `(read <name-file.lisp>).`
+  * The other one is to write the domain in a file, and load it with the command `(load <name-file.scm>).`

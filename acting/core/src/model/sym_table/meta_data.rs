@@ -8,6 +8,9 @@ pub struct SymTableMetaData {
     n_chronicle_result: usize,
     n_start: usize,
     n_end: usize,
+    n_start_task: usize,
+    n_end_task: usize,
+    n_arbitrary: usize,
 }
 
 impl SymTableMetaData {
@@ -44,15 +47,34 @@ impl SymTableMetaData {
         self.n_start += 1;
         n
     }
+
     pub fn new_end_index(&mut self) -> usize {
         let n = self.n_end;
         self.n_end += 1;
         n
     }
 
+    pub fn new_start_task_index(&mut self) -> usize {
+        let n = self.n_start_task;
+        self.n_start_task += 1;
+        n
+    }
+
+    pub fn new_end_task_index(&mut self) -> usize {
+        let n = self.n_end_task;
+        self.n_end_task += 1;
+        n
+    }
+
     pub fn new_chronicle_result_index(&mut self) -> usize {
         let n = self.n_chronicle_result;
         self.n_chronicle_result += 1;
+        n
+    }
+
+    pub fn new_arbitrary_index(&mut self) -> usize {
+        let n = self.n_arbitrary;
+        self.n_arbitrary += 1;
         n
     }
 }

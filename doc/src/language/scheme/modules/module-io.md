@@ -10,11 +10,11 @@ test
 ```
 - `__read__`: reads a string from a file. Prefer using the macro **read**.
 ```lisp
->> (__read__ <path-to-file>/<name-file>.lisp)
+>> (__read__ <path-to-file>/<name-file>.scm)
 ```
 - `write`: write a LValue to a file.
 ```lisp
->> (write <path-to-file>/<name-file>.lisp)
+>> (write <path-to-file>/<name-file>.scm)
 ```
 
 ## Macros
@@ -22,6 +22,6 @@ test
 - `read` : macro used to read, parse and eval a lisp file.
 
 ```lisp
-(read test.lisp)
-=> (eval (parse (__read__ test.lisp)))
+(load test.scm)
+=> (eval (parse (__read__ test.scm)))
 ```

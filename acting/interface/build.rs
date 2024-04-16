@@ -1,7 +1,9 @@
+// #[cfg(feature = "generate_bindings")]
 use std::fs;
+// #[cfg(feature = "generate_bindings")]
 use std::path::PathBuf;
 
-//Build GRPC server and client for UPF planning service
+// #[cfg(feature = "generate_bindings")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let proto_file: PathBuf = "../../grpc/platform_interface.proto".into();
     //let proto_file = proto_file.canonicalize().unwrap();
@@ -18,3 +20,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+// #[cfg(not(feature = "generate_bindings"))]
+// fn main() -> Result<(), Box<dyn std::error::Error>> {
+//     Ok(())
+// }

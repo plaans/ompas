@@ -1,32 +1,24 @@
-use crate::model::process_ref::Label;
+use crate::model::process_ref::{Label, RefinementLabel};
 use crate::model::sym_domain::cst::Cst;
-use crate::ompas::manager::acting::acting_var::ExecutionVar;
+use crate::ompas::manager::acting::acting_var::ActingVarRef;
 use crate::ompas::manager::acting::process::ActingProcessInner;
 use crate::ompas::manager::acting::ActingProcessId;
-use sompas_structs::lvalue::LValue;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 pub struct RefinementProcess {
-    pub args: Vec<ExecutionVar<Cst>>,
+    pub label: RefinementLabel,
+    pub args: Vec<ActingVarRef<Cst>>,
     pub childs: HashMap<Label, ActingProcessId>,
 }
 
 impl RefinementProcess {
-    pub fn new(args: Vec<ExecutionVar<Cst>>) -> Self {
+    pub fn new(label: RefinementLabel, args: Vec<ActingVarRef<Cst>>) -> Self {
         Self {
+            label,
             args,
             childs: Default::default(),
         }
-    }
-
-    pub fn get_name_as_lvalue(&self) -> LValue {
-        let vec: Vec<LValue> = self
-            .args
-            .iter()
-            .map(|e| LValue::from(e.get_val().clone().unwrap()))
-            .collect();
-        vec.into()
     }
 
     pub fn add_process(&mut self, label: Label, id: ActingProcessId) {
@@ -41,7 +33,7 @@ impl RefinementProcess {
         self.childs
             .iter()
             .filter_map(|(k, v)| {
-                if let Label::Action(_) = k {
+                if let Label::Task(_) = k {
                     Some(*v)
                 } else {
                     None
@@ -67,7 +59,7 @@ impl RefinementProcess {
         self.childs
             .iter()
             .filter_map(|(k, v)| {
-                if let Label::Acquire(_) = k {
+                if let Label::ResourceAcquisition(_) = k {
                     Some(*v)
                 } else {
                     None

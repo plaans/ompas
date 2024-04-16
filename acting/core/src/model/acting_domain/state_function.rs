@@ -8,15 +8,23 @@ pub struct StateFunction {
     label: String,
     pub parameters: Parameters,
     pub result: Domain,
-    pub body: LValue,
+    pub result_debug: String,
+    pub body: Option<LValue>,
 }
 
 impl StateFunction {
-    pub fn new(label: String, parameters: Parameters, result: Domain, body: LValue) -> Self {
+    pub fn new(
+        label: String,
+        parameters: Parameters,
+        result: Domain,
+        result_debug: String,
+        body: Option<LValue>,
+    ) -> Self {
         Self {
             label,
             parameters,
             result,
+            result_debug,
             body,
         }
     }
@@ -28,8 +36,11 @@ impl Display for StateFunction {
             f,
             "parameter(s) : {}\nresult: {}\nbody: {}",
             self.parameters,
-            self.result,
-            self.body.format("body: ".len()),
+            self.result_debug,
+            match &self.body {
+                Some(body) => body.format("body: ".len()),
+                None => "".to_string(),
+            },
         )
     }
 }
@@ -39,7 +50,7 @@ impl StateFunction {
         &self.parameters
     }
 
-    pub fn get_body(&self) -> &LValue {
+    pub fn get_body(&self) -> &Option<LValue> {
         &self.body
     }
 

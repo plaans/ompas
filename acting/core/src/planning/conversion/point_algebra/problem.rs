@@ -34,13 +34,12 @@ pub fn try_into_pa_relation(
     let timepoint_domain = sym_table.get_type_as_domain(TYPE_TIMEPOINT).unwrap();
 
     if let Ok(i) = constraint.get_left().try_into() {
-        let p_i = sym_table.get_var_parent(&i);
+        let p_i = sym_table.get_var_parent(i);
         if let Ok(j) = constraint.get_right().try_into() {
-            let p_j = sym_table.get_var_parent(&j);
-            if sym_table.contained_in_domain(&sym_table.get_domain_of_var(&p_i), &timepoint_domain)
-            {
+            let p_j = sym_table.get_var_parent(j);
+            if sym_table.contained_in_domain(&sym_table.get_domain_of_var(p_i), &timepoint_domain) {
                 if sym_table
-                    .contained_in_domain(&sym_table.get_domain_of_var(&p_j), &timepoint_domain)
+                    .contained_in_domain(&sym_table.get_domain_of_var(p_j), &timepoint_domain)
                 {
                     Ok(Relation::new(p_i, p_j, relation_type))
                 } else {

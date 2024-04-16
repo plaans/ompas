@@ -1,4 +1,6 @@
+use sompas_structs::lnumber::LNumber;
 use sompas_structs::lvalue::LValue;
+use std::ops::Deref;
 use std::sync::Arc;
 
 pub const VALUE_NO_APPLICABLE_METHOD: usize = 0;
@@ -14,6 +16,20 @@ pub enum RaeExecError {
 }
 
 impl RaeExecError {
+    pub fn format_err(err: &LValue) -> String {
+        match err {
+            LValue::Err(e) => {
+                if let LValue::Number(LNumber::Int(i)) = e.deref() {
+                    let error = Self::i64_as_err(*i);
+                    format!("{:?}", error)
+                } else {
+                    e.to_string()
+                }
+            }
+            lv => lv.to_string(),
+        }
+    }
+
     pub fn i64_as_err(i: i64) -> RaeExecError {
         match i {
             0 => Self::NoApplicableMethod,

@@ -1,21 +1,19 @@
+use crate::default_gobot_sim_path;
 use crate::platform_server::PlatformGobotSimService;
 use crate::tcp::task_tcp_connection;
 use crate::TOKIO_CHANNEL_SIZE;
-use crate::{default_gobot_sim_path, PROCESS_TOPIC_GOBOT_SIM};
 use async_trait::async_trait;
-use ompas_core::ompas::scheme::exec::platform::lisp_domain::LispDomain;
-use ompas_core::ompas::scheme::exec::platform::platform_config::{
-    InnerPlatformConfig, PlatformConfig,
-};
-use ompas_core::ompas::scheme::exec::platform::PlatformDescriptor;
-use ompas_core::ompas_path;
+use ompas_core::ompas::manager::platform::platform_config::{InnerPlatformConfig, PlatformConfig};
+use ompas_core::ompas::manager::platform::scheme_domain::SchemeDomain;
+use ompas_core::ompas::manager::platform::PlatformDescriptor;
+use ompas_core::OMPAS_PATH;
 use ompas_interface::platform_interface::platform_interface_server::PlatformInterfaceServer;
 use ompas_language::interface::{
     DEFAULT_PLATFORM_SERVICE_IP, DEFAULT_PLATFROM_SERVICE_PORT, LOG_TOPIC_PLATFORM,
-    PROCESS_TOPIC_PLATFORM,
 };
+use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::logger::LogClient;
-use ompas_middleware::ProcessInterface;
+use ompas_middleware::{LogLevel, ProcessInterface};
 use sompas_structs::lmodule::LModule;
 use sompas_structs::lruntimeerror::LResult;
 use sompas_structs::lvalue::LValue;
@@ -47,7 +45,7 @@ pub struct PlatformGobotSim {
     pub service_info: SocketAddr,
     pub godot_tcp_info: SocketAddr,
     pub headless: bool,
-    pub domain: LispDomain,
+    pub domain: SchemeDomain,
     pub config: String,
     pub log: LogClient,
 }
@@ -64,7 +62,7 @@ impl Default for PlatformGobotSim {
                 .parse()
                 .unwrap(),
             headless: false,
-            domain: LispDomain::default(),
+            domain: SchemeDomain::default(),
             config: "".to_string(),
             log: Default::default(),
         }
@@ -72,7 +70,7 @@ impl Default for PlatformGobotSim {
 }
 
 impl PlatformGobotSim {
-    pub fn new(domain: LispDomain, headless: bool, log: LogClient) -> Self {
+    pub fn new(domain: SchemeDomain, headless: bool, log: LogClient) -> Self {
         PlatformGobotSim {
             service_info: format!(
                 "{}:{}",
@@ -137,18 +135,13 @@ impl PlatformGobotSim {
             },
         };
 
-        let mut process = ProcessInterface::new(
-            PROCESS_GOBOT_SIM,
-            PROCESS_TOPIC_GOBOT_SIM,
-            LOG_TOPIC_PLATFORM,
-        )
-        .await;
+        let mut process =
+            ProcessInterface::new(PROCESS_GOBOT_SIM, PROCESS_TOPIC_OMPAS, LOG_TOPIC_PLATFORM).await;
 
         tokio::spawn(async move {
-            //blocked on the reception of the end signal.
             process.recv().await.expect("error receiving kill message");
             child.kill().expect("could not kill godot");
-            //process.die().await;
+            process.log("Godot simulator killed", LogLevel::Info);
         });
         Ok(LValue::Nil)
     }
@@ -157,7 +150,7 @@ impl PlatformGobotSim {
     pub async fn open_com(&self) -> LResult {
         let socket_addr = self.godot_tcp_info;
 
-        let (tx_request, rx_request) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx_request, rx_request) = mpsc::unbounded_channel();
         let (tx_response, rx_response) = tokio::sync::broadcast::channel(TOKIO_CHANNEL_SIZE);
         let (tx_update, rx_update) = tokio::sync::broadcast::channel(TOKIO_CHANNEL_SIZE);
 
@@ -168,12 +161,9 @@ impl PlatformGobotSim {
         };
         let server_info: SocketAddr = self.socket().await;
         tokio::spawn(async move {
-            let mut process = ProcessInterface::new(
-                PROCESS_SERVER_GRPC,
-                PROCESS_TOPIC_PLATFORM,
-                LOG_TOPIC_PLATFORM,
-            )
-            .await;
+            let mut process =
+                ProcessInterface::new(PROCESS_SERVER_GRPC, PROCESS_TOPIC_OMPAS, LOG_TOPIC_PLATFORM)
+                    .await;
 
             //println!("Serving : {}", server_info);
             let server = Server::builder().add_service(PlatformInterfaceServer::new(service));
@@ -206,7 +196,7 @@ impl PlatformGobotSim {
         match cmd!(sh, "which godot3.5").quiet().read() {
             Ok(s) => Some(s.into()),
             Err(_) => {
-                let ompas_path = ompas_path();
+                let ompas_path = OMPAS_PATH.get_ref();
                 let path =
                     PathBuf::from(format!("{}/ompas-gobot-sim/gobot-bin/godot3.5", ompas_path));
                 if path.is_file() {
@@ -223,7 +213,7 @@ impl PlatformGobotSim {
         match cmd!(sh, "which godot3.5-headless").quiet().read() {
             Ok(s) => Some(s.into()),
             Err(_) => {
-                let ompas_path = ompas_path();
+                let ompas_path = OMPAS_PATH.get_ref();
                 let path = PathBuf::from(format!(
                     "{}/ompas-gobot-sim/gobot-bin/godot3.5-headless",
                     ompas_path
@@ -255,7 +245,7 @@ impl PlatformGobotSim {
         let sh = Shell::new().unwrap();
 
         self.check_dependencies();
-        sh.change_dir(format!("{}/ompas-gobot-sim", ompas_path()));
+        sh.change_dir(format!("{}/ompas-gobot-sim", OMPAS_PATH.get_ref()));
         sh.create_dir("gobot-bin")
             .expect("Could not create dir gobot-bin");
         sh.change_dir("gobot-bin");
@@ -283,7 +273,7 @@ impl PlatformGobotSim {
         let sh = Shell::new().unwrap();
 
         self.check_dependencies();
-        sh.change_dir(format!("{}/ompas-gobot-sim", ompas_path()));
+        sh.change_dir(format!("{}/ompas-gobot-sim", OMPAS_PATH.get_ref()));
         sh.create_dir("gobot-bin")
             .expect("Could not create dir gobot-bin");
         sh.change_dir("gobot-bin");
@@ -306,7 +296,10 @@ impl PlatformGobotSim {
         // godot3 -e --quit (imports the project and quits).
         // Needed to generate the .import directory
         let sh = Shell::new().unwrap();
-        sh.change_dir(format!("{}/ompas-gobot-sim/gobot-sim/simu", ompas_path()));
+        sh.change_dir(format!(
+            "{}/ompas-gobot-sim/gobot-sim/simu",
+            OMPAS_PATH.get_ref()
+        ));
 
         if !sh.path_exists(format!("{}/.import", sh.current_dir().to_str().unwrap())) {
             print!("Init gobot-sim project in godot...");
@@ -336,33 +329,28 @@ impl PlatformDescriptor for PlatformGobotSim {
 
         match self.start_platform(config).await {
             Ok(_) => {
-                self.log.info("Successfully started platform.").await;
+                self.log.info("Successfully started platform.");
                 match self.open_com().await {
                     Ok(_) => {
-                        self.log.info("Successfully open com with platform.").await;
+                        self.log.info("Successfully open com with platform.");
                     }
                     Err(e) => {
                         self.log
-                            .error(format!("Error opening com with platform: {e}."))
-                            .await;
+                            .error(format!("Error opening com with platform: {e}."));
                     }
                 }
             }
             Err(e) => {
-                self.log
-                    .error(format!("Error starting platform: {e}"))
-                    .await;
+                self.log.error(format!("Error starting platform: {e}"));
             }
         }
     }
 
     async fn stop(&self) {
-        self.log
-            .info("Process Gobot-Sim killed via subscriptions of its different processes.")
-            .await;
+        //
     }
 
-    async fn domain(&self) -> LispDomain {
+    async fn domain(&self) -> SchemeDomain {
         self.domain.clone()
     }
 

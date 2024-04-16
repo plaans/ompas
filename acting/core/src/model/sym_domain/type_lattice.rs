@@ -1,11 +1,12 @@
 use crate::model::sym_domain::basic_type::BasicType::*;
-use crate::model::sym_domain::basic_type::{TYPE_BOOL, TYPE_BOOLEAN, TYPE_ID_EMPTY};
+use crate::model::sym_domain::basic_type::TYPE_ID_EMPTY;
 use crate::model::sym_domain::simple_type::SimpleType;
 use crate::model::sym_domain::Domain::*;
-use crate::model::sym_domain::{Domain, TypeId};
+use crate::model::sym_domain::{Domain, DomainSubstitution, TypeId};
+use map_macro::hash_set;
 use ompas_language::sym_table::{
     TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_METHOD, TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_PREDICATE,
-    TYPE_PRESENCE, TYPE_RESSOURCE_HANDLE, TYPE_STATE_FUNCTION, TYPE_TASK, TYPE_TIMEPOINT,
+    TYPE_RESOURCE_HANDLE, TYPE_STATE_FUNCTION, TYPE_TASK, TYPE_TIMEPOINT,
 };
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Display, Write};
@@ -42,8 +43,8 @@ impl Default for TypeLattice {
         dc.add_type(Handle, vec![]);
         dc.add_type(Number, vec![]);
         dc.add_type(Nil, vec![]);
-        dc.add_type(Int, vec![Number as usize]);
         dc.add_type(Float, vec![Number as usize]);
+        dc.add_type(Int, vec![Number as usize, Float as usize]);
         dc.add_decomposition(Number as usize, vec![Int as usize, Float as usize]);
         dc.add_type(Symbol, vec![]);
         dc.add_type(EmptyList, vec![List as usize, Nil as usize]);
@@ -73,7 +74,7 @@ impl Default for TypeLattice {
                 Number as usize,
             ],
         );
-        dc.add_alias(TYPE_BOOLEAN, TYPE_BOOL);
+        //dc.add_alias(TYPE_BOOLEAN, TYPE_BOOL);
 
         dc
     }
@@ -83,12 +84,13 @@ impl TypeLattice {
     pub fn new() -> Self {
         let mut lt = Self::default();
         //Type linked to the resource representation
-        lt.add_type(TYPE_RESSOURCE_HANDLE, vec![]);
+        lt.add_type(TYPE_RESOURCE_HANDLE, vec![]);
 
         //Type linked to the planning objects
-        lt.add_alias(Number, TYPE_TIMEPOINT);
-
-        lt.add_alias(Boolean, TYPE_PRESENCE);
+        //lt.add_alias(Number, TYPE_TIMEPOINT);
+        lt.add_type(TYPE_TIMEPOINT, vec![Float as usize, Int as usize]);
+        //lt.add_type(TYPE_PRESENCE, vec![True as usize, False as usize]);
+        //lt.add_alias(Boolean, TYPE_PRESENCE);
 
         lt.add_type(TYPE_ABSTRACT_TASK, vec![Symbol as usize]);
         lt.add_type(
@@ -118,7 +120,10 @@ impl TypeLattice {
         self.childs.push(vec![]);
         self.parents.push(vec![]);
         self.decomposition.push(vec![]);
-        let p_id = *self.ids.get(t.to_string().as_str()).unwrap();
+        let p_id = *self
+            .ids
+            .get(t.to_string().to_ascii_lowercase().as_str())
+            .unwrap();
         self.aliases.insert(id, p_id);
         id
     }
@@ -205,7 +210,98 @@ impl TypeLattice {
         &self.decomposition[*id]
     }
 
+    fn _substitute_aliases(&self, d: &Domain) -> (Domain, HashSet<DomainSubstitution>) {
+        let mut substitutions: HashSet<_> = HashSet::default();
+        let mut add_subs = |sub: HashSet<DomainSubstitution>| {
+            for s in sub {
+                substitutions.insert(s);
+            }
+        };
+
+        let d = match d {
+            Simple(s) => match self.aliases.get(s) {
+                None => Simple(*s),
+                Some(id) => {
+                    add_subs(hash_set!(DomainSubstitution {
+                        alias: *s,
+                        base: *id,
+                    }));
+                    Simple(*id)
+                }
+            },
+            Composed(t, c) => {
+                let t = match self.aliases.get(t) {
+                    None => *t,
+                    Some(id) => {
+                        add_subs(hash_set! {DomainSubstitution {
+                            alias: *t,
+                            base: *id,
+                        }});
+                        *id
+                    }
+                };
+
+                Composed(
+                    t,
+                    c.iter()
+                        .map(|c| {
+                            let (t, sub) = self._substitute_aliases(c);
+                            add_subs(sub);
+                            t
+                        })
+                        .collect(),
+                )
+            }
+            Union(u) => Union(
+                u.iter()
+                    .map(|d| {
+                        let (d, subs) = self._substitute_aliases(d);
+                        add_subs(subs);
+                        d
+                    })
+                    .collect(),
+            ),
+            Substract(t, s) => {
+                let (t, sub) = self._substitute_aliases(t);
+                add_subs(sub);
+                let (s, sub) = self._substitute_aliases(s);
+                add_subs(sub);
+                Substract(Box::new(t), Box::new(s))
+            }
+            Cst(t, c) => {
+                let (t, sub) = self._substitute_aliases(t);
+                add_subs(sub);
+                Cst(Box::new(t), c.clone())
+            }
+            Application(a, args, r) => {
+                let (a, sub) = self._substitute_aliases(a);
+                add_subs(sub);
+                let (r, sub) = self._substitute_aliases(r);
+                add_subs(sub);
+                Application(
+                    Box::new(a),
+                    args.iter()
+                        .map(|d| {
+                            let (d, sub) = self._substitute_aliases(d);
+                            add_subs(sub);
+                            d
+                        })
+                        .collect(),
+                    Box::new(r),
+                )
+            }
+            _ => d.clone(),
+        };
+        (d, substitutions)
+    }
+
     pub fn contained_in(&self, d1: &Domain, d2: &Domain) -> bool {
+        //let (d1, _) = &self.substitute_aliases(d1);
+        //let (d2, _) = &self.substitute_aliases(d2);
+        self.__contained_in(d1, d2)
+    }
+
+    fn __contained_in(&self, d1: &Domain, d2: &Domain) -> bool {
         match (d1, d2) {
             (Simple(t1), Simple(t2)) => {
                 let childs_t2 = self.get_all_childs(t2);
@@ -217,7 +313,7 @@ impl TypeLattice {
                 childs_t2.contains(top1)
             }
             (Cst(d1, c1), Cst(d2, c2)) => {
-                if self.contained_in(d1, d2) {
+                if self.__contained_in(d1, d2) {
                     c1 == c2
                 } else {
                     false
@@ -226,7 +322,7 @@ impl TypeLattice {
             (Composed(top1, comp1), Composed(top2, comp2)) => {
                 if top1 == top2 && comp1.len() == comp2.len() {
                     for (d1, d2) in comp1.iter().zip(comp2) {
-                        if !self.contained_in(d1, d2) {
+                        if !self.__contained_in(d1, d2) {
                             return false;
                         }
                     }
@@ -238,7 +334,7 @@ impl TypeLattice {
             (Union(u1), Union(_)) => {
                 for t1 in u1 {
                     //println!("Meet {ta} and {tb}.");
-                    if !self.contained_in(t1, d2) {
+                    if !self.__contained_in(t1, d2) {
                         return false;
                     }
                 }
@@ -247,26 +343,26 @@ impl TypeLattice {
             (Union(_), _) => false,
             (t, Union(u2)) => {
                 for t2 in u2 {
-                    if self.contained_in(t, t2) {
+                    if self.__contained_in(t, t2) {
                         return true;
                     }
                 }
                 false
             }
-            (Substract(t1, _), t2) => self.contained_in(t1.deref(), t2),
+            (Substract(t1, _), t2) => self.__contained_in(t1.deref(), t2),
             (_, Substract(_, _)) => todo!(),
 
-            (Cst(d1, _), t2) => self.contained_in(d1, t2),
+            (Cst(d1, _), t2) => self.__contained_in(d1, t2),
             (_, Cst(_, _)) => false,
             (Application(t1, params_1, r_1), Application(t2, params_2, r_2)) => {
-                if self.contained_in(t1, t2) {
+                if self.__contained_in(t1, t2) {
                     if params_1.len() == params_2.len() {
                         for (p_1, p_2) in params_1.iter().zip(params_2) {
-                            if !self.contained_in(p_1, p_2) {
+                            if !self.__contained_in(p_1, p_2) {
                                 return false;
                             }
                         }
-                        self.contained_in(r_1, r_2)
+                        self.__contained_in(r_1, r_2)
                     } else {
                         false
                     }
@@ -278,15 +374,25 @@ impl TypeLattice {
         }
     }
 
-    pub(crate) fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub fn meet(&self, t1: &Domain, t2: &Domain) -> Domain {
+        //let (d1, subs) = self.substitute_aliases(t1);
+        //let (d2, subs2) = self.substitute_aliases(t2);
+        // let r = self.__meet(d1, d2);
+        // r.substitute(subs.union(&subs2).cloned().collect())
+        self.__meet(t1, t2)
+    }
+
+    fn __meet(&self, t1: &Domain, t2: &Domain) -> Domain {
         match (t1, t2) {
             (Simple(t1), Simple(t2)) => {
                 if t1 == t2 {
                     Simple(*t1)
                 } else {
-                    let childs_t1 = self.get_all_childs(t1);
+                    let mut childs_t1 = self.get_all_childs(t1);
+                    childs_t1.sort();
                     //println!("childs of {t1}: {:?}", childs_t1);
-                    let childs_t2 = self.get_all_childs(t2);
+                    let mut childs_t2 = self.get_all_childs(t2);
+                    childs_t2.sort();
                     //println!("childs of {t2}: {:?}", childs_t2);
 
                     for child_1 in &childs_t1 {
@@ -390,6 +496,7 @@ impl TypeLattice {
                 }
             }
             (Application(_, _, _), Application(_, _, _)) => {
+                //println!("meet({}, {})", t1.format(&self), t2.format(&self));
                 todo!()
             }
             (Application(t_app, params, r), Simple(t2))
@@ -401,11 +508,22 @@ impl TypeLattice {
                     Application(Box::new(t), params.clone(), r.clone())
                 }
             }
-            _ => todo!(),
+            (_, _) => {
+                //println!("meet({}, {})", t1.format(&self), t2.format(&self));
+                todo!()
+            }
         }
     }
 
-    pub(crate) fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub fn union(&self, t1: &Domain, t2: &Domain) -> Domain {
+        // let (t1, subs) = self.substitute_aliases(t1);
+        // let (t2, subs2) = self.substitute_aliases(t2);
+        // self.__union(&t1, &t2)
+        //     .substitute(subs.union(&subs2).cloned().collect())
+        self.__union(t1, t2)
+    }
+
+    fn __union(&self, t1: &Domain, t2: &Domain) -> Domain {
         if t1.is_any() || t2.is_any() {
             Domain::any()
         } else if t1.is_empty() {
@@ -508,40 +626,14 @@ impl TypeLattice {
                     }
                     self.simplify_union(types)
                 }
-                (Substract(t1, t2), t3) => {
-                    /*println!(
-                        "debug: ({}/{})|{} = ({}|{})/({}/({}^{}))",
-                        t1.format(&self),
-                        t2.format(&self),
-                        t3.format(&self),
-                        t1.format(&self),
-                        t3.format(&self),
-                        t2.format(&self),
-                        t2.format(&self),
-                        t3.format(&self)
-                    );*/
-                    self.__substract(
-                        &self.__union(t1.deref(), t3),
-                        &self.__substract(t2.deref(), &self.__meet(t2.deref(), t3)),
-                    )
-                }
-                (t1, Substract(t2, t3)) => {
-                    /*println!(
-                        "debug: {}|({}/{})| = ({}|{})/({}/({}^{}))",
-                        t1.format(&self),
-                        t2.format(&self),
-                        t3.format(&self),
-                        t1.format(&self),
-                        t2.format(&self),
-                        t3.format(&self),
-                        t3.format(&self),
-                        t1.format(&self)
-                    );*/
-                    self.__substract(
-                        &self.__union(t1, t2.deref()),
-                        &self.__substract(t3.deref(), &self.__meet(t3.deref(), t1)),
-                    )
-                }
+                (Substract(t1, t2), t3) => self.__substract(
+                    &self.__union(t1.deref(), t3),
+                    &self.__substract(t2.deref(), &self.__meet(t2.deref(), t3)),
+                ),
+                (t1, Substract(t2, t3)) => self.__substract(
+                    &self.__union(t1, t2.deref()),
+                    &self.__substract(t3.deref(), &self.__meet(t3.deref(), t1)),
+                ),
 
                 (Cst(d1, _), t2) => {
                     let union = self.__union(d1, t1);
@@ -566,7 +658,54 @@ impl TypeLattice {
         }
     }
 
-    pub(crate) fn __substract(&self, t1: &Domain, t2: &Domain) -> Domain {
+    pub fn get_aliases(&self, t: &Domain) -> HashSet<(TypeId, TypeId)> {
+        let mut set: HashSet<(_, _)> = Default::default();
+
+        match t {
+            Simple(t) => {
+                if let Some(id) = self.aliases.get(t) {
+                    set.insert((*t, *id));
+                }
+            }
+            Composed(c, d) => {
+                set = set.union(&self.get_aliases(&Simple(*c))).cloned().collect();
+                for t in d {
+                    set = set.union(&self.get_aliases(t)).cloned().collect();
+                }
+            }
+            Union(u) => {
+                for t in u {
+                    set = set.union(&self.get_aliases(t)).cloned().collect();
+                }
+            }
+            Substract(s, c) => {
+                set = set.union(&self.get_aliases(s)).cloned().collect();
+                set = set.union(&self.get_aliases(c)).cloned().collect();
+            }
+            Cst(t, _) => {
+                set = self.get_aliases(t);
+            }
+            IntRange(_, _) => {}
+            Application(f, args, r) => {
+                set = set.union(&self.get_aliases(f)).cloned().collect();
+                set = set.union(&self.get_aliases(r)).cloned().collect();
+                for t in args {
+                    set = set.union(&self.get_aliases(t)).cloned().collect();
+                }
+            }
+        };
+        set
+    }
+
+    pub fn substract(&self, t1: &Domain, t2: &Domain) -> Domain {
+        //let (t2, subs) = self.substitute_aliases(t2);
+        //let (t1, subs2) = self.substitute_aliases(t1);
+        //self.__substract(&t1, &t2)
+        //    .substitute(subs.union(&subs2).cloned().collect())
+        self.__substract(t1, t2)
+    }
+
+    fn __substract(&self, t1: &Domain, t2: &Domain) -> Domain {
         let meet = self.__meet(t1, t2);
         if meet == Simple(Empty as usize) {
             t1.clone()
@@ -628,17 +767,7 @@ impl TypeLattice {
                         Substract(Box::new(t), Box::new(t1.clone()))
                     }
                 }
-                (Substract(t1, t2), t3) => {
-                    /*println!(
-                        "debug: {}/{} = {}/({}|{})",
-                        ta.format(&self),
-                        tb.format(&self),
-                        t1.format(&self),
-                        t2.format(&self),
-                        tb.format(&self)
-                    );*/
-                    Substract(t1.clone(), Box::new(self.__union(t2, t3)))
-                }
+                (Substract(t1, t2), t3) => Substract(t1.clone(), Box::new(self.__union(t2, t3))),
                 (Cst(d1, c1), Cst(d2, c2)) => {
                     if c1 == c2 {
                         let sub = self.__substract(d1, d2);
@@ -657,7 +786,7 @@ impl TypeLattice {
         }
     }
 
-    pub(crate) fn simplify_union(&self, set: HashSet<Domain>) -> Domain {
+    pub fn simplify_union(&self, set: HashSet<Domain>) -> Domain {
         let mut tested: HashSet<TypeId> = Default::default();
         let mut simples: HashSet<TypeId> = Default::default();
         let mut others: HashSet<Domain> = Default::default();
@@ -714,14 +843,6 @@ impl TypeLattice {
             _ => Union(types),
         }
     }
-
-    /*fn add_child(&mut self, id_type: TypeId, id_child: TypeId) {
-        let childs = &mut self.childs[id_type];
-        if childs[0] == Empty as usize {
-            childs.remove(0);
-        }
-        childs.push(id_child);
-    }*/
 
     pub fn export_dot(&self) -> String {
         let mut dot: String = "digraph {\n".to_string();

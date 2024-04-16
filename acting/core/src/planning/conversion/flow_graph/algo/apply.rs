@@ -2,6 +2,7 @@ use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::constraint::Constraint;
 use crate::model::chronicle::lit::{AcquireLit, Lit, LitSet};
 use crate::model::process_ref::Label;
+use crate::model::sym_domain::basic_type::BasicType;
 use crate::model::sym_domain::basic_type::BasicType::{Boolean, Float, True};
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::closure::Update;
@@ -20,12 +21,12 @@ use ompas_language::exec::platform::EXEC_COMMAND;
 use ompas_language::exec::refinement::EXEC_TASK;
 use ompas_language::exec::resource::RELEASE;
 use ompas_language::exec::state::{
-    ASSERT, ASSERT_SHORT, INSTANCE, INSTANCES, READ_STATE, READ_STATIC_STATE, TRANSITIVE_ASSERT,
-    WAIT_FOR,
+    ASSERT, ASSERT_SHORT, DURATIVE_EFFECT, EFFECT, INSTANCE, INSTANCES, READ_STATE,
+    READ_STATIC_STATE, WAIT_FOR,
 };
 use ompas_language::exec::ARBITRARY;
 use ompas_language::supervisor::ACQUIRE;
-use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESSOURCE_HANDLE};
+use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_RESOURCE_HANDLE};
 use sompas_language::basic_math::{ADD, DIV, EQ, GEQ, GT, LEQ, LT, MUL, NEQ, NOT, NOT_SHORT, SUB};
 use sompas_language::error::IS_ERR;
 use sompas_language::io::PRINT;
@@ -66,7 +67,8 @@ impl Default for ApplyConversionCollection {
         d.add_conversion(EXEC_TASK, convert_exec);
         d.add_conversion(ASSERT, convert_assert);
         d.add_conversion(ASSERT_SHORT, convert_assert);
-        d.add_conversion(TRANSITIVE_ASSERT, convert_transitive_assert);
+        d.add_conversion(EFFECT, convert_assert);
+        d.add_conversion(DURATIVE_EFFECT, convert_transitive_effect);
         d.add_conversion(READ_STATE, convert_read_state);
         d.add_conversion(READ_STATIC_STATE, convert_read_state);
         d.add_conversion(EQ, convert_eq);
@@ -115,7 +117,7 @@ pub fn convert_apply(
         seq.push(convert_lv(e, fl, &mut define_table)?);
     }
 
-    let results: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let results: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(*f)).collect();
 
     let flow_apply = match conv_collection.get_conversion(proc) {
         Some(proc) => proc(fl, seq)?,
@@ -125,22 +127,25 @@ pub fn convert_apply(
         }
     };
 
-    let end = fl.get_flow_end(&flow_apply);
+    let end = fl.get_flow_end(flow_apply);
 
     for o in results {
-        fl.st.set_drop(&o, &end);
+        fl.st.set_drop(o, end);
     }
     Ok(flow_apply)
 }
 
 fn convert_is_err(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let flow_apply = fl.new_instantaneous_assignment(Lit::Apply(
-        seq.iter().map(|f| fl.get_flow_result(f)).collect(),
+        seq.iter().map(|f| fl.get_flow_result(*f)).collect(),
     ));
-    let result_is_err = fl.get_flow_result(&flow_apply);
-    fl.st.set_domain(&result_is_err, Boolean);
+    let st = fl.st.clone();
+    let result_is_err = fl.get_flow_result(flow_apply);
+    let result_is_err = st.get_domain_id(result_is_err);
+    fl.st.set_domain(result_is_err, Boolean);
     assert_eq!(seq.len(), 2);
-    let arg_is_err = fl.get_flow_result(&seq[1]);
+    let arg_is_err = fl.get_flow_result(seq[1]);
+    let arg_is_err = st.get_domain_id(arg_is_err);
     fl.st.add_update(
         vec![result_is_err],
         Update::new(
@@ -164,11 +169,11 @@ fn convert_exec(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRun
     seq.remove(0);
 
     let flow_apply = fl.new_assignment(Lit::Exec(
-        seq.iter().map(|f| fl.get_flow_result(f)).collect(),
+        seq.iter().map(|f| fl.get_flow_result(*f)).collect(),
     ));
-    let flow_result = fl.get_flow_result(&flow_apply);
+    let flow_result = fl.get_flow_result(flow_apply);
 
-    fl.st.set_domain(&flow_result, Domain::nil());
+    fl.st.set_domain_of_var(flow_result, Domain::nil());
     seq.push(fl.new_assignment(fl.st.new_nil()));
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -178,7 +183,7 @@ fn convert_read_state(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId
     seq.remove(0);
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::Read(
-        seq.iter().map(|f| fl.get_flow_result(f)).collect(),
+        seq.iter().map(|f| fl.get_flow_result(*f)).collect(),
     ));
 
     seq.push(flow_apply);
@@ -189,29 +194,29 @@ fn convert_assert(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LR
     seq.remove(0);
 
     let flow_apply = fl.new_assignment(Lit::Write(
-        seq.iter().map(|f| fl.get_flow_result(f)).collect(),
+        seq.iter().map(|f| fl.get_flow_result(*f)).collect(),
     ));
 
     fl.st
-        .set_domain(&fl.get_flow_result(&flow_apply), Domain::nil());
+        .set_domain_of_var(fl.get_flow_result(flow_apply), Domain::nil());
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
 
-fn convert_transitive_assert(
+fn convert_transitive_effect(
     fl: &mut FlowGraph,
     mut seq: Vec<FlowId>,
 ) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
-    let duration = seq.pop().unwrap();
+    let duration = seq.remove(0);
 
     let flow_apply = fl.new_assignment(Lit::Write(
-        seq.iter().map(|f| fl.get_flow_result(f)).collect(),
+        seq.iter().map(|f| fl.get_flow_result(*f)).collect(),
     ));
 
     fl.st
-        .set_domain(&fl.get_flow_result(&flow_apply), Domain::nil());
-    fl.set_duration(&flow_apply, fl.get_flow_result(&duration));
+        .set_domain_of_var(fl.get_flow_result(flow_apply), Domain::nil());
+    fl.set_duration(flow_apply, fl.get_flow_result(duration));
     seq.push(duration);
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -220,11 +225,13 @@ fn convert_transitive_assert(
 fn convert_eq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let left = fl.get_flow_result(&seq[0]);
-    let right = fl.get_flow_result(&seq[1]);
+    let left = fl.get_flow_result(seq[0]);
+    let right = fl.get_flow_result(seq[1]);
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::eq(left, right))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -233,12 +240,13 @@ fn convert_eq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunti
 fn convert_leq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let left = fl.get_flow_result(&seq[0]);
-    let right = fl.get_flow_result(&seq[1]);
+    let left = fl.get_flow_result(seq[0]);
+    let right = fl.get_flow_result(seq[1]);
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::leq(left, right))));
-
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -246,11 +254,13 @@ fn convert_leq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_lt(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let left = fl.get_flow_result(&seq[0]);
-    let right = fl.get_flow_result(&seq[1]);
+    let left = fl.get_flow_result(seq[0]);
+    let right = fl.get_flow_result(seq[1]);
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::lt(left, right))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -259,11 +269,13 @@ fn convert_lt(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunti
 fn convert_gt(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let left = fl.get_flow_result(&seq[0]);
-    let right = fl.get_flow_result(&seq[1]);
+    let left = fl.get_flow_result(seq[0]);
+    let right = fl.get_flow_result(seq[1]);
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::lt(right, left))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -272,11 +284,13 @@ fn convert_gt(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunti
 fn convert_geq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let left = fl.get_flow_result(&seq[0]);
-    let right = fl.get_flow_result(&seq[1]);
+    let left = fl.get_flow_result(seq[0]);
+    let right = fl.get_flow_result(seq[1]);
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::leq(right, left))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -285,10 +299,13 @@ fn convert_geq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_not(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let val = fl.get_flow_result(&seq[0]);
+    let val = fl.get_flow_result(seq[0]);
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::not(val))));
+
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -297,11 +314,13 @@ fn convert_not(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_neq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let a = fl.get_flow_result(&seq[0]);
-    let b = fl.get_flow_result(&seq[1]);
+    let a = fl.get_flow_result(seq[0]);
+    let b = fl.get_flow_result(seq[1]);
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::neq(a, b))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -310,10 +329,12 @@ fn convert_neq(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_and(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(*f)).collect();
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::and(args))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -322,10 +343,12 @@ fn convert_and(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_or(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(*f)).collect();
 
     let flow_apply =
         fl.new_instantaneous_assignment(Lit::Constraint(Box::new(Constraint::or(args))));
+    let result = fl.get_flow_result(flow_apply);
+    fl.st.set_domain_of_var(result, BasicType::Boolean);
 
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
@@ -334,13 +357,11 @@ fn convert_or(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunti
 fn convert_add(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(*f)).collect();
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::add(args)));
-    fl.st.set_domain(
-        &fl.st.get_domain_id(&fl.get_flow_result(&flow_apply)),
-        Float,
-    );
+    fl.st
+        .set_domain(fl.st.get_domain_id(fl.get_flow_result(flow_apply)), Float);
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -348,13 +369,11 @@ fn convert_add(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_sub(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(*f)).collect();
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::sub(args)));
-    fl.st.set_domain(
-        &fl.st.get_domain_id(&fl.get_flow_result(&flow_apply)),
-        Float,
-    );
+    fl.st
+        .set_domain_of_var(fl.get_flow_result(flow_apply), Float);
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -362,13 +381,11 @@ fn convert_sub(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_mul(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(*f)).collect();
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::mul(args)));
-    fl.st.set_domain(
-        &fl.st.get_domain_id(&fl.get_flow_result(&flow_apply)),
-        Float,
-    );
+    fl.st
+        .set_domain_of_var(fl.get_flow_result(flow_apply), Float);
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
@@ -376,21 +393,19 @@ fn convert_mul(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRunt
 fn convert_div(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq.remove(0);
 
-    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let args: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(*f)).collect();
 
     let flow_apply = fl.new_instantaneous_assignment(Lit::computation(Computation::div(args)));
-    fl.st.set_domain(
-        &fl.st.get_domain_id(&fl.get_flow_result(&flow_apply)),
-        Float,
-    );
+    fl.st
+        .set_domain_of_var(fl.get_flow_result(flow_apply), Float);
     seq.push(flow_apply);
     Ok(fl.new_seq(seq))
 }
 
 fn convert_wait_for(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     seq[0] = fl.new_assignment(fl.st.new_nil());
-    let last = fl.get_flow_result(seq.last().unwrap());
-    fl.st.set_domain(&fl.st.get_domain_id(&last), True);
+    let last = fl.get_flow_result(*seq.last().unwrap());
+    fl.st.set_domain_of_var(last, True);
     let nil = fl.st.new_nil();
     let result = fl.new_instantaneous_assignment(nil);
     seq.push(result);
@@ -401,7 +416,7 @@ fn convert_wait_for(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, 
 #[named]
 fn convert_arbitrary(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let lit = fl
-        .try_get_flow_lit(&seq[1])
+        .try_get_flow_lit(seq[1])
         .ok_or_else(|| LRuntimeError::new(function_name!(), "arg of arbitrary is not a lit"))?;
 
     match lit {
@@ -418,7 +433,7 @@ fn convert_arbitrary(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRu
             for e in exp {
                 if let Lit::Atom(a) = e {
                     set.push(a);
-                    let d_var = fl.st.get_domain_of_var(&a).get_type();
+                    let d_var = fl.st.get_domain_of_var(a).get_type();
                     domain = fl.st.meet(&domain, &d_var);
                     if domain.is_empty() {
                         return Err(LRuntimeError::new(
@@ -437,9 +452,9 @@ fn convert_arbitrary(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRu
             let flow_apply = fl.new_instantaneous_assignment(Lit::Constraint(Box::new(
                 Constraint::arbitrary(LitSet::Finite(set)),
             )));
-            let r_flow_apply = fl.get_flow_result(&flow_apply);
+            let r_flow_apply = fl.get_flow_result(flow_apply);
             fl.st
-                .meet_to_domain(&fl.st.get_domain_id(&r_flow_apply), domain);
+                .meet_to_domain(fl.st.get_domain_id(r_flow_apply), domain);
 
             Ok(fl.new_seq(vec![flow_apply]))
         }
@@ -459,8 +474,8 @@ fn convert_sleep(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRu
     seq.push(r);*/
 
     let sleep = fl.new_assignment(fl.st.new_nil());
-    fl.set_duration(&sleep, fl.get_flow_result(seq.last().unwrap()));
-    let duration = fl.get_flow_interval(&sleep).get_duration();
+    fl.set_duration(sleep, fl.get_flow_result(*seq.last().unwrap()));
+    let duration = fl.get_flow_interval(sleep).get_duration();
     assert!(duration.is_some());
     seq.push(sleep);
 
@@ -471,22 +486,20 @@ fn convert_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, L
     seq.remove(0);
 
     let release_time = fl.st.new_timepoint();
-    let resource = fl.get_flow_result(&seq[0]);
-    let capacity = seq.get(1).map(|f| fl.get_flow_result(f));
+    let resource = fl.get_flow_result(seq[0]);
+    let capacity = seq.get(1).map(|f| fl.get_flow_result(*f));
     let acquire = fl.new_assignment(Lit::Acquire(AcquireLit {
         resource,
         capacity,
         release_time,
     }));
 
-    let acquire_result = fl.get_flow_result(&acquire);
-    let acquire_domain = fl.st.get_domain_id(&acquire_result);
-    fl.st.set_domain(
-        &acquire_domain,
-        fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
+    fl.st.set_domain_of_var(
+        fl.get_flow_result(acquire),
+        fl.st.get_type_as_domain(TYPE_RESOURCE_HANDLE).unwrap(),
     );
     fl.resource_handles
-        .insert(fl.get_flow_result(&acquire), release_time);
+        .insert(fl.get_flow_result(acquire), release_time);
 
     seq.push(acquire);
     Ok(fl.new_seq(seq))
@@ -494,32 +507,31 @@ fn convert_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, L
 
 fn convert_release(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let rh = seq[1];
-    let result = fl.get_flow_result(&rh);
-    let result_domain = fl.st.get_domain_id(&result);
-    fl.st.set_domain(
-        &result_domain,
-        fl.st.get_type_as_domain(TYPE_RESSOURCE_HANDLE).unwrap(),
+    let result = fl.get_flow_result(rh);
+    fl.st.set_domain_of_var(
+        result,
+        fl.st.get_type_as_domain(TYPE_RESOURCE_HANDLE).unwrap(),
     );
 
     let flow_release = fl.new_instantaneous_assignment(Lit::Release(result));
     fl.st
-        .set_domain(&fl.get_flow_result(&flow_release), Domain::nil());
+        .set_domain_of_var(fl.get_flow_result(flow_release), Domain::nil());
 
     Ok(fl.new_seq(vec![rh, flow_release]))
 }
 
 fn convert_instance(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
-    let results: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(f)).collect();
+    let results: Vec<VarId> = seq.iter().map(|f| fl.get_flow_result(*f)).collect();
     fl.st
-        .set_domain(&results[1], fl.st.get_type_as_domain(TYPE_OBJECT).unwrap());
-    fl.st.set_domain(
-        &results[2],
+        .set_domain_of_var(results[1], fl.st.get_type_as_domain(TYPE_OBJECT).unwrap());
+    fl.st.set_domain_of_var(
+        results[2],
         fl.st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap(),
     );
     let args = results[..2].to_vec();
     let flow_read = fl.new_instantaneous_assignment(Lit::Read(args));
     let flow_equal = fl.new_instantaneous_assignment(Lit::constraint(Constraint::eq(
-        fl.get_flow_result(&flow_read),
+        fl.get_flow_result(flow_read),
         results[2],
     )));
     seq.push(flow_read);
@@ -530,7 +542,7 @@ fn convert_instance(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, 
 #[named]
 fn convert_instances(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let d = fl
-        .try_get_flow_lit(&seq[1])
+        .try_get_flow_lit(seq[1])
         .ok_or_else(|| LRuntimeError::new(function_name!(), ""))?;
 
     if let Lit::Atom(d) = d {
@@ -544,11 +556,11 @@ fn convert_instances(fl: &mut FlowGraph, seq: Vec<FlowId>) -> Result<FlowId, LRu
 
 fn extract_index(fl: &mut FlowGraph, seq: &mut Vec<FlowId>) -> usize {
     let flow_index = seq.remove(1);
-    let lit = fl.try_get_flow_lit(&flow_index).unwrap();
+    let lit = fl.try_get_flow_lit(flow_index).unwrap();
     let index = if let Lit::Atom(v) = lit {
         //println!("{}", fl.st.format_variable(&v));
         fl.st
-            .get_domain_of_var(&v)
+            .get_domain_of_var(v)
             .as_cst()
             .unwrap()
             .as_int()
@@ -566,7 +578,7 @@ fn convert_ctx_arbitrary(
 ) -> Result<FlowId, LRuntimeError> {
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_arbitrary(fl, seq)?;
-    let flow_arbitrary = fl.try_get_last_flow(&flow_id).unwrap();
+    let flow_arbitrary = fl.try_get_last_flow(flow_id).unwrap();
 
     fl.set_label(&flow_arbitrary, Label::Arbitrary(index));
     Ok(flow_id)
@@ -578,8 +590,8 @@ fn convert_ctx_exec_command(
 ) -> Result<FlowId, LRuntimeError> {
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
-    let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_exec, Label::Action(index));
+    let flow_exec = fl.try_get_last_flow(flow_id).unwrap();
+    fl.set_label(&flow_exec, Label::Command(index));
     Ok(flow_id)
 }
 
@@ -589,16 +601,16 @@ fn convert_ctx_exec_task(
 ) -> Result<FlowId, LRuntimeError> {
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_exec(fl, seq)?;
-    let flow_exec = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_exec, Label::Action(index));
+    let flow_exec = fl.try_get_last_flow(flow_id).unwrap();
+    fl.set_label(&flow_exec, Label::Task(index));
     Ok(flow_id)
 }
 
 fn convert_ctx_acquire(fl: &mut FlowGraph, mut seq: Vec<FlowId>) -> Result<FlowId, LRuntimeError> {
     let index = extract_index(fl, &mut seq);
     let flow_id = convert_acquire(fl, seq)?;
-    let flow_acquire = fl.try_get_last_flow(&flow_id).unwrap();
-    fl.set_label(&flow_acquire, Label::Acquire(index));
+    let flow_acquire = fl.try_get_last_flow(flow_id).unwrap();
+    fl.set_label(&flow_acquire, Label::ResourceAcquisition(index));
     Ok(flow_id)
 }
 

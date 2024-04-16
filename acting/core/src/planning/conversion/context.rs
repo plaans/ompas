@@ -1,7 +1,7 @@
 use crate::model::acting_domain::OMPASDomain;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use ompas_language::sym_table::{
     TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_OBJECT_TYPE, TYPE_STATE_FUNCTION,
 };
@@ -55,7 +55,7 @@ impl ConversionContext {
         }
 
         for (t, instances) in state.instance.inner.iter() {
-            for instance in instances {
+            for instance in instances.get_all_elements() {
                 st.new_constant_symbol(instance, st.get_type_as_domain(t.to_string()).unwrap());
             }
             st.new_constant_symbol(t, st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap());

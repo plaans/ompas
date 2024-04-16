@@ -40,6 +40,7 @@ pub fn convert_lv(
         LValue::List(l) => convert_list(l, fl, define_table)?,
         LValue::True => convert_bool(true, fl),
         LValue::Nil => convert_nil(fl),
+        LValue::Err(_) => convert_err(fl),
         lv => {
             return Err(LRuntimeError::new(
                 "convert",
@@ -80,6 +81,11 @@ fn convert_nil(fl: &mut FlowGraph) -> FlowId {
     fl.new_instantaneous_assignment(Lit::Atom(id))
 }
 
+fn convert_err(fl: &mut FlowGraph) -> FlowId {
+    let id = fl.st.new_err();
+    fl.new_instantaneous_assignment(Lit::Atom(id))
+}
+
 fn convert_core_operator(_: &LPrimitive, _: &mut FlowGraph) -> FlowId {
     todo!()
 }
@@ -105,7 +111,7 @@ fn convert_list(
                 let var = &list[1].to_string();
                 let val = &list[2];
                 let flow_val = convert_lv(val, fl, define_table)?;
-                define_table.insert(var.to_string(), fl.get_flow_result(&flow_val));
+                define_table.insert(var.to_string(), fl.get_flow_result(flow_val));
                 let id = st.new_nil();
                 let flow_result = fl.new_instantaneous_assignment(Lit::Atom(id));
 
@@ -125,17 +131,17 @@ fn convert_list(
                  */
 
                 let cond_flow = convert_lv(cond, fl, define_table)?;
-                let cond_result = st.get_domain_id(&fl.get_flow_result(&cond_flow));
-                st.meet_to_domain(&cond_result, Boolean);
-                let br_cond_flow = fl.new_instantaneous_assignment(fl.get_flow_result(&cond_flow));
-                let cond_result = st.get_domain_id(&fl.get_flow_result(&cond_flow));
+                let cond_result = st.get_domain_id(fl.get_flow_result(cond_flow));
+                st.meet_to_domain(cond_result, Boolean);
+                let br_cond_flow = fl.new_instantaneous_assignment(fl.get_flow_result(cond_flow));
+                let cond_result = st.get_domain_id(fl.get_flow_result(cond_flow));
 
                 let true_flow = convert_lv(true_branch, fl, define_table)?;
                 let true_flow = fl.new_seq(vec![true_flow]);
                 let false_flow = convert_lv(false_branch, fl, define_table)?;
                 let false_flow = fl.new_seq(vec![false_flow]);
-                let true_result = st.get_domain_id(&fl.get_flow_result(&true_flow));
-                let false_result = st.get_domain_id(&fl.get_flow_result(&false_flow));
+                let true_result = st.get_domain_id(fl.get_flow_result(true_flow));
+                let false_result = st.get_domain_id(fl.get_flow_result(false_flow));
 
                 let branching = BranchingFlow {
                     cond_flow: br_cond_flow,
@@ -144,8 +150,8 @@ fn convert_list(
                 };
                 let flow_branch = fl.new_branching(branching);
 
-                let result = fl.get_flow_result(&flow_branch);
-                let result = st.get_domain_id(&result);
+                let result = fl.get_flow_result(flow_branch);
+                let result = st.get_domain_id(result);
 
                 st.add_update(
                     vec![true_result, false_result],
@@ -204,7 +210,7 @@ fn convert_list(
                 let mut seq = vec![];
                 for e in &list[1..] {
                     let e_flow = convert_lv(e, fl, &mut define_table)?;
-                    results.push(fl.get_flow_result(&e_flow));
+                    results.push(fl.get_flow_result(e_flow));
                     seq.push(e_flow);
                 }
                 out_of_scope.append(&mut results);
@@ -215,22 +221,26 @@ fn convert_list(
                 let define_table = &mut define_table.clone();
                 let e = &list[1];
                 let async_flow = convert_lv(e, fl, define_table)?;
-                let r_async = st.get_domain_id(&fl.get_flow_result(&async_flow));
+                let r_async = st.get_domain_id(fl.get_flow_result(async_flow));
 
                 let handle_flow = fl.new_async(async_flow);
 
-                let handle = st.get_domain_id(&fl.get_flow_result(&handle_flow));
+                let handle = fl.get_flow_result(handle_flow);
+                let handle_domain = st.get_domain_id(fl.get_flow_result(handle_flow));
 
                 fl.handles.insert(handle, async_flow);
 
                 st.add_update(
                     vec![r_async],
-                    Update::new(handle, closure::composed_update(handle, r_async)),
+                    Update::new(
+                        handle_domain,
+                        closure::composed_update(handle_domain, r_async),
+                    ),
                 );
 
                 st.add_update(
-                    vec![handle],
-                    Update::new(r_async, closure::in_composed_update(r_async, handle)),
+                    vec![handle_domain],
+                    Update::new(r_async, closure::in_composed_update(r_async, handle_domain)),
                 );
 
                 handle_flow
@@ -238,37 +248,40 @@ fn convert_list(
             LPrimitive::Await => {
                 let define_table = &mut define_table.clone();
                 let h = convert_lv(&list[1], fl, define_table)?;
-                let result = fl.get_flow_result(&h);
+                let result = fl.get_flow_result(h);
+                let result_domain = st.get_domain_id(result);
 
-                st.meet_to_domain(&result, BasicType::Handle);
+                st.meet_to_domain(result_domain, BasicType::Handle);
 
                 let flow_await = fl.new_assignment(Lit::Await(result));
-                out_of_scope.push(fl.get_flow_result(&h));
+                out_of_scope.push(fl.get_flow_result(h));
 
                 fl.new_seq(vec![h, flow_await])
             }
             LPrimitive::Err => {
+                let arg_err = LValue::Nil;
                 let define_table = &mut define_table.clone();
-                let arg_err = convert_lv(&list[1], fl, define_table)?;
-                let arg_err_result = st.get_domain_id(&fl.get_flow_result(&arg_err));
+                let arg_err = convert_lv(&arg_err, fl, define_table)?;
+                let arg_err_result = fl.get_flow_result(arg_err);
+                let arg_err_result_domain = st.get_domain_id(arg_err_result);
                 let atom_err = st.new_symbol(ERR);
                 let flow = fl.new_instantaneous_assignment(vec![atom_err, arg_err_result]);
-                let err_result = st.get_domain_id(&fl.get_flow_result(&flow));
+                let err_result = st.get_domain_id(fl.get_flow_result(flow));
 
-                st.set_domain(&err_result, BasicType::Err);
+                st.set_domain(err_result, BasicType::Err);
 
                 st.add_update(
-                    vec![arg_err_result],
+                    vec![arg_err_result_domain],
                     Update::new(
                         err_result,
-                        closure::composed_update(err_result, arg_err_result),
+                        closure::composed_update(err_result, arg_err_result_domain),
                     ),
                 );
                 st.add_update(
                     vec![err_result],
                     Update::new(
-                        arg_err_result,
-                        closure::in_composed_update(arg_err_result, err_result),
+                        arg_err_result_domain,
+                        closure::in_composed_update(arg_err_result_domain, err_result),
                     ),
                 );
 
@@ -284,14 +297,18 @@ fn convert_list(
         },
         lv => Err(LRuntimeError::new(
             function_name!(),
-            format!("Conversion of {}({}) not supported.", lv, lv.get_kind()),
+            format!(
+                "Conversion of {}(kind = {}) not supported.",
+                lv,
+                lv.get_kind()
+            ),
         ))?,
     };
 
     out_of_scope.append(&mut define_table.inner().values().copied().collect());
 
     for o in &out_of_scope {
-        st.set_drop(o, &fl.get_flow_end(&r));
+        st.set_drop(*o, fl.get_flow_end(r));
     }
     Ok(r)
 }

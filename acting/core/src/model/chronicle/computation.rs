@@ -1,9 +1,7 @@
 use crate::model::chronicle::lit::Lit;
-use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::HashSet;
 use std::fmt::Write;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -53,24 +51,16 @@ impl FormatWithSymTable for Computation {
 }
 
 impl GetVariables for Computation {
-    fn get_variables(&self) -> HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         match self {
             Self::Add(vec) | Self::Sub(vec) | Self::Mul(vec) | Self::Div(vec) => {
-                let mut set: HashSet<VarId> = Default::default();
+                let mut set: std::collections::HashSet<VarId> = Default::default();
                 for e in vec {
-                    set = set.union(e.get_variables())
+                    set = set.union(&e.get_variables()).cloned().collect()
                 }
                 set
             }
         }
-    }
-
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
-        self.get_variables()
-            .iter()
-            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
-            .cloned()
-            .collect()
     }
 }
 
@@ -87,7 +77,7 @@ impl FlatBindings for Computation {
 }
 
 impl Replace for Computation {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         match self {
             Self::Add(vec) | Self::Sub(vec) | Self::Mul(vec) | Self::Div(vec) => {
                 for e in vec {

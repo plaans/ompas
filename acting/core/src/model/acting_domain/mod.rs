@@ -1,17 +1,31 @@
+use crate::model::acting_domain::acting_model_collection::ActingModelCollection;
 use crate::model::acting_domain::command::Command;
+use crate::model::acting_domain::event::Event;
 use crate::model::acting_domain::method::Method;
 use crate::model::acting_domain::model::ModelKind;
+use crate::model::acting_domain::parameters::{ParameterType, Parameters};
 use crate::model::acting_domain::state_function::StateFunction;
 use crate::model::acting_domain::task::Task;
-use im::HashMap;
+use crate::model::add_domain_symbols;
+use crate::model::sym_domain::basic_type::{TYPE_ID_INT, TYPE_INT};
+use crate::model::sym_domain::Domain;
+use crate::model::sym_table::r#ref::RefSymTable;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
+use ompas_language::exec::resource::{MAX_Q, MAX_QUANTITY, QUANTITY};
+use ompas_language::exec::state::INSTANCE;
+use ompas_language::sym_table::{TYPE_OBJECT, TYPE_OBJECT_TYPE};
 use ompas_language::*;
-use sompas_structs::lenv::LEnvSymbols;
+use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
+pub mod acting_model_collection;
 pub mod command;
+pub mod event;
 pub mod method;
 pub mod model;
 pub mod parameters;
@@ -27,9 +41,82 @@ pub struct OMPASDomain {
     pub lambdas: HashMap<String, LValue>,
     pub map_symbol_type: HashMap<String, String>,
     pub env: LEnvSymbols,
+    pub init: LValue,
+    pub events: HashMap<String, Event>,
+    pub acting_model_collection: Option<ActingModelCollection>,
 }
 
 impl OMPASDomain {
+    pub async fn init_acting_model_collection(
+        &mut self,
+        env: &LEnv,
+        state: WorldStateSnapshot,
+        st: &RefSymTable,
+        pre_compute_models: bool,
+    ) {
+        add_domain_symbols(st, self);
+        let mut amc = ActingModelCollection::default();
+        if pre_compute_models {
+            amc.pre_compute_acting_models(self, env, state, st).await;
+        }
+
+        self.acting_model_collection = Some(amc)
+    }
+
+    pub fn init(&mut self, st: &RefSymTable) {
+        self.add_state_function(
+            QUANTITY.to_string(),
+            StateFunction::new(
+                QUANTITY.to_string(),
+                Parameters::new(vec![(
+                    Arc::new("?o".to_string()),
+                    ParameterType::new(
+                        TYPE_OBJECT.into(),
+                        st.get_type_as_domain(TYPE_OBJECT).unwrap(),
+                    ),
+                )]),
+                Domain::IntRange(0, MAX_QUANTITY),
+                TYPE_INT.to_string(),
+                None,
+            ),
+        )
+        .unwrap();
+        self.add_state_function(
+            MAX_Q.to_string(),
+            StateFunction::new(
+                MAX_Q.to_string(),
+                Parameters::new(vec![(
+                    Arc::new("?o".to_string()),
+                    ParameterType::new(
+                        TYPE_OBJECT.into(),
+                        st.get_type_as_domain(TYPE_OBJECT).unwrap(),
+                    ),
+                )]),
+                Domain::Simple(TYPE_ID_INT),
+                TYPE_INT.to_string(),
+                None,
+            ),
+        )
+        .unwrap();
+        self.add_state_function(
+            INSTANCE.to_string(),
+            StateFunction::new(
+                INSTANCE.to_string(),
+                Parameters::new(vec![(
+                    Arc::new("?o".to_string()),
+                    ParameterType::new(
+                        TYPE_OBJECT.into(),
+                        st.get_type_as_domain(TYPE_OBJECT).unwrap(),
+                    ),
+                )]),
+                st.get_type_as_domain(TYPE_OBJECT_TYPE).unwrap(),
+                TYPE_OBJECT_TYPE.to_string(),
+                None,
+            ),
+        )
+        .unwrap();
+    }
+
     pub fn get_element_description(&self, label: &str) -> String {
         match self.map_symbol_type.get(label) {
             None => format!("Keyword {} is not defined in the domain.", label),
@@ -94,7 +181,7 @@ impl OMPASDomain {
                 )
             )),
             Some(task) => {
-                task.add_method(label.clone());
+                task.add_method(&label);
                 self.methods.insert(label.clone(), value);
                 self.map_symbol_type.insert(label, METHOD_TYPE.into());
                 Ok(())
@@ -166,17 +253,13 @@ impl OMPASDomain {
         self.env.insert(label, value);
     }
 
-    /*pub async fn add_type(&mut self, t: String, p: Option<String>) {
-        let parents: Vec<TypeId> = vec![self
-            .lattice
-            .get_type_id(match p {
-                Some(p) => p.to_string(),
-                None => TYPE_OBJECT.to_string(),
-            })
-            .await
-            .unwrap()];
-        self.lattice.add_type(t, parents).await;
-    }*/
+    pub fn add_init(&mut self, body: LValue) {
+        self.init = body;
+    }
+
+    pub fn get_init(&self) -> &LValue {
+        &self.init
+    }
 
     //List of symbols
     pub fn get_list_tasks(&self) -> LValue {
@@ -223,32 +306,6 @@ impl OMPASDomain {
         &self.map_symbol_type
     }
 
-    /*pub async fn get_parents(&self, t: &str) -> Vec<String> {
-        let id: &TypeId = &self.lattice.get_type_id(t).await.unwrap();
-        let mut parents: Vec<TypeId> = self.lattice.get_parents(id).await;
-
-        let mut new_parents = vec![];
-
-        for p in parents.drain(..) {
-            new_parents.push(self.lattice.format_type(&p).await)
-        }
-
-        new_parents
-    }*/
-
-    /*pub async fn get_childs(&self, t: &str) -> Vec<String> {
-        let id = &self.lattice.get_type_id(t).await.unwrap();
-        let mut childs: Vec<TypeId> = self.lattice.get_all_childs(id).await;
-
-        let mut new_childs = vec![];
-
-        for p in childs.drain(..) {
-            new_childs.push(self.lattice.format_type(&p).await)
-        }
-
-        new_childs
-    }*/
-
     //Displayers
     pub fn print_tasks(&self) -> String {
         let mut str = "*TASKS:\n".to_string();
@@ -290,79 +347,43 @@ impl OMPASDomain {
         str
     }
 
+    pub fn print_events(&self) -> String {
+        let mut str = "*EVENTS:\n".to_string();
+        for (label, value) in &self.events {
+            str.push_str(format!("\t-{}:\n{}\n", label, value).as_str())
+        }
+        str
+    }
+
     pub fn get_exec_env(&self) -> LEnvSymbols {
         let mut env = self.env.clone();
-        /*let mut map_task_method: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_pre_conditions: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_score: HashMap<LValue, LValue> = Default::default();
-        let mut map_method_types: HashMap<LValue, LValue> = Default::default();
-        let mut map_action_model: HashMap<LValue, LValue> = Default::default();*/
 
         //Add all tasks to env:
         for (label, task) in self.get_tasks() {
             env.insert(label.clone(), task.get_body().clone());
-            //map_task_method.insert(label.into(), task.get_methods().into());
         }
 
         //Add all methods to env:
-
         for (label, method) in self.get_methods() {
             env.insert(label.to_string(), method.lambda_body.clone());
-            /*map_method_pre_conditions.insert(
-                label.to_string().into(),
-                method.lambda_pre_conditions.clone(),
-            );
-            map_method_score.insert(label.to_string().into(), method.lambda_score.clone());
-            map_method_types.insert(
-                label.to_string().into(),
-                method.parameters.get_types_as_lvalue(),
-            );*/
         }
 
         //Add all actions to env:
         for (label, action) in self.get_commands() {
             env.insert(label.clone(), action.get_body().clone());
-            /*map_action_model.insert(
-                label.into(),
-                action.get_model(&ModelKind::PlantModel).unwrap().clone(),
-            );*/
         }
 
         //Add all state functions to env:
-        for (label, state_function) in self.get_state_functions() {
-            env.insert(label.clone(), state_function.body.clone());
+        for (label, sf) in self.get_state_functions() {
+            if let Some(body) = sf.get_body() {
+                env.insert(label.clone(), body.clone())
+            };
         }
 
         //Add all lambdas to env:
         for (label, lambda) in self.get_lambdas() {
             env.insert(label.clone(), lambda.clone())
         }
-
-        /*env.insert(__COMMANDS_LIST__.to_string(), self.get_list_commands());
-        env.insert(__METHODS_LIST__.to_string(), self.get_list_methods());
-        env.insert(__TASKS_LIST__.to_string(), self.get_list_tasks());
-        env.insert(
-            __STATE_FUNCTION_LIST__.to_string(),
-            self.get_list_state_functions(),
-        );
-        env.insert(
-            __SYMBOL_TYPE__.to_string(),
-            self.get_map_symbol_type().into(),
-        );
-        /*env.insert(
-            RAE_METHOD_GENERATOR_MAP.to_string(),
-            map_method_generator.into(),
-        );*/
-        env.insert(__TASKS_METHODS_MAP__.to_string(), map_task_method.into());
-        env.insert(__METHOD_TYPES_MAP__.to_string(), map_method_types.into());
-        env.insert(
-            __METHOD_PRE_CONDITIONS_MAP__.to_string(),
-            map_method_pre_conditions.into(),
-        );
-
-        env.insert(__METHOD_SCORE_MAP__.to_string(), map_method_score.into());
-
-        env.insert(__COMMAND_MODEL_MAP__.to_string(), map_action_model.into());*/
 
         env
     }
@@ -389,8 +410,10 @@ impl OMPASDomain {
         }
 
         //Add all state functions to env:
-        for (label, state_function) in self.get_state_functions() {
-            env.insert(label.clone(), state_function.body.clone());
+        for (label, sf) in self.get_state_functions() {
+            if let Some(body) = sf.get_body() {
+                env.insert(label.clone(), body.clone());
+            }
         }
 
         //Add all lambdas to env:
@@ -411,6 +434,7 @@ impl Display for OMPASDomain {
         str.push_str(format!("\n{}", self.print_state_functions()).as_str());
         str.push_str(format!("\n{}", self.print_commands()).as_str());
         str.push_str(format!("\n{}", self.print_lambdas()).as_str());
+        str.push_str(format!("\n{}", self.print_events()).as_str());
 
         write!(f, "{}", str)
     }

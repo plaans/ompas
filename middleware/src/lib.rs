@@ -3,20 +3,30 @@ extern crate core;
 use crate::logger::{
     EndSignal, FileDescriptor, LogClient, LogMessage, LogTopicId, Logger, END_SIGNAL,
 };
+use chrono::{DateTime, Local};
+use env_param::EnvParam;
 use lazy_static::lazy_static;
 use log::Level;
 use map_macro::{hash_map, hash_set};
 use ompas_utils::other::get_and_update_id_counter;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
 pub mod logger;
 const TOKIO_CHANNEL_SIZE: usize = 100;
+
+pub static OMPAS_WORKING_DIR: EnvParam<String> = EnvParam::new("OMPAS_WORKING_DIR", "/tmp");
+
+pub const RUNS_DIR: &str = "runs";
+
+pub const LOGS_DIR: &str = "logs";
 
 lazy_static! {
     static ref MASTER: Master = Master::new();
@@ -34,12 +44,14 @@ pub struct Master {
     processes: Arc<Mutex<HashMap<ProcessId, ProcessDescriptor>>>,
     topic_id: Arc<RwLock<HashMap<ProcessTopicLabel, ProcessTopidId>>>,
     topics: Arc<RwLock<HashMap<ProcessTopidId, ProcessTopic>>>,
-    sender_kill: Arc<mpsc::Sender<KillRequest>>,
-    sender_death: Arc<RwLock<Option<mpsc::Sender<DeathNotification>>>>,
+    sender_kill: Arc<mpsc::UnboundedSender<KillRequest>>,
+    sender_death: Arc<RwLock<Option<mpsc::UnboundedSender<DeathNotification>>>>,
     next_topic_id: Arc<AtomicUsize>,
     next_process_id: Arc<AtomicUsize>,
     end_receiver: Arc<broadcast::Receiver<EndSignal>>,
     logger: Logger,
+    date: DateTime<Local>,
+    run_dir: PathBuf,
 }
 
 pub struct ProcessTopic {
@@ -70,11 +82,16 @@ impl Default for Master {
 
 impl Master {
     fn new() -> Self {
-        let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
-        let (tx_death, rx_death) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx_death, rx_death) = mpsc::unbounded_channel();
         let (tx_end, rx_end) = broadcast::channel(TOKIO_CHANNEL_SIZE);
+        let date = Local::now();
 
-        let logger = Logger::default();
+        let mut run_dir: PathBuf = OMPAS_WORKING_DIR.get_ref().into();
+        run_dir.push(RUNS_DIR);
+        run_dir.push(format!("run_{}", date.format("%Y-%m-%d_%H-%M-%S")));
+
+        let (logger, tx_end_logger) = Logger::new(date, run_dir.clone());
 
         let master = Self {
             processes: Arc::new(Default::default()),
@@ -94,20 +111,23 @@ impl Master {
             next_process_id: Arc::new(Default::default()),
             end_receiver: Arc::new(rx_end),
             logger,
+            date,
+            run_dir,
         };
 
         let master2 = master.clone();
 
-        tokio::spawn(async move { Master::run_middleware(master2, rx, rx_death, tx_end).await });
+        tokio::spawn(async move {
+            Master::run_middleware(master2, rx, rx_death, tx_end, tx_end_logger).await
+        });
 
         master
     }
 
-    pub async fn end() {
+    pub fn end() {
         MASTER
             .sender_kill
             .send(KillRequest::end())
-            .await
             .unwrap_or_else(|_| panic!("Error while sending end message"));
     }
 
@@ -118,28 +138,23 @@ impl Master {
 
     async fn remove_process(&self, process_id: ProcessId) {
         let process: ProcessDescriptor = self.processes.lock().await.remove(&process_id).unwrap();
-        self.logger
-            .log(LogMessage {
-                level: Level::Info,
-                source: process.label.to_string(),
-                topic: MASTER.logger.subscribe_to_topic(LOG_TOPIC_ROOT).await,
-                message: format!("Process {} is dead.", process.label),
-            })
-            .await;
+        self.logger.log(LogMessage {
+            level: Level::Info,
+            source: process.label.to_string(),
+            topic: MASTER.logger.subscribe_to_topic(LOG_TOPIC_ROOT).await,
+            message: format!("Process {} is dead.", process.label),
+        });
     }
 
     async fn run_middleware(
         master: Master,
-        mut receiver_kill: mpsc::Receiver<KillRequest>,
-        mut receiver_death: mpsc::Receiver<DeathNotification>,
-        end: broadcast::Sender<EndSignal>,
+        mut receiver_kill: mpsc::UnboundedReceiver<KillRequest>,
+        mut receiver_death: mpsc::UnboundedReceiver<DeathNotification>,
+        tx_end_master: broadcast::Sender<EndSignal>,
+        tx_end_logger: mpsc::Sender<EndSignal>,
     ) {
         let log: LogClient = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
-        log.info("INITIATE MASTER").await;
-
-        let (tx_end_logger, rx) = mpsc::channel(1);
-
-        master.logger.start(rx).await;
+        log.info("INITIATE MASTER");
 
         'main: loop {
             tokio::select! {
@@ -150,8 +165,7 @@ impl Master {
                             log.info(format!(
                                 "{} requested termination of process topic {}.",
                                 kill_request.requestor, kill_request.topic,
-                            ))
-                            .await;
+                            ));
 
                             let mut topic_ids: Vec<ProcessTopidId> = vec![id];
 
@@ -175,14 +189,14 @@ impl Master {
                                                     kill_request.requestor,
                                                     kill_request.topic,
                                                 ))
-                                                    .await;
+                                                    ;
                                             }
                                             Err(err) => {
                                                 log.warn(format!(
                                                     "Error request termination of process {}: {}",
                                                     process.label, err
                                                 ))
-                                                .await;
+                                                ;
                                             }
                                         }
                                     }
@@ -200,7 +214,7 @@ impl Master {
                                     let child_name = topics.get(&topic).unwrap().label.clone();
                                     log.info(format!(
                                         "Request termination of process topic {child_name} because it is a child of the process topic {topic_name}",
-                                    )).await;
+                                    ));
                                     topic_ids.push(topic);
                                 }
                             }
@@ -225,10 +239,10 @@ impl Master {
             master.remove_process(death_notification.process_id).await;
         }
 
-        log.info("END MASTER").await;
+        log.info("END MASTER");
         let _ = tx_end_logger.send(END_SIGNAL).await;
         master.logger.end().await;
-        let _ = end.send(END_SIGNAL);
+        let _ = tx_end_master.send(END_SIGNAL);
     }
 
     async fn subscribe_to_topic(&self, process_id: ProcessId, topic: impl Display) {
@@ -264,8 +278,7 @@ impl Master {
         let id_parent = self.new_topic(parent.to_string(), p).await;
 
         let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
-        log.debug(format!("Process {} is child of {}", child, parent))
-            .await;
+        log.debug(format!("Process {} is child of {}", child, parent));
         self.topics
             .write()
             .await
@@ -281,7 +294,7 @@ impl Master {
             Some(id) => id,
             None => {
                 let log = LogClient::new(MASTER_LABEL, LOG_TOPIC_ROOT).await;
-                log.debug(format!("Creating process topic {}", name)).await;
+                log.debug(format!("Creating process topic {}", name));
                 let id = get_and_update_id_counter(self.next_topic_id.clone());
 
                 let mut topics = self.topics.write().await;
@@ -294,7 +307,7 @@ impl Master {
                             topics.get_mut(&parent_id).unwrap().childs.insert(id);
                         }
                         None => {
-                            log.debug(format!("Creating process topic {}", name)).await;
+                            log.debug(format!("Creating process topic {}", name));
                             let parent_id = get_and_update_id_counter(self.next_topic_id.clone());
                             self.topic_id.write().await.insert(parent.to_string(), id);
                             topics.insert(
@@ -368,8 +381,7 @@ impl Master {
             },
         );
 
-        self.subscribe_to_topic(id, process_topic).await;
-
+        self.subscribe_to_topic(id, process_topic.to_string()).await;
         ProcessInterface {
             label: label.to_string(),
             id,
@@ -377,7 +389,7 @@ impl Master {
             receiver: rx,
             log: LogClient {
                 topic_id: self.logger.subscribe_to_topic(log_topic).await,
-                source: label.to_string(),
+                source: Arc::new(label.to_string()),
             },
             sender_death: self.sender_death.read().await.as_ref().unwrap().clone(),
         }
@@ -417,6 +429,14 @@ impl Master {
         MASTER.logger.get_max_log_level().await.into()
     }
 
+    pub fn get_string_date() -> String {
+        MASTER.date.format("%Y-%m-%d_%H-%M-%S").to_string()
+    }
+
+    pub fn get_run_dir() -> PathBuf {
+        MASTER.run_dir.clone()
+    }
+
     pub fn reinit() {
         lazy_static::initialize(&MASTER)
     }
@@ -428,8 +448,8 @@ pub struct ProcessInterface {
     label: String,
     #[allow(dead_code)]
     id: ProcessId,
-    sender_kill: mpsc::Sender<KillRequest>,
-    sender_death: mpsc::Sender<DeathNotification>,
+    sender_kill: mpsc::UnboundedSender<KillRequest>,
+    sender_death: mpsc::UnboundedSender<DeathNotification>,
     receiver: mpsc::Receiver<EndSignal>,
     log: LogClient,
 }
@@ -468,10 +488,9 @@ impl ProcessInterface {
             .await
     }
 
-    pub async fn kill(&self, topic: impl Display) {
+    pub fn kill(&self, topic: impl Display) {
         self.sender_kill
             .send(KillRequest::new(self.label.to_string(), topic.to_string()))
-            .await
             .unwrap_or_else(|e| {
                 panic!(
                     "Error sending kill signal for topic {} requested by {}: {}",
@@ -486,28 +505,28 @@ impl ProcessInterface {
     /*
     LOG FUNCTIONS
      */
-    pub async fn log(&self, message: impl Display, level: LogLevel) {
-        self.log.log(message, level).await;
+    pub fn log(&self, message: impl Display, level: LogLevel) {
+        self.log.log(message, level);
     }
 
-    pub async fn log_error(&self, message: impl Display) {
-        self.log.error(message).await
+    pub fn log_error(&self, message: impl Display) {
+        self.log.error(message)
     }
 
-    pub async fn log_warn(&self, message: impl Display) {
-        self.log.warn(message).await
+    pub fn log_warn(&self, message: impl Display) {
+        self.log.warn(message)
     }
 
-    pub async fn log_info(&self, message: impl Display) {
-        self.log.info(message).await
+    pub fn log_info(&self, message: impl Display) {
+        self.log.info(message)
     }
 
-    pub async fn log_debug(&self, message: impl Display) {
-        self.log.debug(message).await
+    pub fn log_debug(&self, message: impl Display) {
+        self.log.debug(message)
     }
 
-    pub async fn log_trace(&self, message: impl Display) {
-        self.log.trace(message).await
+    pub fn log_trace(&self, message: impl Display) {
+        self.log.trace(message)
     }
 
     pub fn get_log_client(&self) -> LogClient {
@@ -516,7 +535,7 @@ impl ProcessInterface {
 
     fn die(&self) {
         self.sender_death
-            .try_send(DeathNotification {
+            .send(DeathNotification {
                 process_id: self.id,
             })
             .unwrap_or_else(|e| panic!("Error sending death notification of {}: {}", self.label, e))
@@ -529,7 +548,7 @@ impl Drop for ProcessInterface {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LogLevel {
     Error = 1,
     Warn,

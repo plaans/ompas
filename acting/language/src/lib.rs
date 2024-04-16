@@ -32,6 +32,21 @@ pub mod exec {
         pub const INF: &str = "inf";
     }
 
+    pub mod upom {
+        pub const MOD_UPOM: &str = "mod-upom";
+        pub const DOC_MOD_UPOM: &str =
+            "Collection of selection to use the UPOM algorithm to refine a task.";
+
+        pub const UPOM_TASK: &str = "upom-task";
+        pub const DOC_UPOM_TASK: &str = "todo";
+
+        pub const UPOM_COMMAND: &str = "upom-command";
+        pub const DOC_UPOM_COMMAND: &str = "todo";
+
+        pub const PROCESS_UPOM: &str = "__PROCESS_UPOM__";
+        pub const LOG_TOPIC_UPOM: &str = "__LOG_TOPIC_UPOM__";
+    }
+
     pub mod aries {
         pub const CTX_ARIES: &str = "aries";
         pub const SELECT_ARIES: &str = "select_aries";
@@ -42,6 +57,9 @@ pub mod exec {
 
     pub const ARBITRARY: &str = "arbitrary";
     pub const DOC_ARBITRARY: &str = "Takes a list of element and arbitrarily return one of them, either a random, using an optional function or using the acting engine.";
+
+    pub const RAE___SLEEP__: &str = "__sleep__";
+    pub const DOC_RAE___SLEEP__: &str = "todo";
 
     pub mod platform {
         pub const MOD_PLATFORM: &str = "platform";
@@ -72,8 +90,8 @@ pub mod exec {
     }
 
     pub mod mode {
-        pub const CTX_MODE: &str = "ContextMode";
-        pub const DOC_CTX_MODE: &str =
+        pub const CTX_RAE_MODE: &str = "ctx-rae-mode";
+        pub const DOC_CTX_RAE_MODE: &str =
             "Context that contains the mode of OMPAS, either simu of exec.";
 
         //keywords
@@ -138,6 +156,7 @@ pub mod exec {
         pub const LOCKED: &str = "locked";
         pub const MAX_Q: &str = "max-q";
         pub const QUANTITY: &str = "quantity";
+        pub const MAX_QUANTITY: i64 = 1000;
     }
 
     pub mod state {
@@ -147,11 +166,19 @@ pub mod exec {
         pub const ASSERT: &str = "assert";
         pub const DOC_ASSERT: &str = "Insert a fact in the inner world.";
 
+        pub const ASSERT_STATIC: &str = "assert-static";
+        pub const DOC_ASSERT_STATIC: &str = "Insert a fact in the inner static world.";
+
         pub const ASSERT_SHORT: &str = "+>";
         pub const DOC_ASSERT_SHORT: &str = "Short version of assert.";
 
-        pub const TRANSITIVE_ASSERT: &str = "transitive-assert";
-        pub const DOC_TRANSITIVE_ASSERT: &str= "Update of a fact that takes a given duration. During the transition, the fact is considered as unknown.";
+        pub const EFFECT: &str = "effect";
+        pub const DOC_EFFECT: &str = "Same as assert.";
+
+        pub const DURATIVE: &str = "durative";
+
+        pub const DURATIVE_EFFECT: &str = "durative-effect";
+        pub const DOC_DURATIVE_EFFECT: &str= "Update of a fact that takes a given duration. During the transition, the fact is considered as unknown.";
 
         pub const RETRACT: &str = "retract";
         pub const DOC_RETRACT: &str = "Remove a fact from the inner world.";
@@ -244,7 +271,7 @@ pub mod exec {
         pub const DOC_CTX_EXEC_TASK: &str = "Evaluates a task in an assigned context";
         pub const LAMBDA_CTX_EXEC_TASK: &str = "(lambda args
             (begin
-                (def-label 'subtask (car args))
+                (def-label 'task (car args))
                 (enr (cons exec-task (cdr args)))
             )
         )";
@@ -281,21 +308,26 @@ pub mod exec {
                       (_id_ (second _r_)))
                     (begin
                         (def_process_id _id_)
-                        (if (err? (eval _m_))
-                            (retry)
+                        (define r (eval _m_))
+                        (if (err? r)
+                            (retry r)
                             (set-success-for-task)))))))";
 
         pub const RETRY: &str = "retry";
         pub const DOC_RETRY: &str = "Retry a given task.";
-        pub const LAMBDA_RETRY: &str = "(lambda nil
-        (begin
-            (define __result__ (_retry))
-            (if (err? __result__)
-                __result__
-                (begin
-                    (if (err? (enr __result__))
-                        (retry)
-                        (success))))))";
+        pub const LAMBDA_RETRY: &str = "(lambda (r)
+	(begin
+	    (define _r_ (_retry r))
+	    (if (err? _r_)
+                _r_
+                (let ((_m_ (first _r_))
+                      (_id_ (second _r_)))
+                    (begin
+                        (def_process_id _id_)
+                        (define r (eval _m_))
+                        (if (err? r)
+                            (retry r)
+                            (set-success-for-task)))))))";
 
         pub const __GET_PRECONDITIONS__: &str = "__get_preconditions__";
         pub const DOC___GET_PRECONDITIONS__: &str =
@@ -439,12 +471,6 @@ pub mod monitor {
         pub const DOC_EXPORT_TYPE_LATTICE: &str =
             "Exports in a google-chrome page the lattice in a dot form";
 
-        pub const PLAN_TASK: &str = "plan-task";
-        pub const DOC_PLAN_TASK: &str= "Plan a task using the defined planner with the acting domain defined in the environment";
-
-        pub const PLAN_TASK_OPT: &str = "plan-task-opt";
-        pub const DOC_PLAN_TASK_OPT: &str= "Plan a task using the defined planner with the acting domain defined in the environment, and returns the optimal solution in terms of makespan";
-
         pub const PRE_EVAL_TASK: &str = "pre-eval-task";
         pub const DOC_PRE_EVAL_TASK: &str = "Pre evaluate a task";
 
@@ -454,6 +480,81 @@ pub mod monitor {
         pub const ANNOTATE_TASK: &str = "annotate-task";
         pub const DOC_ANNOTATE_TASK: &str =
             "Pre eval a task and annotate each acting process with a unique id";
+
+        pub const TRANSLATE: &str = "translate";
+        pub const DOC_TRANSLATE: &str= "Converts an object of the domain, and output a markdown file with explanations of the conversion process.";
+    }
+
+    pub mod planning {
+        pub const MOD_PLANNING: &str = "planning";
+        pub const DOC_MOD_PLANNING: &str =
+            "mod used to plan a task regarding the current state of the system.";
+
+        pub const PLAN: &str = "plan";
+        pub const DOC_PLAN: &str= "Plan with an optional task using the defined planner with the acting domain defined in the environment";
+
+        pub const PLAN_OPT: &str = "plan-opt";
+        pub const DOC_PLAN_OPT: &str= "Plan with an optional task using the defined planner with the acting domain defined in the environment, and returns the optimal solution in terms of makespan";
+
+        pub const NEW_EVENT: &str = "new-event";
+        pub const DOC_NEW_EVENT: &str = "Add an event in the planning problem.";
+        pub const DOC_NEW_EVENT_VERBOSE: &str = "Example: (new-event alarm true 10.5)";
+
+        pub const NEW_GOAL: &str = "new-goal";
+        pub const DOC_NEW_GOAL: &str =
+            "Add a goal in the planning problem. The interval is optional";
+        pub const DOC_NEW_GOAL_VERBOSE: &str= "Examples: (new-goal '(battery truck) 100)\n(add-goal '(position truck) warehouse '(100 120))";
+
+        pub const NEW_GOAL_TASK: &str = "new-goal-task";
+        pub const DOC_NEW_GOAL_TASK: &str = "Add a task in the planning problem.";
+        pub const DOC_NEW_GOAL_TASK_VERBOSE: &str =
+            "Example: (new-goal-task move r1 bedroom kitchen)";
+
+        pub const NEW_TIMED_GOAL_TASK: &str = "new-timed-goal-task";
+        pub const DOC_NEW_TIMED_GOAL_TASK: &str =
+            "Add a task in the planning problem. The last arg is the moment the task should start.";
+        pub const DOC_NEW_TIMED_GOAL_TASK_VERBOSE: &str =
+            "Example: (new-timed-goal-task 10 move r1 bedroom kitchen)";
+
+        pub const GET_GOALS_EVENTS: &str = "get-goals-events";
+        pub const DOC_GET_GOALS_EVENTS: &str =
+            "Return the list of tasks, goals, and objectives defined in the planning problem.";
+
+        pub const REMOVE_GOAL: &str = "remove-goal";
+        pub const DOC_REMOVE_GOAL: &str= "Remove the goal with the given id. Use `get-planning-problem` to get the list of goals and theirs ids.";
+
+        pub const REMOVE_TASK: &str = "remove-task";
+        pub const DOC_REMOVE_TASK: &str= "Remove the task with the given id. Use `get-planning-problem` to get the list of tasks and theirs ids.";
+
+        pub const REMOVE_EVENT: &str = "remove-event";
+        pub const DOC_REMOVE_EVENT: &str= "Remove the event with the given id. Use `get-planning-problem` to get the list of events and theirs ids.";
+    }
+
+    pub mod continuous_planning {
+        pub const MOD_CONTINUOUS_PLANNING: &str = "continuous-planning";
+        pub const DOC_MOD_CONTINUOUS_PLANNING: &str =
+            "Mod to test the continuous planning capabilities of ompas";
+
+        pub const START: &str = "cp.start";
+        pub const DOC_START: &str = "Start the continuous planning processes.";
+
+        pub const PLAN: &str = "cp.plan";
+        pub const DOC_PLAN: &str = "Plan with the current Acting Tree.";
+
+        pub const NEW_TASK: &str = "cp.new-task";
+        pub const DOC_NEW_TASK: &str = "Simulates a new task to face.";
+
+        pub const SET_START: &str = "cp.set-start";
+        pub const DOC_SET_START: &str = "Simulates the instantiation of the start of a task.";
+
+        pub const SET_END: &str = "cp.set-end";
+        pub const DOC_SET_END: &str = "Simulates the instantiation of the end of a task";
+
+        pub const SET_STATUS: &str = "cp.set-status";
+        pub const DOC_SET_STATUS: &str = "Simulates the instantiation of the status of a process";
+
+        pub const NEW_EVENT: &str = "cp.new-event";
+        pub const DOC_NEW_EVENT: &str = "Simulates the occurrence of a new event.";
     }
 
     pub mod model {
@@ -468,8 +569,8 @@ pub mod monitor {
         pub const ADD_STATE_FUNCTION: &str = "add-state-function";
         pub const DOC_ADD_STATE_FUNCTION: &str = "Add a state function to the domain. The state-function is defined by a label, typed parameters and a type for the result.";
 
-        pub const ADD_STATIC_STATE_FUNCTION: &str = "add-static-state-function";
-        pub const DOC_ADD_STATIC_STATE_FUNCTION: &str = "Add a state function to the domain. The state-function is defined by a label, typed parameters and a type for the result.";
+        pub const ADD_FUNCTION: &str = "add-function";
+        pub const DOC_ADD_FUNCTION: &str = "Add a state function to the domain. The state-function is defined by a label, typed parameters and a type for the result.";
 
         pub const ADD_COMMAND: &str = "add-command";
         pub const DOC_ADD_COMMAND: &str= "Add a command to the domain. A command is defined by a label, typed parameters and an optional model.";
@@ -502,9 +603,6 @@ pub mod monitor {
         pub const DOC_ADD_STATIC_FACTS: &str =
             "Add a list of facts to the static inner state of the system.";
 
-        /*pub const ADD_CONSTANT: &str = "add-constant";
-        pub const DOC_ADD_CONSTANT: &str = "Add a new constant in the list of instance.";*/
-
         pub const ADD_TYPE: &str = "add-type";
         pub const DOC_ADD_TYPE: &str = "Add a new type to the domain.";
 
@@ -521,7 +619,35 @@ pub mod monitor {
         pub const DOC_ADD_RESOURCE: &str = "Declare a new resource";
 
         pub const ADD_RESOURCES: &str = "add-resources";
-        pub const DOC_ADD_RESOUCES: &str = "Declare a list of new resources";
+        pub const DOC_ADD_RESOURCES: &str = "Declare a list of new resources";
+
+        pub const ADD_INIT: &str = "add-init";
+        pub const DOC_ADD_INIT: &str =
+            "Defines a program that should be executed at the launch of ompas.";
+
+        pub const ADD_EVENT: &str = "add-event";
+        pub const DOC_ADD_EVENT: &str = "Defines programs to execute if a trigger is true.";
+
+        pub const EVENT_NEW_INSTANCE: &str = "new-instance";
+
+        pub const REMOVE_COMMAND: &str = "remove-command";
+        pub const DOC_REMOVE_COMMAND: &str = "Removes command from the domain definition.";
+
+        pub const REMOVE_STATE_FUNCTION: &str = "remove-state-function";
+        pub const DOC_REMOVE_STATE_FUNCTION: &str =
+            "Removes state-function from the domain definition.";
+
+        pub const REMOVE_METHOD: &str = "remove-method";
+        pub const DOC_REMOVE_METHOD: &str = "Removes method from the domain definition";
+
+        pub const REMOVE_TASK: &str = "remove-task";
+        pub const DOC_REMOVE_TASK: &str = "Removes task and its methods from the domain definition";
+
+        pub const REMOVE_OBJECT: &str = "remove-object";
+        pub const DOC_REMOVE_OBJECT: &str = "Removes an object from the instance collection.";
+
+        pub const REMOVE_EVENT: &str = "remove-event";
+        pub const DOC_REMOVE_EVENT: &str = "Removes an event from the domain of OMPAS.";
 
         //Macros
 
@@ -544,12 +670,12 @@ pub mod monitor {
             `(add-state-function (map 
                 (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
 
-        pub const DEF_STATIC_STATE_FUNCTION: &str = "def-static-state-function";
-        pub const DOC_DEF_STATIC_STATE_FUNCTION: &str =
-            "Wrapper around add-state-function to ease the definition of new state-function.";
-        pub const DOC_DEF_STATIC_STATE_FUNCTION_VERBOSE: &str =
+        pub const DEF_FUNCTION: &str = "def-function";
+        pub const DOC_DEF_FUNCTION: &str =
+            "Wrapper around add-function to ease the definition of new state-function.";
+        pub const DOC_DEF_FUNCTION_VERBOSE: &str =
             "Example: (def-state-function at (:params (?r robot)) (:result location))";
-        pub const MACRO_DEF_STATIC_STATE_FUNCTION: &str = "(lambda attributes
+        pub const MACRO_DEF_FUNCTION: &str = "(lambda attributes
         (let ((label (car attributes))
                 (attributes (cdr attributes)))
 
@@ -560,7 +686,7 @@ pub mod monitor {
                  (cons 
                         (cons (caar l) (list (cdar l)))
                         (__l__ (cdr l))))))
-            `(add-static-state-function (map 
+            `(add-function (map 
                 (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
 
         pub const DEF_COMMAND: &str = "def-command";
@@ -636,6 +762,29 @@ pub mod monitor {
         pub const DOC_DEF_ENV_VERBOSE: &str = "Example: (def-env x 2)";
         pub const MACRO_DEF_ENV: &str = "(lambda (label value)
             `(add-lambda ',label ',value))";
+
+        pub const DEF_INIT: &str = "def-init";
+        pub const DOC_DEF_INIT: &str = "Wrapper around add-init";
+        pub const DOC_DEF_INIT_VERBOSE: &str = "Example: (def-init (sleep 1))";
+        pub const MACRO_DEF_INIT: &str = "(lambda (body)
+            `(add-init ',body ))";
+
+        pub const DEF_EVENT: &str = "def-event";
+        pub const DOC_DEF_EVENT: &str = "Wrapper around add-event";
+        pub const DOC_DEF_EVENT_VERBOSE: &str= "Example: (def-event on_new_package (new-instance (?p package)) (lambda (?p) (t_process_package ?p)))";
+        pub const MACRO_DEF_EVENT: &str = "(lambda attributes
+        (let ((label (car attributes))
+                (attributes (cdr attributes)))
+
+        (begin
+            (define __l__ (lambda (l)
+                (if (null? l)
+                nil
+                 (cons 
+                        (cons (caar l) (list (cdar l)))
+                        (__l__ (cdr l))))))
+            `(add-event (map 
+                (quote ,(cons (cons ':name label) (__l__ attributes))))))))";
 
         pub const OM_MODEL: &str = "om-model";
         pub const DOC_OM_MODEL: &str =
@@ -727,7 +876,7 @@ pub mod monitor {
         pub const DEF_RESOURCES: &str = "def-resources";
         pub const DOC_DEF_RESOURCES: &str =
             "Wrapper to ease the definition of new objects. Objects are defined with their types.";
-        pub const DOC_DEF_RESOURCES_VERBOSE: &str = "Example: (def-objects (b1 4) (b2 5) b3)";
+        pub const DOC_DEF_RESOURCES_VERBOSE: &str = "Example: (def-resources (b1 4) (b2 5) b3)";
         pub const MACRO_DEF_RESOURCES: &str = "(lambda args
     (cons 'add-resources (quote-list args)))";
 
@@ -736,6 +885,7 @@ pub mod monitor {
         pub const TASK: &str = ":task";
         pub const PARAMETERS: &str = ":params";
         pub const PRE_CONDITIONS: &str = ":pre-conditions";
+        pub const TRIGGER: &str = ":trigger";
         pub const BODY: &str = ":body";
         pub const MODEL: &str = ":model";
         pub const PLANT_MODEL: &str = ":plant-model";
@@ -744,8 +894,10 @@ pub mod monitor {
         pub const MODEL_TYPE: &str = ":model-type";
         pub const EFFECTS: &str = ":effects";
         pub const RESULT: &str = ":result";
-        pub const SCORE: &str = ":score";
         pub const COST: &str = ":cost";
+
+        pub const ONCE: &str = "once";
+        pub const WHENEVER: &str = "whenever";
     }
 
     pub mod log {
@@ -756,19 +908,19 @@ pub mod monitor {
         pub const LOG_PLATFORM: &str = "log-platform";
         pub const LOG_OMPAS: &str = "log-ompas";
 
-        pub const ACTIVATE_LOG: &str = "activate_log";
+        pub const ACTIVATE_LOG: &str = "activate-log";
         pub const DOC_ACTIVATE_LOG: &str =
             "Create a new window where the log of the given topic will be printed.\
          Logs = {log-root, log-platform, log-ompas}";
 
-        pub const DEACTIVATE_LOG: &str = "deactivate_log";
+        pub const DEACTIVATE_LOG: &str = "deactivate-log";
         pub const DOC_DEACTIVATE_LOG: &str= "Kill the windows where the log was printed. Logs = {log-root, log-platform, log-ompas}";
 
-        pub const SET_LOG_LEVEL: &str = "set_log_level";
+        pub const SET_LOG_LEVEL: &str = "set-log-level";
         pub const DOC_SET_LOG_LEVEL: &str = "Set the log level used by the system to filter logs.\
         LogLevel = {error, warn, info, debug, trace}.";
 
-        pub const GET_LOG_LEVEL: &str = "get_log_level";
+        pub const GET_LOG_LEVEL: &str = "get-log-level";
         pub const DOC_GET_LOG_LEVEL: &str =
             "Return the actual log level used by the system to filter logs.\
         LogLevel = {error, warn, info, debug, trace}.";
@@ -792,13 +944,13 @@ pub mod monitor {
         pub const __DEBUG_OMPAS__: &str = "__debug_ompas__";
         pub const DOC___DEBUG_OMPAS___: &str= "Send an expression that will be executed in the execution environment and return its result.";
 
-        pub const TRIGGER_TASK: &str = "trigger-task";
-        pub const DOC_TRIGGER_TASK: &str = "Sends to the system a new task to address.";
-        pub const DOC_TRIGGER_TASK_VERBOSE: &str = "Example: (trigger-task t_dumber robot0)";
+        pub const EXEC_TASK: &str = "exec-task";
+        pub const DOC_EXEC_TASK: &str = "Sends to the system a new task to address.";
+        pub const DOC_EXEC_TASK_VERBOSE: &str = "Example: (exec-task t_dumber robot0)";
 
-        pub const ADD_TASK_TO_EXECUTE: &str = "add-task-to-execute";
-        pub const DOC_ADD_TASK_TO_EXECUTE: &str =
-            "Add a task in the list of tasks that will be sent to the system after it launches.";
+        pub const EXEC_COMMAND: &str = "exec-command";
+        pub const DOC_EXEC_COMMAND: &str = "Sends to RAE a new command to execute";
+        pub const DOC_EXEC_COMMAND_VERBOSE: &str = "Example: (exec-command do_move robot1 1 1)";
 
         pub const _WAIT_TASK: &str = "_wait_task";
         pub const DOC__WAIT_TASK: &str = "Wait on the result of a triggered task.";
@@ -807,7 +959,7 @@ pub mod monitor {
         pub const LAMBDA_WAIT_TASK: &str = "(lambda (_id_) (await (_wait_task _id_)))";
         pub const DOC_WAIT_TASK: &str = "wrapper of _wait_task";
 
-        pub const GET_TASK_ID: &str = "get_task_id";
+        pub const GET_TASK_ID: &str = "get-task-id";
         pub const DOC_GET_TASK_ID: &str = "Get the internal id of the triggered task.";
 
         pub const CANCEL_TASK: &str = "cancel-task";
@@ -824,14 +976,35 @@ pub mod monitor {
         pub const DOC_SET_SELECT: &str =
             "Set the select engine: greedy, aries, upom, c_choice, etc.";
 
+        pub const SET_CONTINUOUS_PLANNING: &str = "set-continuous-planning";
+        pub const DOC_SET_CONTINUOUS_PLANNING: &str =
+            "Set continuous planning mode of OMPAS: none, satisfactory, optimality.";
+
+        pub const SET_PLANNER_REACTIVITY: &str = "set-planner-reactivity";
+        pub const DOC_SET_PLANNER_REACTIVITY: &str= "Set the time that will define the reactivity of the planner. The value can be the symbol \"inf\", or a number in secs";
+
+        pub const GET_PLANNER_REACTIVITY: &str = "get-planner-reactivity";
+        pub const DOC_GET_PLANNER_REACTIVITY: &str = "Returns the reactivity of the planner.";
+
+        pub const SET_DELIBERATION_REACTIVITY: &str = "set-deliberation-reactivity";
+        pub const DOC_SET_DELIBERATION_REACTIVITY: &str= "Set the time that will define the reactivity of the deliberation. The value can be the symbol \"inf\", or a number in secs";
+
+        pub const GET_DELIBERATION_REACTIVITY: &str = "get-deliberation-reactivity";
+        pub const DOC_GET_DELIBERATION_REACTIVITY: &str =
+            "Returns the reactivity of the deliberation.";
+
+        pub const SET_PRE_COMPUTE_MODELS: &str = "set-pre-compute-models";
+        pub const DOC_SET_PRE_COMPUTE_MODELS: &str =
+            "Set the value to pre compute acting models used during planning at the init of OMPAS";
+
+        pub const GET_PRE_COMPUTE_MODELS: &str = "get-pre-compute-models";
+        pub const DOC_GET_PRE_COMPUTE_MODELS: &str =
+            "Return the value of the option of \"pre_compute_models\"";
         pub const GET_SELECT: &str = "get-select";
         pub const DOC_GET_SELECT: &str = "Return the select algorithm used.";
 
         pub const GET_STATE: &str = "get-state";
         pub const DOC_GET_STATE: &str = "Returns the current state";
-
-        pub const GET_TASK_NETWORK: &str = "get-task-network";
-        pub const DOC_GET_TASK_NETWORK: &str = "Return the actual task network.";
 
         pub const GET_TYPE_HIERARCHY: &str = "get-type-hierarchy";
         pub const DOC_GET_TYPE_HIERARCHY: &str = "Return the type hierarchy defined in the domain.";
@@ -841,51 +1014,67 @@ pub mod monitor {
         pub const DOC_GET_AGENDA_VERBOSE: &str= "The agenda can be filtered in function of the kind\
         of the action {task, command} and their status {pending, accepted, rejected, success, failure, cancelled}";
 
-        pub const GET_RESOURCES: &str = "get-resources";
+        pub const GET_RESOURCES: &str = "get-resource-state";
         pub const DOC_GET_RESOURCES: &str =
             "Return the resources defined in the system and their waiting list.";
 
-        pub const GET_MONITORS: &str = "get-monitors";
+        pub const GET_MONITORS: &str = "get-monitored-fluents";
         pub const DOC_GET_MONITORS: &str =
             "Return the list of all dynamic expressions currently checked.";
 
-        pub const GET_COMMANDS: &str = "get-commands";
+        pub const GET_COMMANDS: &str = "get-command-list";
         pub const DOC_GET_COMMANDS: &str = "Return the list of all commands defined in the domain.";
 
-        pub const GET_TASKS: &str = "get-tasks";
-        pub const DOC_GET_TASKS: &str = "Return the list of all commands defined in the domain.";
+        pub const GET_TASK_LIST: &str = "get-task-list";
+        pub const DOC_GET_TASK_LIST: &str =
+            "Return the list of all commands defined in the domain.";
 
-        pub const GET_METHODS: &str = "get-methods";
-        pub const DOC_GET_METHODS: &str = "Return the list of all methods defined in the domain.";
+        pub const GET_METHOD_LIST: &str = "get-method-list";
+        pub const DOC_GET_METHOD_LIST: &str =
+            "Return the list of all methods defined in the domain.";
 
-        pub const GET_STATE_FUNCTIONS: &str = "get-state-functions";
+        pub const GET_STATE_FUNCTIONS: &str = "get-state-function-list";
         pub const DOC_GET_STATE_FUNCTIONS: &str =
             "Return the list of all state-functions defined in the domain.";
 
         pub const GET_DOMAIN: &str = "get-domain";
         pub const DOC_RAE_GET_ENV: &str = "Return the domain.";
 
-        /*pub const GET_SYMBOL_TYPE: &str = "get-symbol-type";
-        pub const DOC_GET_SYMBOL_TYPE: &str =
-            "Return the type of the symbol as defined in the domain: state-function, command, task, method.";*/
-
-        /*pub const GET_STATUS: &str = "get-status";
-        pub const DOC_GET_STATUS: &str = "Returns the current status of actions";*/
-
         pub const GET_STATS: &str = "get-stats";
         pub const DOC_GET_STATS: &str = "Return the statistics of the execution of the system";
 
         pub const EXPORT_STATS: &str = "export-stats";
-        pub const DOC_EXPORT_STATS: &str = "Export the statistics in csv format in a given file.";
+        pub const DOC_EXPORT_STATS: &str =
+            "Export the stats of the current run in either yaml or json format";
 
-        pub const DUMP_TRACE: &str = "dump_trace";
-        pub const DOC_DUMP_TRACE: &str =
+        pub const EXPORT_TO_CSV: &str = "export-to-csv";
+        pub const DOC_EXPORT_TO_CSV: &str = "Export the statistics in csv format in a given file.";
+
+        pub const DUMP_ACTING_TREE: &str = "dump-acting-tree";
+        pub const DOC_DUMP_ACTING_TREE: &str =
             "Dump in a markdown the graph representing the execution trace.\n[Unstable] The markdown is shown in google-chrome if the right extension is installed.";
 
-        pub const DEBUG_OMPAS: &str = "debug_ompas";
+        pub const DEBUG_OMPAS: &str = "debug-ompas";
         pub const DOC_DEBUG_OMPAS: &str = "Wrapper around __debug_ompas__";
         pub const MACRO_DEBUG_OMPAS: &str = "(lambda (arg)
     `(__debug_ompas__ ',arg)))";
+
+        pub const START_ACTING_TREE_DISPLAY: &str = "start-acting-tree-display";
+        pub const DOC_START_ACTING_TREE_DISPLAY: &str =
+            "Display the acting tree as a svg file in the default svg viewer of the system.";
+
+        pub const STOP_ACTING_TREE_DISPLAY: &str = "stop-acting-tree-display";
+        pub const DOC_STOP_ACTING_TREE_DISPLAY: &str = "Stop the display of the acting tree";
+
+        pub const EXPORT_REPORT: &str = "export-report";
+        pub const DOC_EXPORT_REPORT: &str =
+            "Exports the acting tree and the state of the current run.";
+
+        pub const WAIT_END_ALL: &str = "wait-end-all";
+        pub const DOC_WAIT_END_ALL: &str = "Wait that all current high-level tasks are terminated.";
+
+        pub const BENCH: &str = "bench";
+        pub const DOC_BENCH: &str = "Function to benchmark OMPAS.";
     }
 }
 
@@ -898,11 +1087,14 @@ pub mod supervisor {
     pub const STATUS_FAILURE: &str = "failure";
     pub const STATUS_CANCELLED: &str = "cancelled";
 
-    pub const ACTION: &str = "action";
+    pub const TASK: &str = "task";
     pub const ROOT_TASK: &str = "root_task";
     pub const METHOD: &str = "method";
     pub const ARBITRARY: &str = "arbitrary";
     pub const ACQUIRE: &str = "acquire";
+    pub const COMMAND: &str = "command";
+
+    pub const ABSTRACT_MODEL: &str = "abstract_model";
 }
 
 pub const ACTION_TYPE: &str = "action_type";
@@ -919,11 +1111,19 @@ pub mod select {
     pub const PLANNING: &str = "planning";
     pub const HEURISTIC: &str = "heuristic";
     pub const LEARNING: &str = "learning";
+    pub const RANDOM: &str = "random";
+    pub const COST: &str = "cost";
     pub const ARIES: &str = "aries";
     pub const ARIES_OPT: &str = "aries-opt";
     pub const UPOM: &str = "upom";
     pub const RAE_PLAN: &str = "rae-plan";
     pub const C_CHOICE: &str = "c-choice";
+}
+
+pub mod continuous_planning {
+    pub const NONE: &str = "none";
+    pub const SATISFACTORY: &str = "satisfactory";
+    pub const OPTIMALITY: &str = "optimality";
 }
 
 pub mod process {
@@ -932,7 +1132,8 @@ pub mod process {
     pub const OMPAS: &str = "OMPAS";
 
     pub const PROCESS_STOP_OMPAS: &str = "__PROCESS_STOP_OMPAS__";
-    pub const PROCESS_CHECK_WAIT_FOR: &str = "__PROCESS_CHECK_WAIT_FOR__";
+    pub const PROCESS_CHECK_FLUENT: &str = "__PROCESS_CHECK_FLUENT__";
+    pub const PROCESS_CHECK_EVENT: &str = "__PROCESS_CHECK_EVENT__";
 }
 
 pub mod interface {
@@ -943,22 +1144,25 @@ pub mod interface {
 
     pub const DEFAULT_PLATFORM_SERVICE_IP: &str = "127.0.0.1";
     pub const DEFAULT_PLATFROM_SERVICE_PORT: u16 = 8257;
-    pub const PROCESS_TOPIC_PLATFORM: &str = "__PROCESS_TOPIC_PLATFORM__";
+    //pub const PROCESS_TOPIC_OMPAS: &str = "__PROCESS_TOPIC_PLATFORM__";
     pub const LOG_TOPIC_PLATFORM: &str = "__LOG_TOPIC_PLATFORM__";
     pub const PLATFORM_CLIENT: &str = "PLATFORM_CLIENT";
 }
 
 pub mod sym_table {
 
-    pub const RESULT_PREFIX: char = 'r';
-    pub const HANDLE_PREFIX: char = 'h';
+    pub const RESULT_PREFIX: &str = "_r_";
+    pub const HANDLE_PREFIX: &str = "_h_";
     pub const IF_PREFIX: &str = "if";
-    pub const TIMEPOINT_PREFIX: char = 't';
-    pub const START_PREFIX: char = 's';
-    pub const END_PREFIX: char = 'e';
-    pub const PRESENCE_PREFIX: char = 'p';
-    pub const COND_PREFIX: char = 'c';
-    pub const CHRONICLE_RESULT_PREFIX: &str = "cr";
+    pub const TIMEPOINT_PREFIX: &str = "_t_";
+    pub const START_PREFIX: &str = "_s_";
+    pub const END_PREFIX: &str = "_e_";
+    pub const START_TASK_PREFIX: &str = "_st_";
+    pub const END_TASK_PREFIX: &str = "_et_";
+    pub const PRESENCE_PREFIX: &str = "_p_";
+    pub const COND_PREFIX: &str = "_c_";
+    pub const CHRONICLE_RESULT_PREFIX: &str = "_cr_";
+    pub const ARBITRARY_PREFIX: &str = "_a_";
 
     pub const START: &str = "start";
     pub const END: &str = "end";
@@ -977,7 +1181,14 @@ pub mod sym_table {
     pub const TYPE_STATE_FUNCTION: &str = "*StateFunctionType*";
     pub const TYPE_OBJECT_TYPE: &str = "*ObjectType*";
     pub const TYPE_OBJECT: &str = "*Object*";
-    pub const TYPE_RESSOURCE_HANDLE: &str = "*ResourceHandle*";
+    pub const TYPE_RESOURCE_HANDLE: &str = "*ResourceHandle*";
 
     pub const EPSILON: &str = "*eps*";
+}
+
+pub mod output {
+    pub const OMPAS_STATS: &str = "stats";
+    pub const CSV_FORMAT: &str = "csv";
+    pub const YAML_FORMAT: &str = "yml";
+    pub const JSON_FORMAT: &str = "json";
 }

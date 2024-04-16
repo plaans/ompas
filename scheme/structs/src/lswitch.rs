@@ -1,32 +1,30 @@
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TryRecvError;
 
-const TOKIO_CHANNEL_SIZE: usize = 10;
-
 pub type InterruptSignal = bool;
 
 #[derive(Clone, Debug)]
 pub struct InterruptionSender {
-    inner: mpsc::Sender<InterruptSignal>,
+    inner: mpsc::UnboundedSender<InterruptSignal>,
 }
 
 impl InterruptionSender {
-    pub fn new(tx: mpsc::Sender<InterruptSignal>) -> Self {
+    pub fn new(tx: mpsc::UnboundedSender<InterruptSignal>) -> Self {
         Self { inner: tx }
     }
 
-    pub async fn interrupt(&mut self) {
-        let _ = self.inner.try_send(true);
+    pub fn interrupt(&mut self) {
+        let _ = self.inner.send(true);
     }
 }
 
 pub struct InterruptionReceiver {
-    inner: mpsc::Receiver<InterruptSignal>,
+    inner: mpsc::UnboundedReceiver<InterruptSignal>,
     interrupted: Option<bool>,
 }
 
 impl InterruptionReceiver {
-    pub fn new(rx: mpsc::Receiver<InterruptSignal>) -> Self {
+    pub fn new(rx: mpsc::UnboundedReceiver<InterruptSignal>) -> Self {
         Self {
             inner: rx,
             interrupted: None,
@@ -72,7 +70,7 @@ impl InterruptionReceiver {
 }
 
 pub fn new_interruption_handler() -> (InterruptionSender, InterruptionReceiver) {
-    let (tx, rx) = mpsc::channel(TOKIO_CHANNEL_SIZE);
+    let (tx, rx) = mpsc::unbounded_channel();
 
     let tx = InterruptionSender::new(tx);
     let rx = InterruptionReceiver::new(rx);

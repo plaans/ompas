@@ -70,7 +70,7 @@ pub mod command_request {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandExecutionRequest {
     #[prost(message, repeated, tag = "1")]
-    pub arguments: ::prost::alloc::vec::Vec<Expression>,
+    pub arguments: ::prost::alloc::vec::Vec<Atom>,
     #[prost(uint64, tag = "2")]
     pub command_id: u64,
 }
@@ -145,7 +145,7 @@ pub struct InitGetUpdate {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Event {
-    #[prost(oneof = "event::Event", tags = "1, 2")]
+    #[prost(oneof = "event::Event", tags = "1, 2, 3")]
     pub event: ::core::option::Option<event::Event>,
 }
 /// Nested message and enum types in `Event`.
@@ -157,6 +157,8 @@ pub mod event {
         Instance(super::Instance),
         #[prost(message, tag = "2")]
         Resource(super::Resource),
+        #[prost(message, tag = "3")]
+        Task(super::Task),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -176,6 +178,12 @@ pub struct Resource {
     pub resource_kind: i32,
     #[prost(uint64, tag = "3")]
     pub quantity: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Task {
+    #[prost(message, repeated, tag = "1")]
+    pub arguments: ::prost::alloc::vec::Vec<Atom>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -249,8 +257,8 @@ impl ResourceKind {
 /// Generated client implementations.
 pub mod platform_interface_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::http::Uri;
     use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
     pub struct PlatformInterfaceClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -259,7 +267,7 @@ pub mod platform_interface_client {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
-            D: std::convert::TryInto<tonic::transport::Endpoint>,
+            D: TryInto<tonic::transport::Endpoint>,
             D::Error: Into<StdError>,
         {
             let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
@@ -294,8 +302,9 @@ pub mod platform_interface_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             PlatformInterfaceClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -314,39 +323,71 @@ pub mod platform_interface_client {
             self.inner = self.inner.accept_compressed(encoding);
             self
         }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_decoding_message_size(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_encoding_message_size(limit);
+            self
+        }
         pub async fn get_updates(
             &mut self,
             request: impl tonic::IntoRequest<super::InitGetUpdate>,
-        ) -> Result<tonic::Response<tonic::codec::Streaming<super::PlatformUpdate>>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/platform_interface/GetUpdates");
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::PlatformUpdate>>,
+            tonic::Status,
+        > {
             self.inner
-                .server_streaming(request.into_request(), path, codec)
+                .ready()
                 .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/platform_interface/GetUpdates",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("platform_interface", "GetUpdates"));
+            self.inner.server_streaming(req, path, codec).await
         }
         pub async fn send_commands(
             &mut self,
             request: impl tonic::IntoStreamingRequest<Message = super::CommandRequest>,
-        ) -> Result<tonic::Response<tonic::codec::Streaming<super::CommandResponse>>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/platform_interface/SendCommands");
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::CommandResponse>>,
+            tonic::Status,
+        > {
             self.inner
-                .streaming(request.into_streaming_request(), path, codec)
+                .ready()
                 .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/platform_interface/SendCommands",
+            );
+            let mut req = request.into_streaming_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("platform_interface", "SendCommands"));
+            self.inner.streaming(req, path, codec).await
         }
     }
 }
@@ -358,27 +399,36 @@ pub mod platform_interface_server {
     #[async_trait]
     pub trait PlatformInterface: Send + Sync + 'static {
         /// Server streaming response type for the GetUpdates method.
-        type GetUpdatesStream: futures_core::Stream<Item = Result<super::PlatformUpdate, tonic::Status>>
+        type GetUpdatesStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::PlatformUpdate, tonic::Status>,
+            >
             + Send
             + 'static;
         async fn get_updates(
             &self,
             request: tonic::Request<super::InitGetUpdate>,
-        ) -> Result<tonic::Response<Self::GetUpdatesStream>, tonic::Status>;
+        ) -> std::result::Result<tonic::Response<Self::GetUpdatesStream>, tonic::Status>;
         /// Server streaming response type for the SendCommands method.
-        type SendCommandsStream: futures_core::Stream<Item = Result<super::CommandResponse, tonic::Status>>
+        type SendCommandsStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::CommandResponse, tonic::Status>,
+            >
             + Send
             + 'static;
         async fn send_commands(
             &self,
             request: tonic::Request<tonic::Streaming<super::CommandRequest>>,
-        ) -> Result<tonic::Response<Self::SendCommandsStream>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<Self::SendCommandsStream>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct PlatformInterfaceServer<T: PlatformInterface> {
         inner: _Inner<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
+        max_decoding_message_size: Option<usize>,
+        max_encoding_message_size: Option<usize>,
     }
     struct _Inner<T>(Arc<T>);
     impl<T: PlatformInterface> PlatformInterfaceServer<T> {
@@ -391,9 +441,14 @@ pub mod platform_interface_server {
                 inner,
                 accept_compression_encodings: Default::default(),
                 send_compression_encodings: Default::default(),
+                max_decoding_message_size: None,
+                max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -411,6 +466,22 @@ pub mod platform_interface_server {
             self.send_compression_encodings.enable(encoding);
             self
         }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.max_decoding_message_size = Some(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.max_encoding_message_size = Some(limit);
+            self
+        }
     }
     impl<T, B> tonic::codegen::Service<http::Request<B>> for PlatformInterfaceServer<T>
     where
@@ -421,7 +492,10 @@ pub mod platform_interface_server {
         type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -430,34 +504,45 @@ pub mod platform_interface_server {
                 "/platform_interface/GetUpdates" => {
                     #[allow(non_camel_case_types)]
                     struct GetUpdatesSvc<T: PlatformInterface>(pub Arc<T>);
-                    impl<T: PlatformInterface>
-                        tonic::server::ServerStreamingService<super::InitGetUpdate>
-                        for GetUpdatesSvc<T>
-                    {
+                    impl<
+                        T: PlatformInterface,
+                    > tonic::server::ServerStreamingService<super::InitGetUpdate>
+                    for GetUpdatesSvc<T> {
                         type Response = super::PlatformUpdate;
                         type ResponseStream = T::GetUpdatesStream;
-                        type Future =
-                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::InitGetUpdate>,
                         ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move { (*inner).get_updates(request).await };
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as PlatformInterface>::get_updates(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
                     let accept_compression_encodings = self.accept_compression_encodings;
                     let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
                         let method = GetUpdatesSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
                         let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
@@ -466,47 +551,65 @@ pub mod platform_interface_server {
                 "/platform_interface/SendCommands" => {
                     #[allow(non_camel_case_types)]
                     struct SendCommandsSvc<T: PlatformInterface>(pub Arc<T>);
-                    impl<T: PlatformInterface>
-                        tonic::server::StreamingService<super::CommandRequest>
-                        for SendCommandsSvc<T>
-                    {
+                    impl<
+                        T: PlatformInterface,
+                    > tonic::server::StreamingService<super::CommandRequest>
+                    for SendCommandsSvc<T> {
                         type Response = super::CommandResponse;
                         type ResponseStream = T::SendCommandsStream;
-                        type Future =
-                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<tonic::Streaming<super::CommandRequest>>,
+                            request: tonic::Request<
+                                tonic::Streaming<super::CommandRequest>,
+                            >,
                         ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move { (*inner).send_commands(request).await };
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as PlatformInterface>::send_commands(&inner, request)
+                                    .await
+                            };
                             Box::pin(fut)
                         }
                     }
                     let accept_compression_encodings = self.accept_compression_encodings;
                     let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
                         let method = SendCommandsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
                         let res = grpc.streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -517,12 +620,14 @@ pub mod platform_interface_server {
                 inner,
                 accept_compression_encodings: self.accept_compression_encodings,
                 send_compression_encodings: self.send_compression_encodings,
+                max_decoding_message_size: self.max_decoding_message_size,
+                max_encoding_message_size: self.max_encoding_message_size,
             }
         }
     }
     impl<T: PlatformInterface> Clone for _Inner<T> {
         fn clone(&self) -> Self {
-            Self(self.0.clone())
+            Self(Arc::clone(&self.0))
         }
     }
     impl<T: std::fmt::Debug> std::fmt::Debug for _Inner<T> {
@@ -530,7 +635,8 @@ pub mod platform_interface_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: PlatformInterface> tonic::server::NamedService for PlatformInterfaceServer<T> {
+    impl<T: PlatformInterface> tonic::server::NamedService
+    for PlatformInterfaceServer<T> {
         const NAME: &'static str = "platform_interface";
     }
 }

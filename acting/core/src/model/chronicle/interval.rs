@@ -1,9 +1,7 @@
-use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::{hashset, HashSet};
-
+use map_macro::hash_set;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Interval {
     start: VarId,
@@ -99,25 +97,17 @@ impl FlatBindings for Interval {
 }
 
 impl GetVariables for Interval {
-    fn get_variables(&self) -> HashSet<VarId> {
-        let mut set = hashset![self.start, self.end];
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
+        let mut set = hash_set![self.start, self.end];
         if let Some(d) = self.duration {
             set.insert(d);
         }
         set
     }
-
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
-        self.get_variables()
-            .iter()
-            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
-            .cloned()
-            .collect()
-    }
 }
 
 impl Replace for Interval {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         self.end.replace(old, new);
         self.start.replace(old, new);
         if let Some(d) = &mut self.duration {

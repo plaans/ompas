@@ -29,6 +29,13 @@ impl ProcessRef {
         }
     }
 
+    pub fn last(&self) -> Option<&Label> {
+        match self {
+            ProcessRef::Id(_) => None,
+            ProcessRef::Relative(_, vec) => vec.last(),
+        }
+    }
+
     pub fn as_id(&self) -> Option<ActingProcessId> {
         if let Self::Id(id) = self {
             Some(*id)
@@ -70,34 +77,67 @@ impl From<ActingProcessId> for ProcessRef {
 }
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub struct RefinementLabel {
+    pub refinement_id: usize,
+    pub method_label: MethodLabel,
+}
+
+impl Display for RefinementLabel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "refinement({},{})",
+            self.refinement_id,
+            match self.method_label {
+                MethodLabel::Executed => "executed".to_string(),
+                MethodLabel::Possibility(u) => format!("possibility({})", u),
+                MethodLabel::Suggested => "suggested".to_string(),
+            }
+        )
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub enum MethodLabel {
+    Executed,
+    Suggested,
+    Possibility(usize),
+}
+
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Label {
-    Refinement(Option<usize>),
-    Action(usize),
-    Acquire(usize),
+    AbstractModel,
+    Refinement(RefinementLabel),
+    Task(usize),
+    Command(usize),
+    ResourceAcquisition(usize),
     Arbitrary(usize),
+    SyntheticTask(usize),
 }
 
 impl Display for Label {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Label::Refinement(m) => {
-                write!(
-                    f,
-                    "refinement{}",
-                    match m {
-                        None => "".to_string(),
-                        Some(m) => format!("({m})"),
-                    }
-                )
+            Label::Refinement(refinement_label) => {
+                write!(f, "{}", refinement_label)
             }
-            Label::Action(id) => {
-                write!(f, "action({id})")
+            Label::Task(id) => {
+                write!(f, "task({id})")
             }
-            Label::Acquire(acq) => {
+            Label::Command(id) => {
+                write!(f, "command({id})")
+            }
+            Label::ResourceAcquisition(acq) => {
                 write!(f, "acquire({acq})")
             }
             Label::Arbitrary(arb) => {
                 write!(f, "arbitrary({arb})")
+            }
+            Label::AbstractModel => {
+                write!(f, "abstract_model")
+            }
+            Label::SyntheticTask(id) => {
+                write!(f, "synthetic_task({})", id)
             }
         }
     }

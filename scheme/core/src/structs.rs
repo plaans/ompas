@@ -1,13 +1,16 @@
 use ompas_middleware::logger::LogClient;
+#[cfg(not(feature = "opt"))]
+use ompas_middleware::LogLevel::Debug;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::list;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lvalue::{LValue, Sym};
 use std::fmt::Display;
+use std::mem::take;
 use std::sync::Arc;
 
 pub trait Unstack {
-    fn unstack(self, results: &mut Results) -> LValue;
+    fn unstack(&mut self, results: &mut Results) -> LValue;
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -21,7 +24,7 @@ pub struct ProcedureFrame {
 }
 
 impl Unstack for ProcedureFrame {
-    fn unstack(self, results: &mut Results) -> LValue {
+    fn unstack(&mut self, results: &mut Results) -> LValue {
         results.pop_n(self.n).into()
     }
 }
@@ -34,6 +37,7 @@ impl From<ProcedureFrame> for StackKind {
 
 pub enum CoreOperatorFrame {
     If(IfFrame),
+    IfEnd,
     Begin(BeginFrame),
     Do(DoFrame),
     Define(DefineFrame),
@@ -49,14 +53,14 @@ pub enum CoreOperatorFrame {
 }
 
 impl Unstack for CoreOperatorFrame {
-    fn unstack(self, results: &mut Results) -> LValue {
+    fn unstack(&mut self, results: &mut Results) -> LValue {
         match self {
             CoreOperatorFrame::If(i) => {
                 list![
                     LPrimitive::If.into(),
                     results.pop().unwrap(),
-                    i.conseq,
-                    i.alt
+                    take(&mut i.conseq),
+                    take(&mut i.alt)
                 ]
             }
             CoreOperatorFrame::Begin(b) => {
@@ -65,7 +69,7 @@ impl Unstack for CoreOperatorFrame {
                 list.append(&mut r);
                 list.into()
             }
-            CoreOperatorFrame::Do(mut df) => {
+            CoreOperatorFrame::Do(df) => {
                 let mut list = vec![LPrimitive::Do.into()];
                 list.append(&mut df.results);
                 list.push(results.pop().unwrap());
@@ -75,7 +79,7 @@ impl Unstack for CoreOperatorFrame {
             CoreOperatorFrame::Define(d) => {
                 list!(
                     LPrimitive::Define.into(),
-                    d.symbol.into(),
+                    take(&mut d.symbol).into(),
                     results.pop().unwrap()
                 )
             }
@@ -103,6 +107,9 @@ impl Unstack for CoreOperatorFrame {
             }
             CoreOperatorFrame::EnrEnd => {
                 list!(LPrimitive::Enr.into(), results.pop().unwrap())
+            }
+            CoreOperatorFrame::IfEnd => {
+                list!(LPrimitive::If.into(), results.pop().unwrap())
             }
         }
     }
@@ -168,7 +175,7 @@ pub struct StackFrame {
 }
 
 impl Unstack for StackFrame {
-    fn unstack(self, results: &mut Results) -> LValue {
+    fn unstack(&mut self, results: &mut Results) -> LValue {
         self.kind.unstack(results)
     }
 }
@@ -218,9 +225,9 @@ pub enum StackKind {
 }
 
 impl Unstack for StackKind {
-    fn unstack(self, results: &mut Results) -> LValue {
+    fn unstack(&mut self, results: &mut Results) -> LValue {
         match self {
-            StackKind::NonEvaluated(lv) => lv,
+            StackKind::NonEvaluated(lv) => take(lv),
             StackKind::Procedure(p) => p.unstack(results),
             StackKind::CoreOperator(co) => co.unstack(results),
         }
@@ -236,8 +243,16 @@ impl<'a> ScopeCollection<'a> {
     pub fn new(root_env: &'a mut LEnv) -> Self {
         Self {
             root_env,
-            inner: vec![],
+            inner: Vec::with_capacity(1024),
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len() + 1
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 
     pub fn new_defined_scope(&mut self, env: LEnv) {
@@ -245,10 +260,12 @@ impl<'a> ScopeCollection<'a> {
     }
 
     pub fn new_scope(&mut self) {
+        //let d = DebugF::default();
         match self.inner.last() {
             Some(last) => self.inner.push(last.clone()),
             None => self.inner.push(self.root_env.clone()),
         }
+        //d.println("new_scope")
     }
 
     pub fn revert_scope(&mut self) {
@@ -272,9 +289,16 @@ impl<'a> ScopeCollection<'a> {
     }
 }
 
-#[derive(Default)]
 pub struct EvalStack {
     inner: Vec<StackFrame>,
+}
+
+impl Default for EvalStack {
+    fn default() -> Self {
+        Self {
+            inner: Vec::with_capacity(1024),
+        }
+    }
 }
 
 impl EvalStack {
@@ -282,8 +306,8 @@ impl EvalStack {
         self.inner.push(f);
     }
     pub fn push_list(&mut self, mut list: Vec<StackFrame>) {
-        list.reverse();
-        for e in list {
+        //list.reverse();
+        for e in list.drain(..).rev() {
             self.inner.push(e)
         }
     }
@@ -299,6 +323,13 @@ pub struct Results {
 }
 
 impl Results {
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
     pub fn last(&self) -> Option<&LValue> {
         self.inner.last()
     }
@@ -323,6 +354,13 @@ pub struct LDebug {
 }
 
 impl LDebug {
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
     pub fn push(&mut self, i: Interruptibility, s: impl Display) {
         self.inner.push(format!(
             "{}: {}",
@@ -334,19 +372,13 @@ impl LDebug {
         ))
     }
 
-    pub fn pop(&mut self) {
-        self.inner.pop();
+    pub fn pop(&mut self) -> Option<String> {
+        self.inner.pop()
     }
 
-    pub async fn log_last_result(&mut self, results: &Results) {
-        //if get_debug() {
-        self.log
-            .trace(format!(
-                "{} => {}",
-                self.inner.pop().unwrap(),
-                results.last().unwrap()
-            ))
-            .await
-        //}
+    pub fn log_last_result(&mut self, results: &Results) {
+        let debug = self.inner.pop().unwrap();
+        let last_result = results.last().unwrap();
+        self.log.trace(format!("{} => {}", debug, last_result))
     }
 }

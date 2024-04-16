@@ -9,7 +9,7 @@ edition = "2018"
 tokio-stream = "0.1.6"
 lazy_static = "1.4.0"
 im = "15.0.0"
-tokio = { version = "1.17.0", features = ["full", "time"] }
+tokio = { workspace = true}
 log =  { version = "0.4.16", features = ["std"] }
 async-recursion = "1.0.0"
 

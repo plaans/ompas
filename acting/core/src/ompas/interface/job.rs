@@ -2,26 +2,22 @@ use crate::ompas::interface::trigger_collection::Response;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
-use tokio::sync::mpsc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum JobType {
     Task,
+    Command,
+    Event,
     Debug,
+    Init,
 }
 
-/*impl Display for JobType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-
-                write!(f, "{}", )
-
-
-    }
-}*/
+pub type SenderJob = tokio::sync::mpsc::UnboundedSender<Result<Response, LRuntimeError>>;
+pub type ReceiverJobResult = tokio::sync::mpsc::UnboundedReceiver<Result<Response, LRuntimeError>>;
 
 #[derive(Debug, Clone)]
 pub struct Job {
-    pub sender: mpsc::Sender<Result<Response, LRuntimeError>>,
+    pub sender: SenderJob,
     pub expr: String,
     pub r#type: JobType,
 }
@@ -33,7 +29,15 @@ impl Display for Job {
 }
 
 impl Job {
-    pub fn new_task(sender: mpsc::Sender<Result<Response, LRuntimeError>>, value: LValue) -> Self {
+    pub fn new(sender: SenderJob, r#type: JobType, value: LValue) -> Self {
+        Self {
+            sender,
+            expr: value.to_string(),
+            r#type,
+        }
+    }
+
+    pub fn new_task(sender: SenderJob, value: LValue) -> Self {
         Self {
             sender,
             expr: value.to_string(),
@@ -41,12 +45,43 @@ impl Job {
         }
     }
 
-    pub fn new_debug(sender: mpsc::Sender<Result<Response, LRuntimeError>>, value: LValue) -> Self {
+    pub fn new_debug(sender: SenderJob, value: LValue) -> Self {
         Self {
             sender,
             expr: value.to_string(),
             r#type: JobType::Debug,
         }
+    }
+
+    pub fn new_command(sender: SenderJob, value: LValue) -> Self {
+        Self {
+            sender,
+            expr: value.to_string(),
+            r#type: JobType::Command,
+        }
+    }
+    pub fn new_event(sender: SenderJob, value: LValue) -> Self {
+        Self {
+            sender,
+            expr: value.to_string(),
+            r#type: JobType::Event,
+        }
+    }
+
+    pub fn new_init(sender: SenderJob, value: LValue) -> Self {
+        Self {
+            sender,
+            expr: value.to_string(),
+            r#type: JobType::Init,
+        }
+    }
+
+    pub fn is_event(&self) -> bool {
+        self.r#type == JobType::Event
+    }
+
+    pub fn is_task(&self) -> bool {
+        self.r#type == JobType::Task
     }
 }
 

@@ -1,5 +1,7 @@
+use crate::model::acting_domain::model::ActingModel;
 use crate::model::chronicle::computation::Computation;
 use crate::model::chronicle::constraint::Constraint;
+use crate::model::chronicle::effect::EffectOperationInner;
 use crate::model::chronicle::lit::Lit;
 use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::sym_domain::basic_type::{
@@ -10,23 +12,18 @@ use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_domain::Domain::Simple;
 use crate::model::sym_domain::{Domain, TypeId};
 use crate::model::sym_table::r#ref::RefSymTable;
-use crate::model::sym_table::r#trait::GetVariables;
+use crate::model::sym_table::r#trait::{FormatWithSymTable, GetVariables};
 use crate::model::sym_table::VarId;
-use crate::ompas::manager::acting::planning::ActingVarRefTable;
-
-use crate::model::acting_domain::model::ActingModel;
+use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
 use crate::ompas::manager::state::instance::InstanceCollection;
 use crate::planning::planner::encoding::{
-    atom_from_cst, get_type, try_variable_into_fvar, var_id_into_atom, PlannerDomain,
+    atom_from_cst, get_type, var_id_into_atom, PlannerDomain,
 };
-use crate::OMPAS_PLAN_ENCODING_OPTIMIZATION_ON;
-use anyhow::anyhow;
+use crate::OMPAS_PLAN_ENCODING_OPTIMIZATION;
 use aries::core::{IntCst, Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
 use aries::model::lang::linear::{LinearSum, LinearTerm};
-use aries::model::lang::{
-    Atom as aAtom, Atom, ConversionError, FAtom, FVar, IAtom, IVar, Type as aType, Variable,
-};
+use aries::model::lang::{Atom as aAtom, Atom, ConversionError, FAtom, IAtom, IVar, Variable};
 use aries::model::symbols::SymbolTable;
 use aries::model::types::TypeHierarchy;
 use aries::utils::input::Sym;
@@ -34,22 +31,20 @@ use aries_planning::chronicles::constraints::{Constraint as aConstraint, Constra
 use aries_planning::chronicles::printer::Printer;
 use aries_planning::chronicles::{
     Chronicle as aChronicle, ChronicleKind as aChronicleKind,
-    ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect, StateFun, SubTask,
-    VarType, TIME_SCALE,
+    ChronicleTemplate as aChronicleTemplate, Condition, Container, Ctx, Effect, EffectOp, Fluent,
+    StateVar, SubTask, VarType, TIME_SCALE,
 };
 use aries_planning::parsing::pddl::TypedSymbol;
+use env_param::EnvParam;
 use function_name::named;
-use num_integer::Integer;
-use ompas_language::exec::resource::{MAX_Q, QUANTITY};
-use ompas_language::exec::state::INSTANCE;
-use ompas_language::sym_table::{
-    TYPE_ABSTRACT_TASK, TYPE_COMMAND, TYPE_METHOD, TYPE_OBJECT, TYPE_OBJECT_TYPE, TYPE_PREDICATE,
-    TYPE_PRESENCE, TYPE_STATE_FUNCTION, TYPE_TASK, TYPE_TIMEPOINT,
-};
+use ompas_language::exec::state::UNKNOWN;
+use ompas_language::sym_table::*;
 use sompas_structs::lruntimeerror;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use std::ops::Deref;
 use std::sync::Arc;
+
+static TIMEPOINT_UB: EnvParam<IntCst> = EnvParam::new("OMPAS_TIMEPOINT_UB", "1000000");
 
 #[named]
 pub fn encode_ctx(
@@ -89,24 +84,16 @@ pub fn encode_ctx(
         symbols.push(TypedSymbol::new(sym, TYPE_OBJECT_TYPE));
     }
 
-    /*for t in &problem.types {
-        types.push((t.into(), Some(OBJECT_TYPE.into())));
-        symbols.push(TypedSymbol::new(t, TYPE_TYPE));
-    }*/
-
     let th = TypeHierarchy::new(types).unwrap_or_else(|e| panic!("{e}"));
 
     for (t, instances) in &instance.inner {
-        for sym in instances {
+        for sym in instances.get_all_elements() {
             symbols.push(TypedSymbol::new(sym, t));
         }
     }
 
-    //Adding custom state functions
-    symbols.push(TypedSymbol::new(INSTANCE, TYPE_STATE_FUNCTION));
-    symbols.push(TypedSymbol::new(QUANTITY, TYPE_STATE_FUNCTION));
-    symbols.push(TypedSymbol::new(MAX_Q, TYPE_STATE_FUNCTION));
-    //symbols.push(TypedSymbol::new(NIL_OBJECT, OBJECT_TYPE));
+    symbols.push(TypedSymbol::new(UNKNOWN, TYPE_OBJECT));
+
     for sf in &domain.sf {
         symbols.push(TypedSymbol::new(sf.get_label(), TYPE_STATE_FUNCTION));
     }
@@ -127,68 +114,11 @@ pub fn encode_ctx(
     let symbol_table = SymbolTable::new(th, symbols).unwrap_or_else(|e| panic!("{e}"));
 
     //We have 4 synthetic state functions.
-    let mut state_functions = Vec::with_capacity(domain.sf.len() + 3);
+    let mut state_functions = Vec::with_capacity(domain.sf.len());
     /*
      * Add state function for type.
      * instance(?<object>) -> type
      */
-    {
-        let sym = symbol_table
-            .id(INSTANCE)
-            .ok_or_else(|| anyhow!("{} undefined", INSTANCE))?;
-        let mut args = Vec::with_capacity(2);
-        args.push(aType::Sym(
-            symbol_table
-                .types
-                .id_of(TYPE_OBJECT)
-                .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-        ));
-        args.push(aType::Sym(
-            symbol_table
-                .types
-                .id_of(TYPE_OBJECT_TYPE)
-                .ok_or_else(|| anyhow!("{} undefined", TYPE_OBJECT_TYPE))?,
-        ));
-        state_functions.push(StateFun { sym, tpe: args })
-    }
-
-    /*
-     * Add state function for type.
-     * quantity(?<resource>) -> float
-     */
-    {
-        let sym = symbol_table
-            .id(QUANTITY)
-            .ok_or_else(|| anyhow!("{} undefined", QUANTITY))?;
-        let mut args = Vec::with_capacity(2);
-        args.push(aType::Sym(
-            symbol_table
-                .types
-                .id_of(TYPE_OBJECT_TYPE)
-                .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-        ));
-        args.push(aType::Int);
-        state_functions.push(StateFun { sym, tpe: args })
-    }
-
-    /*
-     * Add state function for type.
-     * quantity(?<resource>) -> float
-     */
-    {
-        let sym = symbol_table
-            .id(MAX_Q)
-            .ok_or_else(|| anyhow!("{} undefined", QUANTITY))?;
-        let mut args = Vec::with_capacity(2);
-        args.push(aType::Sym(
-            symbol_table
-                .types
-                .id_of(TYPE_OBJECT_TYPE)
-                .ok_or_else(|| anyhow!("{} undefined.", TYPE_OBJECT))?,
-        ));
-        args.push(aType::Int);
-        state_functions.push(StateFun { sym, tpe: args })
-    }
 
     for sf in &domain.sf {
         let sym = symbol_table.id(sf.get_label()).ok_or_else(|| {
@@ -202,7 +132,10 @@ pub fn encode_ctx(
             args.push(get_type(&lattice, &symbol_table, tpe)?);
         }
         args.push(get_type(&lattice, &symbol_table, &sf.result)?);
-        state_functions.push(StateFun { sym, tpe: args })
+        state_functions.push(Fluent {
+            sym,
+            signature: args,
+        })
     }
 
     Ok(Ctx::new(Arc::new(symbol_table), state_functions))
@@ -249,7 +182,7 @@ fn convert_constraint(
             let b: FAtom = get_atom(&b, ctx).try_into().map_err(|c: ConversionError| {
                 LRuntimeError::new("conversion_error", c.to_string())
             })?;
-            aConstraint::fleq(a, b)
+            aConstraint::leq(a, b)
         }
         Constraint::Eq(a, b) => match (a, b) {
             (Lit::Atom(a), Lit::Atom(b)) => aConstraint::eq(get_atom(a, ctx), get_atom(b, ctx)),
@@ -261,13 +194,11 @@ fn convert_constraint(
                 let mut cs =
                     convert_constraint(c.deref(), prez, container, table, st, ctx, Some(value))?;
                 constraints.append(&mut cs);
-                aConstraint::neq(get_atom(a, ctx), value)
+                aConstraint::eq(get_atom(a, ctx), value)
             }
             (Lit::Atom(value), Lit::Computation(c)) => {
                 let value = get_atom(value, ctx);
-                let mut factor: IntCst = 1;
                 let mut variables = vec![(-1, value)];
-                let mut terms = vec![];
                 match c.deref() {
                     Computation::Add(add) => {
                         for var in add {
@@ -382,65 +313,33 @@ fn convert_constraint(
                     }
                 }
 
-                //Compute the common factor between all terms
-                for (_, var) in &variables {
-                    if let aAtom::Fixed(f) = var {
-                        factor = factor.lcm(&f.denom);
-                    }
-                }
-
-                let mut cst: IntCst = 0;
+                let mut sum = LinearSum::zero();
 
                 for (sign, var) in variables {
-                    let factor = sign * factor;
-
-                    let (factor, var, shift) = match var {
-                        aAtom::Int(i) => (factor, i.var, i.shift),
-                        aAtom::Fixed(f) => {
-                            let factor = factor / f.denom;
-                            (factor, f.num.var, f.num.shift)
+                    match var {
+                        Atom::Int(IAtom { var, shift }) => {
+                            sum += LinearTerm::int(sign, var, prez);
+                            sum += LinearTerm::constant_int(sign * shift, prez);
+                        }
+                        Atom::Fixed(FAtom {
+                            num: IAtom { var, shift },
+                            denom,
+                        }) => {
+                            sum += LinearTerm::rational(sign, var, denom, prez);
+                            sum += LinearTerm::constant_rational(sign * shift, denom, prez);
                         }
                         _ => unreachable!(),
                     };
-                    cst += factor * shift;
-                    match var {
-                        IVar::ZERO => {}
-                        _ => terms.push(LinearTerm::new(factor, var, false)),
-                    }
                 }
 
-                match terms.len() {
-                    0 | 1 => {
-                        unreachable!()
-                    }
-                    2 => {
-                        let a = terms[0];
-                        let b = terms[1];
-
-                        let (a, b): (aAtom, aAtom) = if factor == 1 {
-                            let a = a.var().into();
-                            let b = b.var() + cst;
-                            let b = b.var.into();
-                            (a, b)
-                        } else {
-                            let a = FAtom::new(a.var().into(), factor).into();
-                            let b = FAtom::new(b.var() + cst, factor).into();
-                            (a, b)
-                        };
-
-                        aConstraint::eq(a, b)
-                    }
-                    _ => {
-                        let mut lsum = LinearSum::zero();
-                        for term in terms {
-                            lsum += term;
-                        }
-                        lsum += cst;
-                        aConstraint::linear_eq_zero(lsum)
-                    }
-                }
+                let sum = sum.simplify();
+                //println!("INFO! sum = {:?}", sum);
+                aConstraint::linear_eq_zero(sum)
             }
-            _ => Err(LRuntimeError::default().chain("constraint::eq"))?,
+            _ => Err(LRuntimeError::new(
+                "constraint::eq",
+                format!("cannot encode constraint {}", c.format(st, false)),
+            ))?,
         },
         Constraint::Not(a) => {
             let a: VarId = a.try_into().expect("");
@@ -519,15 +418,8 @@ fn convert_constraint(
                         .model
                         .new_optional_bvar(prez, container / VarType::Reification)
                         .into();
-                    let mut cs = convert_constraint(
-                        c.deref(),
-                        prez,
-                        container,
-                        table,
-                        st,
-                        ctx,
-                        Some(value),
-                    )?;
+                    let mut cs =
+                        convert_constraint(c, prez, container, table, st, ctx, Some(value))?;
                     constraints.append(&mut cs);
                     aConstraint::neq(get_atom(&a, ctx), value)
                 }
@@ -592,18 +484,65 @@ pub fn read_chronicle(
             None => ctx.model.new_bvar(container / VarType::Presence),
         };
         let variable: Variable = prez_var.into();
-        table.add_binding(*ch.get_presence(), variable);
+        table.add_binding(ch.get_presence(), variable);
         params.push(variable);
         let prez: aLit = prez_var.true_lit();
         prez
     };
 
+    if ch.meta_data.kind == ChronicleKind::Root {
+        table.add_binding(
+            ch.get_interval().get_start(),
+            Variable::try_from(Atom::from(ctx.origin()))?,
+        );
+        table.add_binding(
+            ch.get_interval().get_end(),
+            Variable::try_from(Atom::from(ctx.horizon()))?,
+        );
+    } else {
+        let start = ctx.model.new_optional_fvar(
+            INT_CST_MIN,
+            INT_CST_MAX,
+            TIME_SCALE.get(), //Not sure of that
+            prez,
+            container / VarType::ChronicleStart,
+        );
+        let end = ctx.model.new_optional_fvar(
+            INT_CST_MIN,
+            INT_CST_MAX,
+            TIME_SCALE.get(), //Not sure of that
+            prez,
+            container / VarType::ChronicleEnd,
+        );
+        table.add_binding(ch.get_interval().get_start(), start.into());
+        table.add_binding(ch.get_interval().get_end(), end.into());
+    }
+
     //print!("init params...");
     //TODO: handle case where some parameters are already instantiated.
     for var in &ch.get_variables() {
-        let var_domain = st.get_var_domain(var);
+        let var = st.get_var_parent(*var);
+        let var_domain = st.get_var_domain(st.get_domain_id(var));
         let domain = &var_domain.domain;
-        let label = st.get_label(var, false);
+        let label = st.get_label(var, true);
+        let var_type = if label.starts_with(TIMEPOINT_PREFIX)
+            || label.starts_with(START_TASK_PREFIX)
+            || label.starts_with(END_TASK_PREFIX)
+        {
+            VarType::InternalTimepoint
+        } else if label.starts_with(START_PREFIX) {
+            VarType::ChronicleStart
+        } else if label.starts_with(END_PREFIX) {
+            VarType::ChronicleEnd
+        } else if label.starts_with(PRESENCE_PREFIX) {
+            VarType::Presence
+        } else if label.starts_with(ARBITRARY_PREFIX) {
+            VarType::Arbitrary
+        } else if label.starts_with(RESULT_PREFIX) {
+            VarType::Reification
+        } else {
+            VarType::Parameter(label.clone())
+        };
 
         let (t, var_val) = &match domain {
             Simple(TYPE_ID_NIL | TYPE_ID_FALSE) => {
@@ -631,27 +570,21 @@ pub fn read_chronicle(
             }
         };
 
-        let param = if let Some(var) = table.get_var(*var) {
+        let param = if let Some(var) = table.get_var(var) {
             *var
         } else if t == lattice.get_type_id(TYPE_TIMEPOINT).unwrap() {
             let fvar = ctx.model.new_optional_fvar(
                 0,
-                INT_CST_MAX,
+                TIMEPOINT_UB.get(),
                 TIME_SCALE.get(),
                 prez,
-                container / VarType::Parameter(label),
+                container / var_type,
             );
 
-            table.add_binding(*var, fvar.into());
+            table.add_binding(var, fvar.into());
             fvar.into()
-        } else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
-            if let Some(var) = table.get_var(*var) {
-                *var
-            } else {
-                panic!()
-            }
         } else if *t == TYPE_ID_INT {
-            let (lb, ub): (IntCst, IntCst) = if OMPAS_PLAN_ENCODING_OPTIMIZATION_ON.get() {
+            let (lb, ub): (IntCst, IntCst) = if OMPAS_PLAN_ENCODING_OPTIMIZATION.get() {
                 if let Some(VarVal::Range(l, u)) = var_val {
                     (*l as IntCst, *u as IntCst)
                 } else {
@@ -661,10 +594,10 @@ pub fn read_chronicle(
                 (INT_CST_MIN, INT_CST_MAX)
             };
 
-            let ivar =
-                ctx.model
-                    .new_optional_ivar(lb, ub, prez, container / VarType::Parameter(label));
-            table.add_binding(*var, ivar.into());
+            let ivar = ctx
+                .model
+                .new_optional_ivar(lb, ub, prez, container / var_type);
+            table.add_binding(var, ivar.into());
             ivar.into()
         } else if *t == TYPE_ID_FLOAT || *t == TYPE_ID_NUMBER {
             let fvar = ctx.model.new_optional_fvar(
@@ -672,16 +605,13 @@ pub fn read_chronicle(
                 INT_CST_MAX,
                 TIME_SCALE.get(), //Not sure of that
                 prez,
-                container / VarType::Parameter(label),
+                container / var_type,
             );
             table.add_binding(var, fvar.into());
             fvar.into()
         } else if *t == TYPE_ID_BOOLEAN {
-            let bvar = ctx
-                .model
-                .new_optional_bvar(prez, container / VarType::Parameter(label));
-            //context.model.
-            table.add_binding(*var, bvar.into());
+            let bvar = ctx.model.new_optional_bvar(prez, container / var_type);
+            table.add_binding(var, bvar.into());
             bvar.into()
         } else if *t == TYPE_ID_NIL {
             unreachable!()
@@ -697,12 +627,16 @@ pub fn read_chronicle(
                 .get_symbol_table()
                 .types
                 .id_of(&str)
-                .unwrap_or_else(|| panic!("{str} should be defined in type hierarchy"));
-            //let s = ch.sym_table.get_atom(var, true).unwrap();
-            let svar =
-                ctx.model
-                    .new_optional_sym_var(t, prez, container / VarType::Parameter(label));
-            table.add_binding(*var, svar.into());
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{str} should be defined in type hierarchy, encoded chronicle:\n{}",
+                        ch
+                    )
+                });
+            let svar = ctx
+                .model
+                .new_optional_sym_var(t, prez, container / var_type);
+            table.add_binding(var, svar.into());
             svar.into()
         };
         if let Some(var_val) = var_val {
@@ -735,19 +669,29 @@ pub fn read_chronicle(
 
     //print!("init conditions...");
     for c in ch.get_conditions() {
-        let sv =
-            c.sv.iter()
-                .map(|a| {
-                    get_atom(a, ctx)
-                        .try_into()
-                        .unwrap_or_else(|e| panic!("{}", e))
-                })
-                .collect();
+        let fluent = ctx
+            .get_fluent(
+                ctx.model
+                    .get_symbol_table()
+                    .id(&c.sv[0].format(&st, true))
+                    .unwrap(),
+            )
+            .unwrap()
+            .clone();
+
+        let args = c.sv[1..]
+            .iter()
+            .map(|a| {
+                get_atom(a, ctx)
+                    .try_into()
+                    .unwrap_or_else(|e| panic!("{}", e))
+            })
+            .collect();
+        let sv = StateVar { fluent, args };
+
         let value = get_atom(&c.value, ctx);
-        let start: FVar = try_variable_into_fvar(table.get_var(c.get_start()).cloned().unwrap())?;
-        let start = FAtom::from(start);
-        let end: FVar = try_variable_into_fvar(table.get_var(c.get_end()).cloned().unwrap())?;
-        let end = FAtom::from(end);
+        let start: FAtom = get_atom(&c.get_start(), ctx).try_into()?;
+        let end: FAtom = get_atom(&c.get_end(), ctx).try_into()?;
         let condition = Condition {
             start,
             state_var: sv,
@@ -760,25 +704,55 @@ pub fn read_chronicle(
 
     //print!("init effects...");
     for e in ch.get_effects() {
-        let sv =
-            e.sv.iter()
-                .map(|a| {
-                    get_atom(a, ctx)
-                        .try_into()
-                        .unwrap_or_else(|e| panic!("{}", e))
-                })
-                .collect();
-        let value = get_atom(&e.value, ctx);
-        let start: FVar = try_variable_into_fvar(*table.get_var(e.get_start()).unwrap())?;
-        let start = FAtom::from(start);
-        let end: FVar = try_variable_into_fvar(*table.get_var(e.get_end()).unwrap())?;
-        let end = FAtom::from(end);
+        let fluent = ctx
+            .get_fluent(
+                ctx.model
+                    .get_symbol_table()
+                    .id(&e.sv[0].format(&st, true))
+                    .unwrap(),
+            )
+            .unwrap()
+            .clone();
+
+        let args = e.sv[1..]
+            .iter()
+            .map(|a| {
+                get_atom(a, ctx)
+                    .try_into()
+                    .unwrap_or_else(|e| panic!("{}", e))
+            })
+            .collect();
+        let sv = StateVar { fluent, args };
+
+        let value = get_atom(&e.operation.var_id, ctx);
+        let operation = match &e.operation.inner {
+            EffectOperationInner::Assign => EffectOp::Assign(value),
+            EffectOperationInner::Increase => {
+                if let Atom::Int(iatom) = value {
+                    let sum = LinearSum::from(iatom);
+                    EffectOp::Increase(sum)
+                } else {
+                    panic!("Increase support only integer variable.");
+                }
+            }
+            EffectOperationInner::Decrease => {
+                if let Atom::Int(iatom) = value {
+                    let sum = -LinearSum::from(iatom);
+                    EffectOp::Increase(sum)
+                } else {
+                    panic!("Decrease support only integer variable.");
+                }
+            }
+        };
+        let start: FAtom = get_atom(&e.get_start(), ctx).try_into()?;
+        let end: FAtom = get_atom(&e.get_end(), ctx).try_into()?;
+
         let effect = Effect {
             transition_start: start, // + FAtom::EPSILON,
-            persistence_start: end,  // + FAtom::EPSILON,
-            min_persistence_end: vec![],
+            transition_end: end,     // + FAtom::EPSILON,
+            min_mutex_end: vec![],
             state_var: sv,
-            value,
+            operation,
         };
         effects.push(effect);
     }
@@ -792,31 +766,32 @@ pub fn read_chronicle(
         let end: FAtom = get_atom(&s.interval.get_end(), ctx)
             .try_into()
             .unwrap_or_else(|t| panic!("{:?}", t));
-        let e: Vec<aAtom> = s.name.iter().map(|a| get_atom(a, ctx)).collect();
+        let mut task_name = vec![get_atom(&s.result, ctx)];
+        s.name.iter().for_each(|a| task_name.push(get_atom(a, ctx)));
         let st = SubTask {
             id: None,
             start,
             end,
-            task_name: e,
+            task_name,
         };
 
         subtasks.push(st);
     }
-    //println!("ok!");
 
-    let start = try_variable_into_fvar(*table.get_var(ch.get_interval().get_start()).unwrap())?;
-    let start = FAtom::from(start);
-    let end = try_variable_into_fvar(*table.get_var(ch.get_interval().get_end()).unwrap())?;
-    let end = FAtom::from(end);
+    let (start, end): (FAtom, FAtom) = (
+        get_atom(&ch.get_interval().get_start(), ctx).try_into()?,
+        get_atom(&ch.get_interval().get_end(), ctx).try_into()?,
+    );
 
-    //print!("init name...");
-    let name: Vec<aAtom> = ch.get_name().iter().map(|a| get_atom(a, ctx)).collect();
-    //println!("ok!");
+    let mut name: Vec<aAtom> = vec![get_atom(&ch.get_result(), ctx)];
+    ch.get_name()
+        .iter()
+        .for_each(|a| name.push(get_atom(a, ctx)));
 
-    //print!("init task...");
-    let task: Vec<aAtom> = ch.get_task().iter().map(|a| get_atom(a, ctx)).collect();
-    //println!("ok!");
-    //print!("\n\n");
+    let mut task: Vec<aAtom> = vec![get_atom(&ch.get_result(), ctx)];
+    ch.get_task()
+        .iter()
+        .for_each(|a| task.push(get_atom(a, ctx)));
 
     let template = aChronicle {
         kind: match ch.meta_data.kind {

@@ -1,7 +1,6 @@
 use crate::serde::{
     GodotMessageSerde, GodotMessageSerdeData, GodotMessageType, SerdeCancelRequest, SerdeCommand,
 };
-use crate::PROCESS_TOPIC_GOBOT_SIM;
 use ompas_core::ompas::manager::state::partial_state::PartialState;
 use ompas_interface::platform_interface::command_request::Request;
 use ompas_interface::platform_interface::{
@@ -11,6 +10,7 @@ use ompas_interface::platform_interface::{
 };
 use ompas_interface::platform_interface::{CommandCancelled, ResourceKind};
 use ompas_language::interface::*;
+use ompas_language::process::PROCESS_TOPIC_OMPAS;
 use ompas_middleware::ProcessInterface;
 use sompas_structs::lvalues::LValueS;
 use std::collections::HashMap;
@@ -21,8 +21,8 @@ use std::net::SocketAddr;
 use std::process::exit;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 pub const BUFFER_SIZE: usize = 65_536; //65KB should be enough for the moment
 
@@ -33,7 +33,7 @@ const PROCESS_GOBOT_WRITE_TCP: &str = "__PROCESS_GOBOT_WRITE_TCP__";
 /// Opens the tcp connection with godot
 pub async fn task_tcp_connection(
     socket_addr: &SocketAddr,
-    command_request_receiver: mpsc::Receiver<CommandRequest>,
+    command_request_receiver: UnboundedReceiver<CommandRequest>,
     command_response_sender: broadcast::Sender<CommandResponse>,
     state_update_sender: broadcast::Sender<PlatformUpdate>,
 ) {
@@ -59,11 +59,11 @@ pub async fn task_tcp_connection(
 
 async fn async_write_socket(
     mut stream: WriteHalf<TcpStream>,
-    mut receiver: Receiver<CommandRequest>,
+    mut receiver: UnboundedReceiver<CommandRequest>,
 ) {
     let mut process = ProcessInterface::new(
         PROCESS_GOBOT_WRITE_TCP,
-        PROCESS_TOPIC_GOBOT_SIM,
+        PROCESS_TOPIC_OMPAS,
         LOG_TOPIC_PLATFORM,
     )
     .await;
@@ -159,7 +159,7 @@ async fn async_read_socket(
 ) {
     let mut process = ProcessInterface::new(
         PROCESS_GOBOT_READ_TCP,
-        PROCESS_TOPIC_GOBOT_SIM,
+        PROCESS_TOPIC_OMPAS,
         LOG_TOPIC_PLATFORM,
     )
     .await;
@@ -185,14 +185,14 @@ async fn async_read_socket(
                 match msg {
                     Ok(_) => {}
                     Err(_) => {
-                        process.kill(PROCESS_TOPIC_PLATFORM).await;
+                        process.kill(PROCESS_TOPIC_OMPAS);
                     }//panic!("Error while reading buffer"),
                 };
                 let size = read_size_from_buf(&size_buf);
                 match buf_reader.read_exact(&mut buf[0..size]).await {
                     Ok(_) => {}
                     Err(_) => {
-                        process.kill(PROCESS_TOPIC_PLATFORM).await;
+                        process.kill(PROCESS_TOPIC_OMPAS);
                     }
                 };
 
@@ -214,11 +214,11 @@ async fn async_read_socket(
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
 
                             //let updates = post_process_state(temps_state, StateVariableType::Static, &mut global);
-                            let updates = post_process_state_2(temps_state, StateVariableType::Static, &mut global_2);
+                            let updates = post_process_state(temps_state, StateVariableType::Static, &mut global_2);
                             for update in updates {
                                 if state_update_sender.send(update).is_err()
                                 {
-                                    process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                    process.kill(PROCESS_TOPIC_OMPAS);
                                     break 'outer;
                                 }
                             }
@@ -226,11 +226,11 @@ async fn async_read_socket(
                         GodotMessageType::DynamicState => {
                             let temps_state: PartialState = PartialState::try_from(message).unwrap();
                             //let updates = post_process_state(temps_state, StateVariableType::Dynamic, &mut global);
-                            let updates = post_process_state_2(temps_state, StateVariableType::Dynamic, &mut global_2);
+                            let updates = post_process_state(temps_state, StateVariableType::Dynamic, &mut global_2);
                             for update in updates {
                                 if state_update_sender.send(update).is_err()
                                 {
-                                    process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                    process.kill(PROCESS_TOPIC_OMPAS);
                                     break 'outer;
                                 }
                             }
@@ -242,7 +242,7 @@ async fn async_read_socket(
                                         if command_response_sender.send(CommandRejected {
                                                 command_id : ar.temp_id as u64
                                             }.into()).is_err() {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.kill(PROCESS_TOPIC_OMPAS);
                                             //process.die().await;
                                             break 'outer;
                                         }
@@ -259,7 +259,7 @@ async fn async_read_socket(
                                                 command_id : ar.temp_id as u64
                                             }.into()).is_err()
                                              {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
+                                            process.kill(PROCESS_TOPIC_OMPAS);
                                             //process.die().await;
                                             break 'outer;
                                         }
@@ -277,8 +277,7 @@ async fn async_read_socket(
                                     command_id,
                                     progress: af.feedback
                                 }.into()).is_err() {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                            //process.die().await;
+                                            process.kill(PROCESS_TOPIC_OMPAS);
                                             break 'outer;
                                         }
                             } else {
@@ -292,8 +291,7 @@ async fn async_read_socket(
                                     command_id,
                                     result: ar.result
                                 }.into()).is_err()  {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                            //process.die().await;
+                                            process.kill(PROCESS_TOPIC_OMPAS);
                                             break 'outer;
                                         }
                             } else {
@@ -310,8 +308,7 @@ async fn async_read_socket(
                                     command_id,
                                     result: ac.cancelled
                                 }.into()).is_err()  {
-                                            process.kill(PROCESS_TOPIC_PLATFORM).await;
-                                            //process.die().await;
+                                            process.kill(PROCESS_TOPIC_OMPAS);
                                             break 'outer;
                                         }
                             } else {
@@ -352,7 +349,7 @@ struct Global2 {
 
 const TRAVEL_TIME: &str = "travel-time";
 
-fn post_process_state_2(
+fn post_process_state(
     state: PartialState,
     r#type: StateVariableType,
     global: &mut Global2,
@@ -392,9 +389,9 @@ fn post_process_state_2(
 
     match r#type {
         StateVariableType::Static => {
-            if let Some(v) = state.get(&LValueS::from(vec!["globals.robot_standard_velocity"])) {
+            if let Some(f) = state.get(&LValueS::from(vec!["globals.robot_standard_velocity"])) {
                 //println!("ok");
-                global.def_velocity = Some(v.try_into().unwrap())
+                global.def_velocity = Some((&f.value).try_into().unwrap())
             }
             //Store velocity
         }
@@ -404,7 +401,7 @@ fn post_process_state_2(
     }
 
     let mut state_variables = vec![];
-    for (k, v) in &state.inner {
+    for (k, f) in &state.inner {
         match k {
             LValueS::List(list) => {
                 let mut sv = list.clone();
@@ -418,7 +415,7 @@ fn post_process_state_2(
                 if state_function.contains(".instance") {
                     let obj_label = parameters[0].to_string();
                     let instance = Instance {
-                        r#type: v.to_string(),
+                        r#type: f.value.to_string(),
                         object: obj_label.to_string(),
                     };
 
@@ -433,14 +430,14 @@ fn post_process_state_2(
                     //Creation of a unary resource corresponding to the instance.
                     updates.push(resource.into());
 
-                    if v.to_string() == "belt" || v.to_string() == "parking_area" {
+                    if f.value.to_string() == "belt" || f.value.to_string() == "parking_area" {
                         let cells = state
                             .get(&LValueS::from(vec![
-                                format!("{}.cells", v).into(),
+                                format!("{}.cells", f.value).into(),
                                 list[1].clone(),
                             ]))
                             .unwrap();
-                        let mut cells: Vec<LValueS> = cells.try_into().unwrap();
+                        let mut cells: Vec<LValueS> = (&cells.value).try_into().unwrap();
                         let tiles: Vec<Tile> = cells
                             .drain(..)
                             .map(|val| {
@@ -460,7 +457,7 @@ fn post_process_state_2(
                     r#type: r#type.into(),
                     state_function,
                     parameters,
-                    value: Some(v.clone().try_into().unwrap()),
+                    value: Some(f.value.clone().try_into().unwrap()),
                 });
             }
             _ => {

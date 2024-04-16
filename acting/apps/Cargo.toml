@@ -8,14 +8,17 @@ edition = "2021"
 [dependencies]
 ompas-core = {path = "../core"}
 sompas-language= {path = "../../scheme/language"}
-sompas-core = {path = "../../scheme/core"}
+sompas-core = {path = "../../scheme/core", features = ["opt"]}
 sompas-structs = {path = "../../scheme/structs"}
 sompas-repl = {path = "../../scheme/repl"}
 sompas-modules = {path = "../../scheme/modules"}
 ompas-language = {path = "../language"}
-structopt = { version = "0.3", default-features = false }
 ompas-middleware = {path = "../../middleware"}
-tokio = { version = "1.17.0", features = ["full", "time"] }
-yaml-rust = "0.4.5"
-chrono = "0.4.24"
 
+structopt = { workspace = true}
+tokio = { workspace = true }
+yaml-rust = {workspace = true}
+chrono = {workspace = true}
+
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"

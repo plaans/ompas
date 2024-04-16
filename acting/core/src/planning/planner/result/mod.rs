@@ -1,3 +1,5 @@
+use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
+use crate::planning::planner::encoding::PlannerProblem;
 use aries::model::extensions::{AssignmentExt, SavedAssignment};
 use aries_planning::chronicles::{printer, FiniteProblem};
 use std::sync::Arc;
@@ -9,6 +11,8 @@ pub mod plan;
 pub struct PlanResult {
     pub ass: Arc<SavedAssignment>,
     pub fp: Arc<FiniteProblem>,
+    pub pp: Arc<PlannerProblem>,
+    pub table: Arc<ActingVarRefTable>,
 }
 
 pub fn print_chronicles(pr: &PlanResult) {

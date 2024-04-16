@@ -1,0 +1,120 @@
+{
+  "robots": [
+    {
+      "position": [
+        10.0,
+        17.0
+      ]
+    },
+    {
+      "position": [
+        7.0,
+        16.0
+      ]
+    }
+  ],
+  "machines": [
+    {
+      "position": [
+        8,
+        3
+      ],
+      "possible_processes": [
+        0,
+        3
+      ]
+    },
+    {
+      "position": [
+        9,
+        11
+      ],
+      "possible_processes": [
+        1
+      ]
+    },
+    {
+      "position": [
+        15,
+        6
+      ],
+      "possible_processes": []
+    },
+    {
+      "position": [
+        20,
+        13
+      ],
+      "possible_processes": [
+        3
+      ]
+    },
+    {
+      "position": [
+        25,
+        3
+      ],
+      "possible_processes": [
+        2,
+        0
+      ]
+    },
+    {
+      "position": [
+        25,
+        9
+      ],
+      "possible_processes": [
+        1,
+        2
+      ]
+    }
+  ],
+  "packages": [
+    [
+      [
+        0,
+        2
+      ],
+      [
+        3,
+        2
+      ]
+    ],
+    [
+      [
+        0,
+        8
+      ],
+      [
+        1,
+        8
+      ]
+    ],
+    [
+      [
+        3,
+        2
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    [
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        2
+      ]
+    ]
+  ],
+  "environment": "/home/jeremy/CLionProjects/ompas/ompas-gobot-sim/gobot-sim/simu/environments/env_6_machines.json"
+}

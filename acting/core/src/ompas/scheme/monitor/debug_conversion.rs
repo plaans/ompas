@@ -1,27 +1,25 @@
-use crate::ompas::manager::acting::acting_var::AsCst;
 use crate::ompas::scheme::exec::state::ModState;
-use crate::ompas::scheme::monitor::control::ModControl;
 use crate::ompas::scheme::monitor::model::ModModel;
 use crate::planning::conversion::context::ConversionContext;
 use crate::planning::conversion::convert_acting_domain;
+#[cfg(feature = "conversion_data")]
+use crate::planning::conversion::debug_with_markdown;
 use crate::planning::conversion::flow_graph::algo::annotate::annotate;
 use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::{PConfig, PLEnv};
 use crate::planning::conversion::flow_graph::algo::p_eval::{p_eval, P_EVAL};
 use crate::planning::planner::problem::PlanningDomain;
-use crate::planning::planner::solver::PMetric;
-use chrono::{DateTime, Utc};
 use ompas_language::exec::refinement::EXEC_TASK;
-use ompas_language::monitor::control::MOD_CONTROL;
 use ompas_language::monitor::debug_conversion::*;
 use ompas_language::monitor::model::MOD_MODEL;
 use ompas_middleware::logger::LogClient;
+use ompas_middleware::Master;
 use sompas_core::expand;
 use sompas_language::LOG_TOPIC_INTERPRETER;
 use sompas_macros::async_scheme_fn;
 use sompas_structs::lenv::LEnv;
 use sompas_structs::llambda::LLambda;
 use sompas_structs::lmodule::LModule;
-use sompas_structs::lruntimeerror::{LResult, LRuntimeError};
+use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use std::env::set_current_dir;
 use std::fs;
@@ -30,7 +28,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::SystemTime;
-use tokio::sync::broadcast;
 
 #[derive(Default)]
 pub struct ModDebugConversion {}
@@ -45,13 +42,39 @@ impl From<ModDebugConversion> for LModule {
             DOC_EXPORT_TYPE_LATTICE,
             false,
         );
-        m.add_async_fn(PLAN_TASK, plan_task, DOC_PLAN_TASK, false);
-        m.add_async_fn(PLAN_TASK_OPT, plan_task_opt, DOC_PLAN_TASK_OPT, false);
         m.add_async_fn(PRE_EVAL_TASK, pre_eval_task, DOC_PRE_EVAL_TASK, false);
         m.add_async_fn(PRE_EVAL_EXPR, pre_eval_expr, DOC_PRE_EVAL_EXPR, false);
         m.add_async_fn(ANNOTATE_TASK, annotate_task, DOC_ANNOTATE_TASK, false);
+        m.add_async_fn(TRANSLATE, translate, DOC_TRANSLATE, false);
         m
     }
+}
+
+#[async_scheme_fn]
+pub async fn translate(_env: &LEnv, _obj: String) -> Result<(), LRuntimeError> {
+    #[cfg(feature = "conversion_data")]
+    {
+        let ctx = _env.get_context::<ModModel>(MOD_MODEL)?;
+        let context: ConversionContext = ctx.get_conversion_context().await;
+        let pd: PlanningDomain = convert_acting_domain(&context).await?;
+        debug_with_markdown(
+            &_obj,
+            pd.templates
+                .iter()
+                .find(|am| {
+                    am.chronicle
+                        .as_ref()
+                        .unwrap()
+                        .get_label()
+                        .unwrap()
+                        .contains(&_obj)
+                })
+                .unwrap(),
+            "/tmp/".into(),
+            true,
+        );
+    }
+    Ok(())
 }
 
 #[async_scheme_fn]
@@ -69,19 +92,18 @@ pub async fn export_type_lattice(env: &LEnv) -> Result<(), LRuntimeError> {
     let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
     let ctx: ConversionContext = ctx.get_conversion_context().await;
 
-    let mut path: PathBuf = "/tmp".into();
-    let date: DateTime<Utc> = Utc::now() + chrono::Duration::hours(2);
-    let string_date = date.format("%Y-%m-%d_%H-%M-%S").to_string();
-    path.push(format!("type_network_{}", string_date));
+    let mut path: PathBuf = Master::get_run_dir();
+    path.push("lattice_of_type");
+    path.push(format!("lattice_of_type_{}", Master::get_string_date()));
     fs::create_dir_all(&path).unwrap();
     let mut path_dot = path.clone();
-    let dot_file_name = "type_network.dot";
+    let dot_file_name = "lattice.dot";
     path_dot.push(dot_file_name);
     let mut file = File::create(&path_dot).unwrap();
     let dot = ctx.st.get_lattice().export_dot();
     file.write_all(dot.as_bytes()).unwrap();
     set_current_dir(&path).unwrap();
-    let graph_file_name = "type_network.png";
+    let graph_file_name = "lattice.png";
     Command::new("dot")
         .args(["-Tpng", dot_file_name, "-o", graph_file_name])
         .spawn()
@@ -89,7 +111,7 @@ pub async fn export_type_lattice(env: &LEnv) -> Result<(), LRuntimeError> {
         .wait()
         .unwrap();
     let mut md_path = path.clone();
-    let md_file_name = "type_network.md";
+    let md_file_name = "lattice.md";
     md_path.push(md_file_name);
     let mut md_file = File::create(&md_path).unwrap();
     let md: String = format!(
@@ -107,46 +129,6 @@ pub async fn export_type_lattice(env: &LEnv) -> Result<(), LRuntimeError> {
         .unwrap();
 
     Ok(())
-}
-
-async fn _plan_task(env: &LEnv, args: &[LValue], opt: bool) -> LResult {
-    let task: LValue = args.into();
-    println!("task to plan: {}", task);
-    let acting_manager = env
-        .get_context::<ModControl>(MOD_CONTROL)?
-        .acting_manager
-        .clone();
-    let ctx = env.get_context::<ModModel>(MOD_MODEL)?;
-    //let mut context: ConversionContext = ctx.get_conversion_context().await;
-    let mut env: LEnv = ctx.get_plan_env().await;
-    let state = ctx.get_plan_state().await;
-
-    env.update_context(ModState::new_from_snapshot(state));
-
-    acting_manager
-        .start_continuous_planning(env, if opt { Some(PMetric::Makespan) } else { None })
-        .await;
-
-    let debug = LValue::from(args).to_string();
-    let args = args.iter().map(|lv| lv.as_cst().unwrap()).collect();
-
-    let _pr = acting_manager.new_high_level_task(debug, args).await;
-    let mut recv: broadcast::Receiver<bool> =
-        acting_manager.subscribe_on_plan_update().await.unwrap();
-    recv.recv()
-        .await
-        .expect("Error while waiting on plan update.");
-    Ok(LValue::Nil)
-}
-
-#[async_scheme_fn]
-pub async fn plan_task(env: &LEnv, args: &[LValue]) -> LResult {
-    _plan_task(env, args, false).await
-}
-
-#[async_scheme_fn]
-pub async fn plan_task_opt(env: &LEnv, args: &[LValue]) -> LResult {
-    _plan_task(env, args, true).await
 }
 
 #[async_scheme_fn]

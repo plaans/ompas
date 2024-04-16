@@ -1,10 +1,8 @@
 use crate::model::chronicle::interval::Interval;
 use crate::model::chronicle::lit::{Lit, LitSet};
-use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::r#trait::{FlatBindings, FormatWithSymTable, GetVariables, Replace};
 use crate::model::sym_table::VarId;
-use im::HashSet;
 use std::fmt::Write;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -88,33 +86,29 @@ impl Constraint {
 }
 
 impl GetVariables for Constraint {
-    fn get_variables(&self) -> im::HashSet<VarId> {
+    fn get_variables(&self) -> std::collections::HashSet<VarId> {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)
             | Constraint::Neq(l1, l2)
-            | Constraint::Lt(l1, l2) => l1.get_variables().union(l2.get_variables()),
+            | Constraint::Lt(l1, l2) => l1
+                .get_variables()
+                .union(&l2.get_variables())
+                .cloned()
+                .collect(),
             Constraint::Min(vec)
             | Constraint::Max(vec)
             | Constraint::And(vec)
             | Constraint::Or(vec) => {
-                let mut vars: im::HashSet<VarId> = Default::default();
+                let mut vars: std::collections::HashSet<VarId> = Default::default();
                 for lit in vec {
-                    vars = vars.union(lit.get_variables())
+                    vars = vars.union(&lit.get_variables()).cloned().collect();
                 }
                 vars
             }
             Constraint::Not(l) => l.get_variables(),
             Constraint::Arbitrary(l) => l.get_variables(),
         }
-    }
-
-    fn get_variables_in_domain(&self, sym_table: &RefSymTable, domain: &Domain) -> HashSet<VarId> {
-        self.get_variables()
-            .iter()
-            .filter(|v| sym_table.contained_in_domain(&sym_table.get_domain_of_var(v), domain))
-            .cloned()
-            .collect()
     }
 }
 
@@ -265,7 +259,7 @@ pub fn equal(a: &Interval, b: &Interval) -> Constraint {
 }
 
 impl Replace for Constraint {
-    fn replace(&mut self, old: &VarId, new: &VarId) {
+    fn replace(&mut self, old: VarId, new: VarId) {
         match self {
             Constraint::Leq(l1, l2)
             | Constraint::Eq(l1, l2)

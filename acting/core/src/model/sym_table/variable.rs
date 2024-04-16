@@ -6,26 +6,29 @@ pub struct Variable {
     pub domain: DomainId,
     pub parameter: bool,
     pub label: String,
+    pub symbol: String,
     pub declaration: Option<VarId>,
     pub drop: Option<VarId>,
 }
 
 impl Variable {
-    pub fn new(label: impl Display, domain: VarId) -> Self {
+    pub fn new(symbol: impl Display, label: impl Display, domain: DomainId) -> Self {
         Self {
             domain,
             parameter: false,
             label: label.to_string(),
+            symbol: symbol.to_string(),
             declaration: None,
             drop: None,
         }
     }
 
-    pub fn new_parameter(label: impl Display, domain: VarId) -> Self {
+    pub fn new_parameter(symbol: impl Display, label: impl Display, domain: DomainId) -> Self {
         Self {
             domain,
             parameter: true,
             label: label.to_string(),
+            symbol: symbol.to_string(),
             declaration: None,
             drop: None,
         }

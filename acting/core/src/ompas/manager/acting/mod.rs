@@ -1,47 +1,53 @@
 use crate::model::acting_domain::model::ActingModel;
 use crate::model::acting_domain::OMPASDomain;
-use crate::model::add_domain_symbols;
-use crate::model::chronicle::{Chronicle, ChronicleKind};
 use crate::model::process_ref::{Label, ProcessRef};
 use crate::model::sym_domain::cst::Cst;
 use crate::model::sym_table::r#ref::RefSymTable;
+use crate::ompas::interface::stat::OMPASRunData;
 use crate::ompas::manager::acting::filter::ProcessFilter;
-use crate::ompas::manager::acting::inner::{PlannerManager, ProcessKind};
+use crate::ompas::manager::acting::inner::ActingProcessKind;
 use crate::ompas::manager::acting::interval::Timepoint;
-use crate::ompas::manager::acting::planning::plan_update::PlanUpdateManager;
-use crate::ompas::manager::acting::planning::problem_update::{
-    ExecutionProblem, ProblemUpdateManager,
-};
-use crate::ompas::manager::acting::planning::{run_continuous_planning, ContinuousPlanningConfig};
+use crate::ompas::manager::acting::process::task::RefinementTrace;
 use crate::ompas::manager::acting::process::ProcessOrigin;
-use crate::ompas::manager::monitor::MonitorManager;
+use crate::ompas::manager::clock::ClockManager;
+use crate::ompas::manager::deliberation::DeliberationManager;
+use crate::ompas::manager::domain::DomainManager;
+use crate::ompas::manager::event::EventManager;
+use crate::ompas::manager::planning::plan_update::ActingTreeUpdate;
+use crate::ompas::manager::planning::planner_manager_interface::FilterWatchedProcesses;
+use crate::ompas::manager::planning::problem_update::ExecutionProblem;
+use crate::ompas::manager::planning::PlannerManager;
 use crate::ompas::manager::resource::{Quantity, ResourceManager, WaitAcquire, WaiterPriority};
 use crate::ompas::manager::state::action_status::ProcessStatus;
-use crate::ompas::manager::state::world_state::WorldState;
-use crate::planning::conversion::_convert;
-use crate::planning::conversion::flow_graph::algo::annotate::annotate;
-use crate::planning::conversion::flow_graph::algo::p_eval::p_eval;
-use crate::planning::conversion::flow_graph::algo::p_eval::r#struct::PLEnv;
-use crate::planning::conversion::flow_graph::algo::pre_processing::pre_processing;
+use crate::ompas::manager::state::StateManager;
+use crate::planning::conversion::flow_graph::algo::pre_processing::expand_lambda;
+use crate::planning::conversion::flow_graph::graph::Dot;
 use crate::planning::planner::solver::PMetric;
 use inner::InnerActingManager;
 use ompas_language::exec::acting_context::DEF_PROCESS_ID;
-use sompas_structs::lenv::LEnv;
+use ompas_language::process::{LOG_TOPIC_OMPAS, PROCESS_TOPIC_OMPAS};
+use ompas_middleware::{Master, ProcessInterface};
+use ompas_utils::task_handler::EndSignal;
+use sompas_structs::lenv::{LEnv, LEnvSymbols};
 use sompas_structs::list;
+use sompas_structs::llambda::LLambda;
 use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
-use sompas_structs::lvalue::{LValue, Sym};
+use sompas_structs::lvalue::LValue;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::process::{Command, Stdio};
 use std::sync::Arc;
-use tokio::sync::{broadcast, watch, RwLock};
-use tokio::time::Instant;
+use std::{fs, thread};
+use tokio::runtime::Handle;
+use tokio::sync::{mpsc, watch, RwLock};
 
+pub mod acting_stat;
 pub mod acting_var;
 pub mod filter;
 pub mod inner;
 pub mod interval;
-pub mod planning;
 pub mod process;
 pub mod task_network;
 
@@ -51,37 +57,23 @@ pub type ActionId = usize;
 pub type ActingProcessId = usize;
 pub type AMId = usize;
 
+pub struct ActingTreeDisplayer {
+    killer: mpsc::Sender<EndSignal>,
+}
+
+pub type RefInnerActingManager = Arc<RwLock<InnerActingManager>>;
+
 #[derive(Clone)]
 pub struct ActingManager {
     pub st: RefSymTable,
     pub resource_manager: ResourceManager,
-    pub monitor_manager: MonitorManager,
-    pub domain: Arc<RwLock<OMPASDomain>>,
-    pub state: WorldState,
-    pub inner: Arc<RwLock<InnerActingManager>>,
-    instant: Instant,
-    planning: Arc<AtomicBool>,
-}
-
-impl ActingManager {
-    pub fn new(st: RefSymTable) -> Self {
-        let instant = Instant::now();
-        let resource_manager = ResourceManager::default();
-        Self {
-            st: st.clone(),
-            resource_manager: resource_manager.clone(),
-            monitor_manager: Default::default(),
-            domain: Arc::new(Default::default()),
-            state: WorldState::new(st.clone()),
-            inner: Arc::new(RwLock::new(InnerActingManager::new(
-                resource_manager,
-                instant,
-                st,
-            ))),
-            instant,
-            planning: Arc::new(AtomicBool::new(false)),
-        }
-    }
+    pub event_manager: EventManager,
+    pub domain_manager: DomainManager,
+    pub state_manager: StateManager,
+    pub inner: RefInnerActingManager,
+    pub clock_manager: ClockManager,
+    pub deliberation_manager: DeliberationManager,
+    acting_tree_displayer: Arc<RwLock<Option<ActingTreeDisplayer>>>,
 }
 
 impl Default for ActingManager {
@@ -91,40 +83,81 @@ impl Default for ActingManager {
 }
 
 impl ActingManager {
+    pub fn new(st: RefSymTable) -> Self {
+        let clock_manager = ClockManager::default();
+        let resource_manager = ResourceManager::default();
+        let mut ompas_domain = OMPASDomain::default();
+        ompas_domain.init(&st);
+        let domain_manager: DomainManager = ompas_domain.into();
+        let state_manager = StateManager::new(clock_manager.clone(), st.clone());
+        let event_manager = EventManager::new(state_manager.clone(), clock_manager.clone());
+        let deliberation_manager = DeliberationManager::default();
+        Self {
+            st: st.clone(),
+            resource_manager: resource_manager.clone(),
+            event_manager,
+            domain_manager: domain_manager.clone(),
+            state_manager,
+            inner: Arc::new(RwLock::new(InnerActingManager::new(
+                resource_manager,
+                clock_manager.clone(),
+                domain_manager,
+                deliberation_manager.clone(),
+                st,
+            ))),
+            clock_manager,
+            deliberation_manager,
+            acting_tree_displayer: Arc::new(Default::default()),
+        }
+    }
+
+    pub async fn is_planner_activated(&self) -> bool {
+        self.inner.read().await.is_planner_activated()
+    }
+
+    pub async fn is_planable(&self, id: &ActingProcessId) -> bool {
+        self.inner.read().await.is_planable(id)
+    }
+}
+
+pub enum MethodModel {
+    Raw(LValue),
+    ActingModel(ActingModel),
+}
+
+impl ActingManager {
     pub async fn clear(&self) {
-        self.monitor_manager.clear().await;
+        self.event_manager.clear().await;
         self.resource_manager.clear().await;
-        self.state.clear().await;
         self.inner.write().await.clear().await;
     }
 
     pub async fn dump_trace(&self, path: Option<PathBuf>) {
-        self.inner.read().await.dump_trace(path)
+        self.inner.read().await.dump_acting_tree(path)
     }
 
     pub async fn format_task_network(&self) -> String {
         todo!()
     }
 
-    pub async fn print_processes(&self, _pf: ProcessFilter) -> String {
-        todo!()
+    pub async fn format_processes(&self, pf: ProcessFilter) -> String {
+        self.inner.read().await.format_processes(pf)
     }
 
     pub async fn get_stats(&self) -> LValue {
         todo!()
     }
 
-    pub async fn export_to_csv(
-        &self,
-        working_dir: Option<PathBuf>,
-        file: Option<String>,
-    ) -> LValue {
-        self.inner
-            .read()
-            .await
-            .export_to_csv(working_dir, file)
-            .await;
-        LValue::Nil
+    pub fn get_header_stat() -> String {
+        InnerActingManager::get_header_stat()
+    }
+
+    pub async fn export_to_csv(&self) -> String {
+        self.inner.read().await.export_to_csv()
+    }
+
+    pub async fn get_run_stat(&self) -> OMPASRunData {
+        self.inner.read().await.get_run_stats().await
     }
 
     pub async fn st(&self) -> RefSymTable {
@@ -139,16 +172,16 @@ impl ActingManager {
         self.inner.read().await.get_status(id)
     }
 
+    pub async fn get_parent(&self, id: &ActingProcessId) -> ActingProcessId {
+        self.inner.read().await.get_parent(id)
+    }
+
     pub async fn get_origin(&self, id: &ActingProcessId) -> ProcessOrigin {
         self.inner.read().await.get_origin(id)
     }
 
-    pub async fn get_kind(&self, id: &ActingProcessId) -> ProcessKind {
+    pub async fn get_kind(&self, id: &ActingProcessId) -> ActingProcessKind {
         self.inner.read().await.get_kind(id)
-    }
-
-    pub fn instant(&self) -> Timepoint {
-        self.instant.elapsed().as_millis().into()
     }
 
     pub async fn get_tried(&self, id: &ActingProcessId) -> Vec<LValue> {
@@ -158,15 +191,15 @@ impl ActingManager {
     //ActingProcess declaration
 
     pub async fn new_high_level_task(&self, debug: String, args: Vec<Cst>) -> ProcessRef {
-        self.inner
-            .write()
-            .await
-            .new_high_level_task(debug, args)
-            .await
+        self.inner.write().await.new_high_level_task(debug, args)
+    }
+
+    pub async fn new_high_level_command(&self, debug: String, args: Vec<Cst>) -> ProcessRef {
+        self.inner.write().await.new_high_level_command(debug, args)
     }
 
     //Task methods
-    pub async fn new_action(
+    pub async fn new_task(
         &self,
         label: Label,
         parent: &ActingProcessId,
@@ -177,22 +210,45 @@ impl ActingManager {
         self.inner
             .write()
             .await
-            .new_action(label, parent, args, debug, origin)
-            .await
+            .new_task(label, parent, args, debug, origin)
     }
 
-    pub async fn new_refinement(
+    pub async fn new_command(
+        &self,
+        label: Label,
+        parent: &ActingProcessId,
+        args: Vec<Option<Cst>>,
+        debug: String,
+        origin: ProcessOrigin,
+    ) -> ActingProcessId {
+        let mut locked_inner = self.inner.write().await;
+        let id = locked_inner.new_command(label, parent, args, debug, origin);
+        if locked_inner.is_planner_activated() {
+            let model = locked_inner
+                .generate_acting_model_for_command(&id)
+                .await
+                .unwrap();
+            locked_inner.new_abstract_model(&id, model);
+        }
+
+        id
+    }
+
+    pub async fn set_failed_method(&self, method: &ActingProcessId) {
+        self.inner.write().await.set_failed_method(method)
+    }
+
+    pub async fn new_executed_method(
         &self,
         parent: &ActingProcessId,
         debug: String,
         args: Vec<Option<Cst>>,
-        model: ActingModel,
-        origin: ProcessOrigin,
+        model: MethodModel,
     ) -> ActingProcessId {
         self.inner
             .write()
             .await
-            .new_refinement(parent, debug, args, model, origin)
+            .new_executed_method(parent, debug, args, model)
             .await
     }
 
@@ -206,7 +262,6 @@ impl ActingManager {
             .write()
             .await
             .new_arbitrary(label, parent, origin)
-            .await
     }
 
     // Acquire methods
@@ -216,11 +271,7 @@ impl ActingManager {
         parent: &ActingProcessId,
         origin: ProcessOrigin,
     ) -> ActingProcessId {
-        self.inner
-            .write()
-            .await
-            .new_acquire(label, parent, origin)
-            .await
+        self.inner.write().await.new_acquire(label, parent, origin)
     }
 
     pub async fn subscribe(&self, id: &ActingProcessId) -> watch::Receiver<ProcessStatus> {
@@ -230,7 +281,7 @@ impl ActingManager {
     // Setters
     //ActingProcess methods
     pub async fn set_start(&self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner.write().await.set_start(id, instant).await
+        self.inner.write().await.set_start(id, instant)
     }
 
     pub async fn set_end(
@@ -239,7 +290,7 @@ impl ActingManager {
         instant: Option<Timepoint>,
         status: ProcessStatus,
     ) {
-        self.inner.write().await.set_end(id, instant, status).await
+        self.inner.write().await.set_end(id, instant, status)
     }
 
     pub async fn set_status(&self, id: &ActingProcessId, status: ProcessStatus) {
@@ -247,7 +298,19 @@ impl ActingManager {
     }
 
     pub async fn set_moment(&self, id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner.write().await.set_moment(id, instant).await
+        self.inner.write().await.set_moment(id, instant)
+    }
+
+    pub async fn set_executed_refinement(
+        &self,
+        action: &ActingProcessId,
+        method: &ActingProcessId,
+        refinement_trace: RefinementTrace,
+    ) {
+        self.inner
+            .write()
+            .await
+            .set_executed_refinement(action, method, refinement_trace)
     }
 
     pub async fn get_last_planned_refinement(
@@ -274,7 +337,7 @@ impl ActingManager {
             .get(method_id)
             .unwrap()
             .inner
-            .as_method()
+            .as_refinement()
             .unwrap()
             .childs
             .keys()
@@ -289,11 +352,11 @@ impl ActingManager {
             .get(method_id)
             .unwrap()
             .inner
-            .as_method()
+            .as_refinement()
             .unwrap()
             .childs
             .keys()
-            .filter(|p| matches!(p, Label::Action(_)))
+            .filter(|p| matches!(p, Label::Task(_)))
             .count()
     }
 
@@ -304,16 +367,12 @@ impl ActingManager {
             .get(method_id)
             .unwrap()
             .inner
-            .as_method()
+            .as_refinement()
             .unwrap()
             .childs
             .keys()
-            .filter(|p| matches!(p, Label::Acquire(_)))
+            .filter(|p| matches!(p, Label::ResourceAcquisition(_)))
             .count()
-    }
-
-    pub async fn executed(&self, id: &ActingProcessId) {
-        self.inner.write().await.executed(id)
     }
 
     pub async fn set_arbitrary_value(
@@ -326,7 +385,6 @@ impl ActingManager {
             .write()
             .await
             .set_arbitrary_value(id_arbitrary, set, greedy)
-            .await
     }
 
     pub async fn acquire(
@@ -344,19 +402,15 @@ impl ActingManager {
     }
 
     pub async fn set_s_acq(&self, acquire_id: &ActingProcessId, instant: Option<Timepoint>) {
-        self.inner
-            .write()
-            .await
-            .set_s_acq(acquire_id, instant)
-            .await
+        self.inner.write().await.set_s_acq(acquire_id, instant)
     }
 
-    pub async fn get_task_args(&self, id: &ActingProcessId) -> Vec<Cst> {
-        self.inner.read().await.get_task_args(id)
+    pub async fn get_process_args(&self, id: &ActingProcessId) -> Vec<Cst> {
+        self.inner.read().await.get_process_args(id)
     }
 
-    pub async fn set_action_args(&self, id: &ActingProcessId, args: Vec<Cst>) {
-        self.inner.write().await.set_action_args(id, args).await;
+    pub async fn set_process_args(&self, id: &ActingProcessId, args: Vec<Cst>) {
+        self.inner.write().await.set_process_args(id, args);
     }
 
     pub async fn get_lv(&self, id: &ActingProcessId) -> LValue {
@@ -375,52 +429,55 @@ impl ActingManager {
         self.inner.read().await.get_debug(id).clone()
     }
 
-    pub async fn start_continuous_planning(&self, env: LEnv, opt: Option<PMetric>) {
-        self.planning
-            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .unwrap_or_else(|_| {
-                eprintln!("error compare exchange in start_continuous_planning");
-                false
-            });
-        let mut locked = self.inner.write().await;
-        let st = self.st.clone();
-        let domain = self.domain.read().await.clone();
-        add_domain_symbols(&st, &domain);
+    pub async fn set_plan_env(&self, env: LEnv) {
+        self.inner.write().await.env = Some(env)
+    }
 
-        let (plan_update_manager, tx) = PlanUpdateManager::new(self.clone());
-        let (problem_update_manager, rx, tx_notif) = ProblemUpdateManager::new(self.clone());
-        locked.set_planner_manager(PlannerManager::new(tx_notif));
-        let config = ContinuousPlanningConfig {
-            problem_receiver: rx,
-            plan_sender: tx,
-            domain,
-            st,
+    pub async fn start_planner_manager(&self, env: LEnv, opt: Option<PMetric>) {
+        let pmi = PlannerManager::run(
+            self.inner.clone(),
+            self.state_manager.clone(),
+            self.domain_manager.clone(),
+            self.st.clone(),
             env,
+            self.deliberation_manager.planner_reactivity.clone(),
             opt,
-        };
-        tokio::spawn(async {
-            let manager = problem_update_manager;
-            manager.run().await;
-        });
-        tokio::spawn(async {
-            let manager = plan_update_manager;
-            manager.run().await;
-        });
-        tokio::spawn(run_continuous_planning(config));
+        )
+        .await;
+
+        self.inner
+            .write()
+            .await
+            .set_planner_manager_interface(pmi)
+            .await;
     }
 
     pub async fn get_execution_problem(&self) -> ExecutionProblem {
-        let mut state = self.state.get_snapshot().await;
-        let resource_state = self.resource_manager.get_snapshot().await;
+        let mut state = self.state_manager.get_snapshot().await;
+        let resource_state = self.resource_manager.get_snapshot(None).await;
         state.absorb(resource_state);
+        let inner = self.inner.read().await;
+        let chronicles = inner.get_current_chronicles();
         ExecutionProblem {
             state,
-            chronicles: self.inner.read().await.get_current_chronicles(),
+            st: self.st.clone(),
+            chronicles,
         }
     }
 
-    pub async fn subscribe_on_plan_update(&self) -> Option<broadcast::Receiver<bool>> {
-        self.inner.read().await.subscribe_on_plan_update().await
+    pub async fn subscribe_on_plan_update(
+        &self,
+        watched_processes: FilterWatchedProcesses,
+    ) -> Option<mpsc::UnboundedReceiver<Vec<ActingProcessId>>> {
+        self.inner
+            .write()
+            .await
+            .subscriber_on_plan_update(watched_processes)
+            .await
+    }
+
+    pub async fn plan(&self) {
+        self.inner.write().await.plan();
     }
 
     pub async fn get_om_lvalue(&self, id: &ActingProcessId) -> LValue {
@@ -431,77 +488,123 @@ impl ActingManager {
         let model: &ActingModel = &locked.models[am_id];
         let lv: LValue = locked.get_refinement_lv(id);
         let lv_om: LValue = model.lv_om.clone();
-
         let (label, params_values) = if let LValue::List(list) = lv {
             (list[0].to_string(), list[1..].to_vec())
         } else {
-            panic!()
+            panic!("action_id: {action_id}, lv: {}, lv_om: {}", lv, lv_om)
         };
 
-        let mut body = vec![
+        let body = vec![
             LPrimitive::Begin.into(),
             list!(DEF_PROCESS_ID.into(), (*id).into()),
+            lv_om,
         ];
 
-        let labels: Vec<Arc<Sym>> = self
-            .domain
-            .read()
+        let lambda: LLambda = self
+            .domain_manager
+            .get_method(&label)
             .await
-            .get_methods()
-            .get(&label)
             .unwrap()
-            .parameters
-            .get_labels();
+            .lambda_body
+            .clone()
+            .try_into()
+            .unwrap();
 
-        for (param, value) in labels.iter().zip(params_values) {
-            body.push(list![LPrimitive::Define.into(), param.into(), value]);
-        }
+        let lambda = LLambda::new(lambda.get_params(), body.into(), LEnvSymbols::default());
 
-        body.push(lv_om);
-        list!(body.into(), (action_id).into())
+        let body = expand_lambda(&lambda, &params_values).unwrap();
+
+        list!(body, (action_id).into())
     }
 
-    pub async fn generate_acting_model_for_method(
-        &self,
-        lv: &LValue,
-        mut p_env: PLEnv,
-    ) -> Result<ActingModel, LRuntimeError> {
-        let debug = lv.to_string();
+    pub async fn update_acting_tree(&self, update: ActingTreeUpdate) {
+        self.inner.write().await.update_acting_tree(update).await
+    }
 
-        let p_eval_lv = p_eval(lv, &mut p_env).await?;
-        //debug_println!("{}\np_eval =>\n{}", lv.format(0), p_eval_lv.format(0));
-        let lv_om = annotate(p_eval_lv);
+    pub async fn start_acting_tree_display(&self) {
+        let inner = self.inner.clone();
+        let handle = Handle::current();
+        let mut clock = self.clock_manager.subscribe_to_clock().await;
 
-        let mut lv_expanded = None;
-        let mut chronicle = None;
+        self.stop_acting_tree_display().await;
 
-        if self.planning.load(Ordering::Relaxed) {
-            let st = self.st.clone();
-            let ch = Some(Chronicle::new(debug, ChronicleKind::Method, st.clone()));
-            let pp_lv = pre_processing(&lv_om, &p_env).await?;
-            //debug_println!("pre_processing =>\n{}", pp_lv.format(0));
+        let (tx, mut rx) = mpsc::channel(1);
 
-            chronicle = match _convert(ch, &pp_lv, &mut p_env, st).await {
-                Ok(ch) => Some(ch),
-                Err(e) => {
-                    println!("{}", e);
-                    None
+        *self.acting_tree_displayer.write().await = Some(ActingTreeDisplayer { killer: tx });
+
+        let mut process =
+            ProcessInterface::new("ACTING_TREE_DISPLAY", PROCESS_TOPIC_OMPAS, LOG_TOPIC_OMPAS)
+                .await;
+
+        thread::spawn(move || {
+            let _guard = handle.enter();
+
+            tokio::spawn(async move {
+                let path: PathBuf = Master::get_run_dir();
+                fs::create_dir_all(&path).unwrap();
+
+                let mut path_dot = path.clone();
+                path_dot.push("acting_tree.dot");
+
+                let mut first = true;
+
+                let mut child = None;
+
+                loop {
+                    tokio::select! {
+                        _ = clock.changed() => {
+                            let dot = inner.read().await.acting_tree_as_dot();
+                            let mut dot_file = OpenOptions::new()
+                                .write(true)
+                                .create(true)
+                                .truncate(true)
+                                .open(&path_dot)
+                                .unwrap();
+                            let _ = dot_file.write_all(dot.as_bytes());
+                            if first {
+                                first = false;
+
+                                let mut command = Command::new("xdot");
+                                command
+                                    .args([&path_dot.display().to_string()])
+                                    .stdout(Stdio::null())
+                                    .stderr(Stdio::null());
+                                child = Some(command.spawn().expect("could not spawn dot displayer"));
+                            }
+                        }
+                        _ = process.recv() => {
+                            break;
+                        }
+                        _ = rx.recv() => {
+                            break;
+                        }
+                    }
                 }
-            };
-
-            lv_expanded = Some(pp_lv);
-        }
-
-        Ok(ActingModel {
-            lv: lv.clone(),
-            lv_om,
-            lv_expanded,
-            instantiations: vec![],
-            chronicle,
-        })
+                if let Some(mut child) = child {
+                    child.kill().expect("could not kill acting tree displayer");
+                }
+            })
+        });
     }
 
-    /*pub async fn absorb_plan_result(&self, result: ActingPlanResult) {
-        self.inner.write().await.absorb_planner_result(result).await
-    }*/
+    pub async fn stop_acting_tree_display(&self) {
+        let mut acting_tree_displayer = self.acting_tree_displayer.write().await;
+        if let Some(display) = acting_tree_displayer.as_ref() {
+            let _ = display.killer.send(true).await;
+        }
+        *acting_tree_displayer = None;
+    }
+
+    pub async fn acting_tree_as_dot(&self) -> Dot {
+        self.inner.read().await.acting_tree_as_dot()
+    }
+
+    pub async fn get_all_high_level_tasks(&self) -> Vec<ActingProcessId> {
+        self.inner.read().await.processes[0]
+            .inner
+            .as_root()
+            .unwrap()
+            .tasks
+            .clone()
+    }
 }

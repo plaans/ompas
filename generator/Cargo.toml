@@ -1,0 +1,44 @@
+[package]
+name = "ompas-generator"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sompas-structs = {path = "../scheme/structs"}
+ompas-core = {path = "../acting/core"}
+ompas-middleware = {path = "../middleware"}
+ompas-language = {path = "../acting/language"}
+
+rand = {workspace = true}
+structopt = { workspace = true}
+serde = { workspace = true}
+serde_yaml = { workspace = true}
+serde_json = { workspace = true, features = [] }
+map-macro = {workspace = true}
+
+serde_repr = "0.1"
+petgraph = "0.6.4"
+
+[[example]]
+name = "test_yaml"
+crate-type = ["bin"]
+
+[[example]]
+name = "gripper_generator"
+crate-type = ["bin"]
+
+[[example]]
+name = "gripper_door_generator"
+crate-type = ["bin"]
+
+[[example]]
+name = "gripper_multi_generator"
+crate-type = ["bin"]
+
+[[example]]
+name = "gripper_build_generator"
+crate-type = ["bin"]
+
+

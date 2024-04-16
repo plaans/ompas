@@ -14,7 +14,7 @@
 //! => ((1 3)(1 4)(2 3)(2 4))
 //! ```
 
-use aries_utils::StreamingIterator;
+use aries::utils::StreamingIterator;
 use rand::Rng;
 use sompas_language::utils::*;
 use sompas_macros::scheme_fn;
@@ -24,7 +24,6 @@ use sompas_structs::lprimitive::LPrimitive;
 use sompas_structs::lruntimeerror::LRuntimeError;
 use sompas_structs::lvalue::LValue;
 use sompas_structs::{list, lruntimeerror};
-use std::ops::Deref;
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct ModUtils {}
@@ -135,14 +134,14 @@ pub fn enumerate(element: &[LValue]) -> Vec<LValue> {
         }
     }
 
-    let mut iter_params = aries_utils::enumerate(vec_iter);
+    let mut iter_params = aries::utils::enumerate(vec_iter);
 
     let mut vec_result: Vec<LValue> = vec![];
 
     while let Some(val) = iter_params.next() {
         let mut enumeration = vec![];
         for val in val {
-            enumeration.push(val.deref().clone())
+            enumeration.push((*val).clone())
         }
         vec_result.push(enumeration.into())
     }

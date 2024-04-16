@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -10,7 +11,7 @@ pub const STATUS_SUCCESS: &str = "success";
 pub const STATUS_FAILURE: &str = "failure";
 pub const STATUS_CANCELLED: &str = "cancelled";
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ProcessStatus {
     Pending,
     Accepted,
@@ -18,22 +19,43 @@ pub enum ProcessStatus {
     Running(Option<f64>), //Progress of the action
     Success,              //True the action is a success, false the action is a failure
     Failure,
-    Cancelled(bool), //True the action has been successfully stopped, false it was a failure to cancel
+    Cancelled(bool),
+    Planned,
+    //True the action has been successfully stopped, false it was a failure to cancel
+}
+
+impl ProcessStatus {
+    pub fn is_failed(&self) -> bool {
+        matches!(self, Self::Failure | Self::Rejected | Self::Cancelled(_))
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        matches!(self, Self::Success) || self.is_failed()
+    }
+
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success)
+    }
 }
 
 impl Display for ProcessStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             ProcessStatus::Accepted => write!(f, "accepted"),
-            ProcessStatus::Running(progress) => match progress {
-                Some(p) => write!(f, "running: {}", p),
-                None => write!(f, "none"),
-            },
+            ProcessStatus::Running(progress) => {
+                write!(f, "running")?;
+                if let Some(p) = progress {
+                    write!(f, "({}%)", (p * 100.0) as i64)
+                } else {
+                    Ok(())
+                }
+            }
             ProcessStatus::Success => write!(f, "success"),
             ProcessStatus::Cancelled(r) => write!(f, "cancelled: {}", r),
             ProcessStatus::Rejected => write!(f, "rejected"),
             ProcessStatus::Failure => write!(f, "failure"),
             ProcessStatus::Pending => write!(f, "pending"),
+            ProcessStatus::Planned => write!(f, "planned"),
         }
     }
 }

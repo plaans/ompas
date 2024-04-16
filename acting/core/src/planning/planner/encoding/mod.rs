@@ -6,13 +6,13 @@ use crate::model::sym_domain::type_lattice::TypeLattice;
 use crate::model::sym_domain::Domain;
 use crate::model::sym_table::r#ref::RefSymTable;
 use crate::model::sym_table::VarId;
-use crate::ompas::manager::acting::planning::ActingVarRefTable;
-use crate::ompas::manager::state::world_state::WorldStateSnapshot;
+use crate::ompas::manager::planning::acting_var_ref_table::ActingVarRefTable;
+use crate::ompas::manager::state::world_state_snapshot::WorldStateSnapshot;
 use crate::planning::planner::encoding::domain::encode_ctx;
 use crate::planning::planner::encoding::instance::generate_instances;
 use crate::planning::planner::problem::ChronicleInstance;
 use anyhow::Result;
-use aries::core::Lit as aLit;
+use aries::core::{Lit as aLit, INT_CST_MAX, INT_CST_MIN};
 use aries::model::extensions::Shaped;
 use aries::model::lang::{
     Atom as aAtom, ConversionError, FAtom, FVar, IAtom, IVar, SAtom, Type as aType, Variable,
@@ -35,6 +35,7 @@ pub mod problem_generation;
 /// Resolution of ms
 
 pub struct PlannerProblem {
+    pub st: RefSymTable,
     pub instances: Vec<ChronicleInstance>,
     pub templates: Vec<ActingModel>,
     pub domain: PlannerDomain,
@@ -53,43 +54,14 @@ pub async fn encode_chronicles(
     st: &RefSymTable,
     problem: &PlannerProblem,
 ) -> Result<chronicles::Problem> {
-    /*println!("# SYMBOL TABLE: \n{:?}", ctx.model.get_symbol_table());
-    println!("{}", bindings.format(&problem.cc.sym_table, false));
-    println!("initial chronicle: {:?}", init_ch.chronicle);*/
-
-    /*for (i, t) in templates.iter().enumerate() {
-        println!("template {}: {:?}", i, t.chronicle)
-    }*/
-
-    //let instant = Instant::now();
-
     let domain = &problem.domain;
 
     let mut ctx = encode_ctx(st, domain, &problem.state.instance)?;
 
     let templates = domain::generate_templates(table, &mut ctx, &problem.templates)?;
 
-    /*for template in &p.templates {
-        Printer::print_chronicle(&template.chronicle, &p.context.model);
-    }*/
-
-    //let init_ch = create_initial_chronicle(&problem, &mut ctx);
-
-    //Printer::print_chronicle(&init_ch.chronicle, &p.context.model);
-    //exit(0);
-
-    //p.chronicles.push(init_ch);
-
     let chronicles = generate_instances(&mut ctx, table, &problem.instances)?;
 
-    /*for instance in &p.chronicles[1..] {
-        Printer::print_chronicle(&instance.chronicle, &p.context.model);
-    }*/
-
-    /*info!(
-        "Generation of the planning problem: {:.3} ms",
-        instant.elapsed().as_micros() as f64 / 1000.0
-    );*/
     Ok(chronicles::Problem {
         context: ctx,
         templates,
@@ -106,7 +78,10 @@ pub fn get_type(
     match t {
         Domain::Simple(t) => match *t {
             TYPE_ID_BOOLEAN => Ok(aType::Bool),
-            TYPE_ID_INT => Ok(aType::Int),
+            TYPE_ID_INT => Ok(aType::Int {
+                lb: INT_CST_MIN,
+                ub: INT_CST_MAX,
+            }),
             TYPE_ID_FLOAT => Ok(aType::Fixed(TIME_SCALE.get())),
             t => {
                 let other: String = lattice.format_type(&t);
@@ -119,6 +94,10 @@ pub fn get_type(
                 }
             }
         },
+        Domain::IntRange(lb, ub) => Ok(aType::Int {
+            lb: *lb as i32,
+            ub: *ub as i32,
+        }),
         t => Err(LRuntimeError::new(
             function_name!(),
             format!("{} not supported yet in aries encoding", t.format(lattice)),
@@ -182,18 +161,18 @@ pub fn atom_from_lvalues(ctx: &Ctx, v: &LValueS) -> aAtom {
     }
 }
 
-#[allow(dead_code)]
+//#[allow(dead_code)]
 pub fn var_id_into_atom(
     a: &VarId,
     st: &RefSymTable,
     table: &ActingVarRefTable,
     ctx: &Ctx,
 ) -> aAtom {
-    let ompas_var = st.get_var_domain(a);
+    let ompas_var = st.get_var_domain(st.get_domain_id(*a));
     let domain = &ompas_var.domain;
     if domain.is_true() {
         aLit::TRUE.into()
-    } else if domain.is_false() {
+    } else if domain.is_false() | domain.is_nil() {
         aLit::FALSE.into()
     } else if let Domain::Cst(_t, cst) = domain {
         match cst {
@@ -221,9 +200,13 @@ pub fn var_id_into_atom(
             },
         }
     } else {
-        (*table
-            .get_var(*a)
-            .unwrap_or_else(|| panic!("{} undefined in bindings", st.format_variable(a))))
+        (*table.get_var(*a).unwrap_or_else(|| {
+            panic!(
+                "{}(domain = {}) undefined in bindings",
+                st.format_variable(*a),
+                st.format_domain(domain)
+            )
+        }))
         .into()
     }
 }

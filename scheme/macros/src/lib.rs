@@ -5,7 +5,9 @@ use proc_macro2::TokenStream as TS;
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
-use syn::{Expr, FnArg, ItemFn, Lifetime, PathArguments, ReturnType, Type};
+use syn::{
+    Expr, FnArg, GenericParam, ItemFn, Lifetime, LifetimeDef, PathArguments, ReturnType, Type,
+};
 use syn::{GenericArgument, Ident};
 
 const DEFAULT_NO_ENV: &str = "__env__";
@@ -66,18 +68,46 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
     if fun.sig.asyncness.is_none() {
         panic!("function should be async")
     }
+
+    let try_first_param = |param: &GenericParam| -> Option<LifetimeDef> {
+        match syn::parse_str(quote!(#param).to_string().as_str()) {
+            Ok(lt) => Some(lt),
+            Err(_) => None,
+        }
+    };
+
     //println!("fun params :{:?}", fun.sig.generics.params);
     let params = &fun.sig.generics.params;
-    let lt: Lifetime = if params.len() == 1 {
-        let lt = &params[0];
-        defined_lt = true;
-        syn::parse_str(quote!(#lt).to_string().as_str())
-            .unwrap_or_else(|e| panic!("expected a litefime: {}", e))
-    } else if params.is_empty() {
-        syn::parse_str(DEFAULT_LIFETIME).unwrap()
-    } else {
-        panic!("expected at most a lifetime");
+    let mut generic: Punctuated<GenericParam, Comma> = params.clone();
+    let lt: LifetimeDef = match params.len() {
+        0 => {
+            let syn: LifetimeDef = syn::parse_str(DEFAULT_LIFETIME).unwrap();
+            generic.insert(0, syn.clone().into());
+            syn
+        }
+        _ => {
+            let lt = try_first_param(&params[0]);
+
+            match lt {
+                Some(lt) => {
+                    defined_lt = true;
+                    lt
+                }
+                None => {
+                    let syn: LifetimeDef = syn::parse_str(DEFAULT_LIFETIME).unwrap();
+                    generic.insert(0, syn.clone().into());
+                    syn
+                }
+            }
+        }
     };
+    // let lt: Lifetime = if params.len() == 1 {
+    //
+    // } else if params.is_empty() {
+    //
+    // } else {
+    //
+    // };
 
     //println!("{}", lt);
     //return quote!(#fun).into()
@@ -101,7 +131,7 @@ pub fn async_scheme_fn(_: TokenStream, input: TokenStream) -> TokenStream {
     let expr_result = build_return(&result, &fun.sig.output, &name);
     let body = fun.block.as_ref();
     let expanded = quote! {
-     #vis fn #name<#lt>(#env : #env_type, #args: #args_type) -> ::std::pin::Pin<::std::boxed::Box<
+     #vis fn #name<#generic>(#env : #env_type, #args: #args_type) -> ::std::pin::Pin<::std::boxed::Box<
         dyn ::std::future::Future<Output = sompas_structs::lruntimeerror::LResult>
             + ::std::marker::Send + #lt
         >>
@@ -166,7 +196,7 @@ fn is_type(t: &Type, other: &Type) -> bool {
 #[inline]
 fn build_params(
     params: Punctuated<FnArg, Comma>,
-    defined_lt: Option<&Lifetime>,
+    defined_lt: Option<&LifetimeDef>,
     is_async: bool,
     fname: &Ident,
 ) -> ((Ident, Type), (Ident, Type), TS) {
@@ -178,7 +208,8 @@ fn build_params(
     let mut env_type: Type = match is_async {
         true => match defined_lt {
             Some(lt) => {
-                syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE_LONG).as_str()).unwrap()
+                syn::parse_str::<Type>(format!("&{} {}", lt.lifetime, ENV_TYPE_LONG).as_str())
+                    .unwrap()
             }
             None => {
                 syn::parse_str::<Type>(format!("&{} {}", DEFAULT_LIFETIME, ENV_TYPE_LONG).as_str())
@@ -191,7 +222,8 @@ fn build_params(
     let mut args_type: Type = match is_async {
         true => match defined_lt {
             Some(lt) => {
-                syn::parse_str::<Type>(format!("&{} [{}]", lt, LVALUE_TYPE_LONG).as_str()).unwrap()
+                syn::parse_str::<Type>(format!("&{} [{}]", lt.lifetime, LVALUE_TYPE_LONG).as_str())
+                    .unwrap()
             }
             None => syn::parse_str::<Type>(
                 format!("&{} [{}]", DEFAULT_LIFETIME, LVALUE_TYPE_LONG).as_str(),
@@ -208,11 +240,11 @@ fn build_params(
     let (types_env, type_args) = if let Some(lt) = defined_lt {
         //println!("&{} {}", lt, ENV_TYPE);
         let types_env: Vec<Type> = vec![
-            syn::parse_str::<Type>(format!("&{} {}", lt, ENV_TYPE).as_str()).unwrap(),
-            syn::parse_str::<Type>(format!("&{} mut {}", lt, ENV_TYPE).as_str()).unwrap(),
+            syn::parse_str::<Type>(format!("&{} {}", lt.lifetime, ENV_TYPE).as_str()).unwrap(),
+            syn::parse_str::<Type>(format!("&{} mut {}", lt.lifetime, ENV_TYPE).as_str()).unwrap(),
         ];
         let type_args: Type =
-            syn::parse_str::<Type>(format!("&{} {}", lt, ARGS_TYPE).as_str()).unwrap();
+            syn::parse_str::<Type>(format!("&{} {}", lt.lifetime, ARGS_TYPE).as_str()).unwrap();
         (types_env, type_args)
     } else {
         let types_env: Vec<Type> = vec![

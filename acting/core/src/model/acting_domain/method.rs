@@ -1,3 +1,4 @@
+use crate::model::acting_domain::model::ModelCollection;
 use crate::model::acting_domain::parameters::Parameters;
 use sompas_structs::lvalue::LValue;
 use std::fmt::{Display, Formatter};
@@ -8,8 +9,8 @@ pub struct Method {
     pub task_label: String,
     pub parameters: Parameters,
     pub lambda_pre_conditions: LValue,
-    pub lambda_score: LValue,
     pub lambda_body: LValue,
+    pub model_collection: ModelCollection,
 }
 
 //Getters
@@ -33,19 +34,6 @@ impl Method {
     pub fn get_label(&self) -> &str {
         &self.label
     }
-    /*pub fn get_lambda(&self) -> LValue {
-        let l1: LLambda = self.lambda_pre_conditions.borrow().try_into().expect("");
-        let l2: LLambda = self.lambda_body.borrow().try_into().expect("");
-        let body: LValue = vec![
-            LCoreOperator::Do.into(),
-            l1.get_body().clone(),
-            l2.get_body().clone(),
-        ]
-        .into();
-        let mut env = l1.get_env_symbols();
-        env.set_outer(l2.get_env_symbols());
-        LLambda::new(l1.get_params(), body, env).into()
-    }*/
 }
 
 impl Method {
@@ -54,7 +42,7 @@ impl Method {
         task_label: String,
         parameters: Parameters,
         conds: LValue,
-        score: LValue,
+        model_collection: ModelCollection,
         body: LValue,
     ) -> Self {
         Self {
@@ -62,8 +50,8 @@ impl Method {
             task_label,
             parameters,
             lambda_pre_conditions: conds,
-            lambda_score: score,
             lambda_body: body,
+            model_collection,
         }
     }
 }
@@ -75,13 +63,13 @@ impl Display for Method {
             "-task: {}\n\
             -parameters: {}\n\
             -pre-conditions: {}\n\
-            -score: {}\n\
-            -body: {}\n",
+            -body: {}\n\
+            -models: {}",
             self.task_label,
             self.parameters,
             self.lambda_pre_conditions.format("pre-conditions: ".len()),
-            self.lambda_score.format("score: ".len()),
-            self.lambda_body.format("body: ".len())
+            self.lambda_body.format("body: ".len()),
+            self.model_collection
         )
     }
 }

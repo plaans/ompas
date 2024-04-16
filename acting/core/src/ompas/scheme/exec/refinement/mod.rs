@@ -625,7 +625,7 @@ pub fn random_select(
     let mut candidates: Vec<&LValue> = candidates.iter().to_vec();
     candidates.shuffle(&mut rng);
     Ok(Selected::Generated(
-        candidates.get(0).cloned().unwrap_or(&LValue::Nil).clone(),
+        candidates.first().cloned().unwrap_or(&LValue::Nil).clone(),
         SelectMode::Random,
     ))
 }
@@ -636,7 +636,7 @@ pub fn greedy_select(
     _: &LEnv,
 ) -> lruntimeerror::Result<Selected> {
     Ok(Selected::Generated(
-        candidates.get(0).cloned().unwrap_or(LValue::Nil),
+        candidates.first().cloned().unwrap_or(LValue::Nil),
         SelectMode::Greedy,
     ))
 }

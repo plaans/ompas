@@ -26,7 +26,7 @@ pub struct GaussianOutput {
 
 impl Gaussian {
     pub fn to_latex(&self, run: &SystemRunData) -> crate::output::gaussian::GaussianOutput {
-        let problem_name: Vec<&str> = self.problem.split("_").collect();
+        let problem_name: Vec<&str> = self.problem.split('_').collect();
         let problem_name = ProblemName {
             domain: problem_name[0].to_string(),
             difficulty: problem_name[1].into(),
@@ -42,7 +42,7 @@ impl Gaussian {
 
         let mut values: HashMap<ConfigName, Vec<f64>> = HashMap::new();
 
-        for (_, data) in &problem_run_data.inner {
+        for data in problem_run_data.inner.values() {
             let (ref_c, stat) = data
                 .inner
                 .iter()
@@ -65,14 +65,14 @@ impl Gaussian {
                         break;
                     }
                 }
-                if check == false {
+                if !check {
                     continue 'a;
                 }
-                let entry = match values.get_mut(&name) {
+                let entry = match values.get_mut(name) {
                     Some(e) => e,
                     None => {
                         values.insert(name.clone(), vec![]);
-                        values.get_mut(&name).unwrap()
+                        values.get_mut(name).unwrap()
                     }
                 };
 

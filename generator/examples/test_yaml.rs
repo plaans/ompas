@@ -1,5 +1,5 @@
-use generator::config::{GeneratorConfig, Job, Recipe};
-use generator::generator::gripper::{BALL, ROOM, TASK};
+use ompas_generator::config::{GeneratorConfig, Job, Recipe};
+use ompas_generator::generator::gripper::{BALL, ROOM, TASK};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]

@@ -71,7 +71,7 @@ pub async fn run_planner(
     execution_problem: &ExecutionProblem,
     config: &OMPASLCPConfig,
     interrupter: Option<PlannerInterrupter>,
-    intermediate_sender: Option<UnboundedSender<Result<SolverResult<PlanResult>>>>,
+    _intermediate_sender: Option<UnboundedSender<Result<SolverResult<PlanResult>>>>,
 ) -> Result<SolverResult<PlanResult>> {
     let OMPASLCPConfig {
         state_subscriber_id: state_subscriber,
@@ -148,7 +148,7 @@ pub async fn run_planner(
             sm.update_subscriber_rule(id, rule).await;
         }
 
-        let debug_date = debug_date.clone();
+        let debug_date = *debug_date;
         let interrupter_2 = interrupter.clone();
         let r: Result<_> = handle
             .spawn_blocking(move || {
@@ -232,7 +232,7 @@ pub async fn run_planner(
         let pb2 = pb.clone();
         let int_2 = interrupter.clone();
         let opt2 = *opt;
-        let debug_date2 = debug_date.clone();
+        let debug_date2 = debug_date;
         tokio::spawn(async move {
             let r = solve_finite_problem(
                 debug_date2,
@@ -328,6 +328,9 @@ pub async fn run_planner(
     Ok(SolverResult::Unsat)
 }
 
+pub type IntermediateSender =
+    Option<UnboundedSender<(SolverResult<(Solution, Option<IntCst>)>, bool)>>;
+
 /// Instantiates a solver for the given subproblem and attempts to solve it.
 ///
 /// If more than one strategy is given, each strategy will have its own solver run on a dedicated thread.
@@ -342,9 +345,7 @@ async fn solve_finite_problem(
     metric: Option<Metric>,
     cost_upper_bound: IntCst,
     interrupter: Option<PlannerInterrupter>,
-    intermediate_sender: Option<
-        tokio::sync::mpsc::UnboundedSender<(SolverResult<(Solution, Option<IntCst>)>, bool)>,
-    >,
+    intermediate_sender: IntermediateSender,
 ) -> SolverResult<(Solution, Option<IntCst>)> {
     let handle = Handle::current();
     if let Some(interrupter) = &interrupter {
@@ -405,7 +406,7 @@ async fn solve_finite_problem(
     let input_stream = solver.input_stream();
     let interrupt_handle = tokio::spawn(async move {
         if let Some(mut interrupter) = interrupter {
-            if interrupter.wait_for(|b| *b == true).await.is_ok() {
+            if interrupter.wait_for(|b| *b).await.is_ok() {
                 if let Some(dd) = &debug_date {
                     dd.print_msg("Interrupt received");
                 }

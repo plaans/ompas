@@ -277,8 +277,7 @@ async fn read_static_state(env: &LEnv, args: &[LValue]) -> LResult {
 pub async fn instance(env: &LEnv, object: String, r#type: String) -> LResult {
     let state = &env.get_context::<ModState>(MOD_STATE)?.state_manager;
 
-    let r = Ok(state.instance(&object, &r#type).await);
-    r
+    Ok(state.instance(&object, &r#type).await)
 }
 
 #[async_scheme_fn]

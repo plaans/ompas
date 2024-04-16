@@ -131,7 +131,7 @@ impl InnerActingManager {
             domain_manager,
             planner_manager_interface: None,
             env: None,
-            deliberation_manager: deliberation_manager,
+            deliberation_manager,
         };
         new.init();
         new
@@ -1852,11 +1852,7 @@ impl InnerActingManager {
             } else {
                 return;
             };
-        let mut templates: HashMap<usize, TaskTemplate> = templates
-            .drain(..)
-            .enumerate()
-            .map(|(id, task_template)| (id, task_template))
-            .collect();
+        let mut templates: HashMap<usize, TaskTemplate> = templates.drain(..).enumerate().collect();
         let st = self.st.clone();
         let bindings = chronicle.get_all_acting_process_models().clone();
 
@@ -2448,7 +2444,7 @@ impl InnerActingManager {
                     }
                 }
                 ActingProcessInner::Task(t) => {
-                    for (_i, r) in t.refinements.iter().enumerate() {
+                    for r in t.refinements.iter() {
                         if let Some(executed) = r.get_executed() {
                             writeln!(dot, "P{id} -> P{};", executed).unwrap();
                             queue.push(*executed)

@@ -63,7 +63,7 @@ impl Utility for Efficiency {
         match sampled {
             SampledResult::Failure => Self::failure(),
             SampledResult::Command(s) | SampledResult::Method(s) => {
-                let label = (&s[0]).to_string();
+                let label = s[0].to_string();
                 let model = env
                     .get_context::<ModUPOM<Efficiency>>(MOD_UPOM)
                     .unwrap()

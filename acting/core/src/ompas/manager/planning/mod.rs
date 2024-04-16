@@ -178,7 +178,7 @@ impl PlannerManager {
             state_manager,
             resource_manager,
             clock_manager,
-            domain_manager: domain_manager,
+            domain_manager,
             st,
             env,
             opt,
@@ -285,7 +285,7 @@ impl PlannerManager {
             let ep = ExecutionProblem {
                 state: new_state,
                 st: st.clone(),
-                chronicles: chronicles,
+                chronicles,
             };
 
             let config = PlannerInstanceConfig {
@@ -468,11 +468,10 @@ impl PlannerInstance {
             let (tx, mut rx) = mpsc::unbounded_channel();
             let ep = Arc::new(execution_problem);
             let ep2 = ep.clone();
-            let _ = tokio::spawn(async move {
+            let _f = tokio::spawn(async move {
                 let r = ompas_lcp::run_planner(&ep2, &config, Some(interrupted), Some(tx.clone()))
                     .await;
                 let _ = tx.send(r);
-                ()
             });
 
             while let Some(r) = rx.recv().await {
@@ -905,7 +904,7 @@ pub async fn populate_problem<'a>(
                                 refinement_id: 0,
                                 method_label: MethodLabel::Possibility(i),
                             };
-                            pr.push(Label::Refinement(refinement_label.clone()));
+                            pr.push(Label::Refinement(refinement_label));
                             let instance = ChronicleInstance {
                                 instantiated_chronicle: am
                                     .get_clean_instantiated_chronicle()
@@ -1129,12 +1128,6 @@ pub fn extract_new_acting_models(pr: &PlanResult) -> Vec<ChronicleInstance> {
         .iter()
         .filter(|c| c.generated)
         .cloned()
-        .map(|ci| {
-            // let empty = Chronicle::new("", ChronicleKind::Method, RefSymTable::default());
-            // let ch = mem::replace(&mut ci.instantiated_chronicle, empty);
-            // ci.am.chronicle = Some(ch);
-            ci
-        })
         .collect()
 }
 

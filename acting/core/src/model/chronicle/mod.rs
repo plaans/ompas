@@ -238,7 +238,9 @@ impl Chronicle {
     }
 
     pub fn get_label(&self) -> Option<String> {
-        self.name.get(0).map(|var_id| var_id.format(&self.st, true))
+        self.name
+            .first()
+            .map(|var_id| var_id.format(&self.st, true))
     }
 
     pub fn get_task(&self) -> &Vec<VarId> {

@@ -94,7 +94,6 @@ pub fn print(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeError> {
         LogOutput::File(pb) => {
             //println!("print {} in {:?}", lv, pb);
             let mut file = OpenOptions::new()
-                .write(true)
                 .append(true)
                 .create(true)
                 .open(pb)

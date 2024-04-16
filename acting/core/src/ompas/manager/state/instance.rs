@@ -144,7 +144,7 @@ impl InstanceCollection {
     }
 
     pub fn remove_instance(&mut self, i: &str) {
-        for (_, set) in &mut self.inner {
+        for set in self.inner.values_mut() {
             set.remove_element(i)
         }
     }

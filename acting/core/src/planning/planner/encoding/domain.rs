@@ -583,11 +583,7 @@ pub fn read_chronicle(
 
             table.add_binding(var, fvar.into());
             fvar.into()
-        }
-        /*else if t == lattice.get_type_id(TYPE_PRESENCE).unwrap() {
-            panic!("{} should not exist", var.format(&st, true))
-        }*/
-        else if *t == TYPE_ID_INT {
+        } else if *t == TYPE_ID_INT {
             let (lb, ub): (IntCst, IntCst) = if OMPAS_PLAN_ENCODING_OPTIMIZATION.get() {
                 if let Some(VarVal::Range(l, u)) = var_val {
                     (*l as IntCst, *u as IntCst)

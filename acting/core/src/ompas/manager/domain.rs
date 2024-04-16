@@ -233,7 +233,7 @@ impl DomainManager {
             .await
             .acting_model_collection
             .as_ref()
-            .and_then(|amc| amc.get_command_model(&label).cloned())
+            .and_then(|amc| amc.get_command_model(label).cloned())
     }
 
     pub async fn get_task_model(&self, label: &str) -> Option<ActingModel> {
@@ -242,7 +242,7 @@ impl DomainManager {
             .await
             .acting_model_collection
             .as_ref()
-            .and_then(|amc| amc.get_task_model(&label).cloned())
+            .and_then(|amc| amc.get_task_model(label).cloned())
     }
 
     pub async fn get_method_model(&self, label: &str) -> Option<ActingModel> {
@@ -251,7 +251,7 @@ impl DomainManager {
             .await
             .acting_model_collection
             .as_ref()
-            .and_then(|amc| amc.get_method_model(&label).cloned())
+            .and_then(|amc| amc.get_method_model(label).cloned())
     }
 
     pub async fn try_instantiate_task(

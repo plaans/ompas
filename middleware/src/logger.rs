@@ -329,7 +329,6 @@ impl Logger {
         });
         let file = OpenOptions::new()
             .read(true)
-            .write(true)
             .append(true)
             .create(true)
             .open(path.clone())
@@ -374,7 +373,7 @@ pub struct LogMessage {
     pub message: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogClient {
     pub(crate) topic_id: LogTopicId,
     pub(crate) source: Arc<String>,

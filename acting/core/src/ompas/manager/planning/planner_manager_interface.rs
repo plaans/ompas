@@ -50,7 +50,7 @@ impl PlannerManagerInterface {
                     },
                 ) in self.watchers.iter().enumerate()
                 {
-                    if let Err(_) = sender.send(vec![]) {
+                    if sender.send(vec![]).is_err() {
                         too_remove.push(id)
                     }
                 }
@@ -76,10 +76,8 @@ impl PlannerManagerInterface {
                         }
                     };
 
-                    if !watched.is_empty() {
-                        if let Err(_) = sender.send(watched) {
-                            too_remove.push(id)
-                        }
+                    if !watched.is_empty() && sender.send(watched).is_err() {
+                        too_remove.push(id)
                     }
                 }
             }

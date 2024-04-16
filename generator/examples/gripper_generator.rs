@@ -1,6 +1,6 @@
-use generator::config::Recipe;
-use generator::generator::gripper::{GripperGenerator, BALL, ROOM, TASK};
-use generator::Generator;
+use ompas_generator::config::Recipe;
+use ompas_generator::generator::gripper::{GripperGenerator, BALL, ROOM, TASK};
+use ompas_generator::Generator;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]

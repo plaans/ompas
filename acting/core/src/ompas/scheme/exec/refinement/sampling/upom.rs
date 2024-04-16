@@ -51,7 +51,7 @@ pub struct StateKey(OrdSet<String>);
 
 impl Display for StateKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\n")?;
+        writeln!(f,)?;
         for k in &self.0 {
             writeln!(f, "{}", k)?;
         }
@@ -109,8 +109,8 @@ impl Display for StateValue {
 
 impl StateValue {
     pub fn rank(&self, method: &LValueS, task: &LValueS, c: f64) -> f64 {
-        let n_task = *self.n_task.get(&task).unwrap();
-        let method = self.method_values.get(&method).unwrap().clone();
+        let n_task = *self.n_task.get(task).unwrap();
+        let method = self.method_values.get(method).unwrap().clone();
         (n_task as f64 / method.n as f64).ln().sqrt() * c + method.q
     }
 
@@ -227,7 +227,7 @@ impl<T: Utility> ModUPOM<T> {
             local: Arc::new(RwLock::new(LocalValue::new_from(
                 &*other.local.read().await,
             ))),
-            type_utility: other.type_utility.clone(),
+            type_utility: other.type_utility,
             c: other.c,
             models: other.models.clone(),
             log: other.log.clone(),
@@ -344,9 +344,7 @@ pub async fn upom_task<T: Utility>(env: &LEnv, task: &[LValue]) -> LResult {
         let LValue::List(list) = &mc.clone().into() else {
             unreachable!()
         };
-        let t = T::compute(env, SampledResult::Method(&list)).await;
-        //ctx.log("got utility");
-        t
+        T::compute(env, SampledResult::Method(list)).await
     } else {
         //ctx.log(format!("Sampling method {}", mc));
         let mut new_env = env.clone();
@@ -395,7 +393,7 @@ pub async fn upom_task<T: Utility>(env: &LEnv, task: &[LValue]) -> LResult {
 pub async fn upom_command<T: Utility>(env: &LEnv, command: &[LValue]) -> LResult {
     let ctx: &ModUPOM<T> = env.get_context::<ModUPOM<T>>(MOD_UPOM)?;
     ctx.log(format!("UPOM(command:{})", LValue::from(command)));
-    let label = (&command[0]).to_string();
+    let label = command[0].to_string();
     let args = &command[1..];
     let command_model = ctx
         .models
@@ -490,7 +488,7 @@ async fn _upom_select<T: Utility>(
             let LValue::List(method) = &candidates[i] else {
                 unreachable!()
             };
-            T::compute(&new_env, SampledResult::Method(&method))
+            T::compute(&new_env, SampledResult::Method(method))
                 .await
                 .f64()
         };
@@ -545,13 +543,12 @@ async fn _upom_select<T: Utility>(
 
                     let handle = tokio::spawn(async move {
                         run_fluent_checker(receiver_event_update_state, event_manager).await;
-                        ()
                     });
 
                     let o_mod_upom = new_env.get_context::<ModUPOM<T>>(MOD_UPOM).unwrap();
 
                     let mod_upom =
-                        ModUPOM::<T>::new(d, o_mod_upom.c.clone(), o_mod_upom.models.clone()).await;
+                        ModUPOM::<T>::new(d, o_mod_upom.c, o_mod_upom.models.clone()).await;
                     new_env.import_module(mod_upom, ImportType::WithoutPrefix);
                     //mod_upom.log(format!("d = {}", d));
 

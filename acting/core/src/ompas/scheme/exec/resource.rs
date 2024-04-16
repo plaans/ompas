@@ -97,7 +97,7 @@ pub async fn new_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
     let ctx = env.get_context::<ModResource>(MOD_RESOURCE)?;
 
     let label: String = args
-        .get(0)
+        .first()
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(NEW_RESOURCE, args, 1..2))?
         .try_into()?;
 
@@ -127,7 +127,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
     let (tx, mut rx) = new_interruption_handler();
 
     let label: String = args
-        .get(0)
+        .first()
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE, args, 1..2))?
         .try_into()?;
     //init of capacity and
@@ -135,7 +135,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         1 => (Quantity::All, WaiterPriority::Execution(0)),
         2 => {
             if let LValue::List(l) = &args[1] {
-                if l.get(0).unwrap() == &PRIORITY.into() && l.len() == 2 {
+                if l.first().unwrap() == &PRIORITY.into() && l.len() == 2 {
                     let priority = l.get(1).unwrap().try_into()?;
                     (Quantity::All, WaiterPriority::Execution(priority))
                 } else {
@@ -149,7 +149,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
         3 => {
             let quantity = Quantity::Some(args[1].borrow().try_into()?);
             let priority = if let LValue::List(l) = &args[1] {
-                if l.get(0).unwrap() == &PRIORITY.into() && l.len() == 2 {
+                if l.first().unwrap() == &PRIORITY.into() && l.len() == 2 {
                     WaiterPriority::Execution(l.get(1).unwrap().try_into()?)
                 } else {
                     Err(LRuntimeError::new("", ""))?
@@ -185,8 +185,7 @@ pub async fn __acquire__(env: &LEnv, args: &[LValue]) -> Result<LAsyncHandle, LR
 
             let f: LFuture = (Box::pin(async move {
                 rx.recv().await;
-                let r = rc.release(rh).await.map(|_| LValue::Nil);
-                r
+                rc.release(rh).await.map(|_| LValue::Nil)
             }) as FutureResult)
                 .shared();
 
@@ -331,7 +330,7 @@ pub async fn __acquire_in_list__(
 ) -> Result<LAsyncHandle, LRuntimeError> {
     let (tx, mut rx) = new_interruption_handler();
     let mut resources: Vec<LValue> = args
-        .get(0)
+        .first()
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ACQUIRE_IN_LIST, args, 1..2))?
         .try_into()?;
     let d: usize = thread_rng().gen();

@@ -290,17 +290,16 @@ impl EventManager {
             let log_2 = log.clone();
             let handle = tokio::spawn(async move {
                 if let Some(Ok(Response::Handle(h))) = rx.recv().await {
-                    if let Ok(_) = h.get_future().await {
-                        if watched.trigger_activation != TriggerActivation::Once {
-                            log_2.info(format!(
-                                "event {} terminated, added again to watched events",
-                                watched.body
-                            ));
-                            arc_2.lock().await.watched.push(watched);
-                        }
+                    if h.get_future().await.is_ok()
+                        && watched.trigger_activation != TriggerActivation::Once
+                    {
+                        log_2.info(format!(
+                            "event {} terminated, added again to watched events",
+                            watched.body
+                        ));
+                        arc_2.lock().await.watched.push(watched);
                     }
                 };
-                ()
             });
             event_collection.running.push(handle)
         }

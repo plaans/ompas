@@ -23,7 +23,7 @@ pub struct BarOutput {
 
 impl Bar {
     pub fn to_latex(&self, run: &SystemRunData) -> BarOutput {
-        let instance_name: Vec<&str> = self.instance.split("_").collect();
+        let instance_name: Vec<&str> = self.instance.split('_').collect();
         let problem_name = ProblemName {
             domain: instance_name[0].to_string(),
             difficulty: instance_name[1].into(),
@@ -61,7 +61,7 @@ impl Bar {
                 write!(x_tick_labels, "{}", config_name.format()).unwrap();
                 write!(dat, "{}", i).unwrap();
                 for field in &self.fields {
-                    if let Some(stat) = config_stat.get(&field) {
+                    if let Some(stat) = config_stat.get(field) {
                         write!(dat, " {} {}", stat.mean, stat.se).unwrap();
                         y_min = y_min.min(stat.mean - stat.se);
                         y_max = y_max.max(stat.mean + stat.se);

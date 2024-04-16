@@ -290,7 +290,7 @@ pub fn firsts(lists: Vec<LValue>) -> Vec<LValue> {
         .iter()
         .map(|lv| {
             if let LValue::List(list) = lv {
-                list.get(0).cloned().unwrap_or(LValue::Nil)
+                list.first().cloned().unwrap_or(LValue::Nil)
             } else {
                 LValue::Nil
             }

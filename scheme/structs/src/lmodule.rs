@@ -9,7 +9,7 @@ use crate::purefonction::PureFonctionCollection;
 use std::any::Any;
 use std::fmt::Display;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct InitScheme(Vec<String>);
 
 impl<T: ToString> From<Vec<T>> for InitScheme {

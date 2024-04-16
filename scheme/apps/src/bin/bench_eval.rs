@@ -102,7 +102,7 @@ async fn test_lisp_integration() -> lruntimeerror::Result<()> {
     for _ in 1..1000 {
         for (e, r) in &elements {
             //stdout.write_all(b"parsing done\n");
-            let result = match eval(&e, &mut env, None).await {
+            let result = match eval(e, &mut env, None).await {
                 Ok(s) => s,
                 Err(e) => {
                     return Err(LRuntimeError::new(

@@ -157,20 +157,12 @@ impl StateManager {
             None => {
                 if let Some(v) = world_state.dynamic.get(key) {
                     Some(v.clone())
+                } else if let Some(v) = world_state.r#static.get(key) {
+                    Some(v.clone())
+                } else if let Some(v) = world_state.inner_dynamic.get(key) {
+                    Some(v.clone())
                 } else {
-                    if let Some(v) = world_state.r#static.get(key) {
-                        Some(v.clone())
-                    } else {
-                        if let Some(v) = world_state.inner_dynamic.get(key) {
-                            Some(v.clone())
-                        } else {
-                            if let Some(v) = world_state.inner_static.get(key) {
-                                Some(v.clone())
-                            } else {
-                                None
-                            }
-                        }
-                    }
+                    world_state.inner_static.get(key).cloned()
                 }
             }
             Some(_type) => match _type {
@@ -178,22 +170,14 @@ impl StateManager {
                     if let Some(v) = world_state.r#static.get(key) {
                         Some(v.clone())
                     } else {
-                        if let Some(v) = world_state.inner_static.get(key) {
-                            Some(v.clone())
-                        } else {
-                            None
-                        }
+                        world_state.inner_static.get(key).cloned()
                     }
                 }
                 StateType::Dynamic => {
                     if let Some(v) = world_state.dynamic.get(key) {
                         Some(v.clone())
                     } else {
-                        if let Some(v) = world_state.inner_dynamic.get(key) {
-                            Some(v.clone())
-                        } else {
-                            None
-                        }
+                        world_state.inner_dynamic.get(key).cloned()
                     }
                 }
                 //StateType::Instance => self.instance.read().await.inner.get(key.to).cloned(),

@@ -20,6 +20,7 @@ use sompas_structs::lvalue::LValue;
 use std::sync::Arc;
 
 //Returns the method to do.
+#[allow(clippy::too_many_arguments)]
 pub async fn aries_select(
     task_id: usize,
     task: &[LValue],
@@ -125,10 +126,10 @@ pub async fn aries_select(
                 SelectMode::Planning(Planner::Aries(aries_config)),
             )
         } else {
-            greedy_select(candidates, &state, &env)?
+            greedy_select(candidates, state, env)?
         }
     } else {
-        greedy_select(candidates, &state, &env)?
+        greedy_select(candidates, state, env)?
     };
 
     Ok(selected)

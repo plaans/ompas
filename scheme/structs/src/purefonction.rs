@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct PureFonctionCollection {
     inner: im::HashSet<String>,
 }

@@ -7,13 +7,13 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, Eq, PartialEq, Hash, Default, Ord)]
+#[derive(Clone, Eq, PartialEq, Hash, Default)]
 pub struct ProblemName {
     pub domain: String,
     pub difficulty: Difficulty,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Default, Ord)]
+#[derive(Clone, Eq, PartialEq, Hash, Default)]
 pub enum Difficulty {
     #[default]
     Easy,
@@ -119,7 +119,7 @@ impl ProblemRunData {
 
     pub fn get_problem_stat(&self) -> ProblemStat {
         let mut config_stats: HashMap<ConfigName, Vec<ConfigInstanceStat>> = Default::default();
-        for (_, run) in &self.inner {
+        for run in self.inner.values() {
             for (c, stat) in run.get_stat().inner {
                 match config_stats.entry(c) {
                     Entry::Occupied(mut o) => o.get_mut().push(stat),

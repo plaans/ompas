@@ -14,7 +14,7 @@ use std::mem;
 use std::ops::Deref;
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LEnvSymbols {
     inner: im::HashMap<String, LValue>,
     outer: Arc<Option<LEnvSymbols>>,
@@ -269,7 +269,12 @@ impl Display for LEnv {
 
 impl PartialEq for LEnv {
     fn eq(&self, other: &Self) -> bool {
-        self == other
+        self.log == other.log
+            && self.init == other.init
+            && self.pfc == other.pfc
+            && self.documentation == other.documentation
+            && self.macro_table == other.macro_table
+            && self.symbols == other.symbols
     }
 }
 

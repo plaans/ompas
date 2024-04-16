@@ -1,7 +1,7 @@
-use generator::config::Recipe;
-use generator::generator::gobot::{MAX_TIME, MIN_TIME, PACKAGE, PROCESS};
-use generator::generator::jobshop::JobshopGenerator;
-use generator::Generator;
+use ompas_generator::config::Recipe;
+use ompas_generator::generator::gobot::{MAX_TIME, MIN_TIME, PACKAGE, PROCESS};
+use ompas_generator::generator::jobshop::JobshopGenerator;
+use ompas_generator::Generator;
 use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;

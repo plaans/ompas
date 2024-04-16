@@ -76,10 +76,10 @@ impl SystemRunData {
             .to_str()
             .unwrap()
             .replace(format!(".{}", format).as_str(), "")
-            .split("_")
+            .split('_')
             .map(|s| s.to_string())
             .collect();
-        let content = match fs::read_to_string(&file) {
+        let content = match fs::read_to_string(file) {
             Ok(s) => s,
             Err(_) => {
                 return;

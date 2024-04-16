@@ -380,7 +380,7 @@ impl OMPASRunData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum OMPASStat {
-    Process(ActingProcessStat),
+    Process(Box<ActingProcessStat>),
     Planner(PlannerStat),
     Acting(ActingStat),
     Bench(BenchStat),
@@ -394,7 +394,7 @@ pub struct BenchStat {
 
 impl From<ActingProcessStat> for OMPASStat {
     fn from(value: ActingProcessStat) -> Self {
-        Self::Process(value)
+        Self::Process(Box::new(value))
     }
 }
 

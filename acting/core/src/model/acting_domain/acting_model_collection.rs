@@ -55,7 +55,7 @@ impl ActingModelCollection {
                     &action_task,
                     None,
                     task.get_parameters(),
-                    &st,
+                    st,
                     &env,
                     ChronicleKind::Task,
                 )
@@ -89,7 +89,7 @@ impl ActingModelCollection {
                         &action_method,
                         Some(&action_task),
                         method.get_parameters(),
-                        &st,
+                        st,
                         &env,
                         ChronicleKind::Method,
                     )
@@ -124,7 +124,7 @@ impl ActingModelCollection {
                     &action_command,
                     None,
                     command.get_parameters(),
-                    &st,
+                    st,
                     &env,
                     ChronicleKind::Command,
                 )

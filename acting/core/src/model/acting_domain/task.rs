@@ -70,7 +70,7 @@ impl Task {
     }
 
     pub fn remove_method(&mut self, method_label: &str) {
-        self.methods.retain(|m| m!=method_label);
+        self.methods.retain(|m| m != method_label);
     }
 
     pub fn set_label(&mut self, label: String) {

@@ -278,7 +278,6 @@ impl<T: Display + Default + Clone, I: Into<NodeId> + From<NodeId>> Forest<T, I> 
     }
 
     fn _find(&mut self, x: NodeId) -> NodeId {
-        let x = x.into();
         if x != self._get_parent(x) {
             let parent = self._get_parent(x);
             let parent = self._find(parent);

@@ -35,7 +35,7 @@ impl ConfigName {
         };
         let mut name = "$\\textit{C}(".to_string();
         write!(name, "{}", default).unwrap();
-        if continuous_planning != "" {
+        if !continuous_planning.is_empty() {
             write!(name, "/{}", continuous_planning).unwrap();
         }
 
@@ -434,7 +434,7 @@ impl ConfigProblemStat {
         for (i, field) in fields.iter().enumerate() {
             let mut info = field.to_latex();
             let unit = field.unit_short();
-            if unit != "" {
+            if !unit.is_empty() {
                 write!(info, "({})", unit).unwrap();
             }
             if i == last {

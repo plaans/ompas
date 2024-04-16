@@ -20,6 +20,12 @@ pub struct ModTime {
     start: Arc<RwLock<Instant>>,
 }
 
+impl Default for ModTime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ModTime {
     pub fn new() -> Self {
         Self {

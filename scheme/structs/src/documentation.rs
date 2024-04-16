@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Display, Formatter};
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct DocCollection {
     inner: im::OrdMap<String, Doc>,
 }
@@ -43,7 +43,7 @@ impl DocCollection {
         self.inner.get_mut(sym)
     }
 }
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Doc {
     //label: String,
     pub(crate) short: String,

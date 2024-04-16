@@ -251,6 +251,10 @@ impl<'a> ScopeCollection<'a> {
         self.inner.len() + 1
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
     pub fn new_defined_scope(&mut self, env: LEnv) {
         self.inner.push(env)
     }
@@ -322,6 +326,10 @@ impl Results {
     pub fn len(&self) -> usize {
         self.inner.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
     pub fn last(&self) -> Option<&LValue> {
         self.inner.last()
     }
@@ -348,6 +356,10 @@ pub struct LDebug {
 impl LDebug {
     pub fn len(&self) -> usize {
         self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
     pub fn push(&mut self, i: Interruptibility, s: impl Display) {
         self.inner.push(format!(

@@ -54,10 +54,10 @@ impl OMPASDomain {
         st: &RefSymTable,
         pre_compute_models: bool,
     ) {
-        add_domain_symbols(&st, &self);
+        add_domain_symbols(st, self);
         let mut amc = ActingModelCollection::default();
         if pre_compute_models {
-            amc.pre_compute_acting_models(&self, env, state, st).await;
+            amc.pre_compute_acting_models(self, env, state, st).await;
         }
 
         self.acting_model_collection = Some(amc)

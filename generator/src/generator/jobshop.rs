@@ -158,7 +158,6 @@ impl Problem for JobshopProblem {
     fn report(&self, p: PathBuf) -> PathBuf {
         let path = self.inner.report(p);
         let mut file = OpenOptions::new()
-            .write(true)
             .append(true)
             .create(true)
             .open(&path)

@@ -1,8 +1,8 @@
-use generator::config::Recipe;
-use generator::generator::gripper::{BALL, ROOM, TASK};
-use generator::generator::gripper_door::{MAX_DISTANCE, MAX_EDGE};
-use generator::generator::gripper_multi::{GripperMultiGenerator, ROBOT};
-use generator::Generator;
+use ompas_generator::config::Recipe;
+use ompas_generator::generator::gripper::{BALL, ROOM, TASK};
+use ompas_generator::generator::gripper_door::{MAX_DISTANCE, MAX_EDGE};
+use ompas_generator::generator::gripper_multi::{GripperMultiGenerator, ROBOT};
+use ompas_generator::Generator;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]

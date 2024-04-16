@@ -1039,7 +1039,7 @@ pub async fn add_resource(env: &LEnv, args: &[LValue]) -> Result<(), LRuntimeErr
     let ctx = env.get_context::<ModModel>(MOD_MODEL).unwrap();
 
     let label: String = args
-        .get(0)
+        .first()
         .ok_or_else(|| LRuntimeError::wrong_number_of_args(ADD_RESOURCE, args, 1..2))?
         .try_into()?;
 

@@ -1092,7 +1092,7 @@ pub async fn _export_report(
     let state = acting_manager.state_manager.get_state(None).await;
     let mut state_str = "State:\n".to_string();
     for (k, v) in state.inner {
-        writeln!(state_str, "- {} = {}", k.to_string(), v.value.to_string()).unwrap();
+        writeln!(state_str, "- {} = {}", k, v.value).unwrap();
     }
 
     let mut state_file_path = run_dir.clone();
@@ -1190,21 +1190,19 @@ fn extract_file_name(args: &[LValue]) -> Result<(Option<String>, &'static str), 
                     if str.contains(YAML_FORMAT) {
                         format = YAML_FORMAT;
                         file_name = Some(
-                            arg.replace("(", "")
-                                .replace(")", "")
-                                .replace(" ", ".")
+                            arg.replace(['(', ')'], "")
+                                .replace(' ', ".")
                                 .replace(&format!(".{}", YAML_FORMAT), ""),
                         );
                     } else if str.contains(JSON_FORMAT) {
                         format = JSON_FORMAT;
                         file_name = Some(
-                            arg.replace("(", "")
-                                .replace(")", "")
-                                .replace(" ", ".")
+                            arg.replace(['(', ')'], "")
+                                .replace(' ', ".")
                                 .replace(&format!(".{}", JSON_FORMAT), ""),
                         );
                     } else {
-                        let name = arg.replace("(", "").replace(")", "").replace(" ", ".");
+                        let name = arg.replace(['(', ')'], "").replace(' ', ".");
                         file_name = Some(name);
                     }
                 }

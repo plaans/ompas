@@ -28,7 +28,7 @@ pub struct Dat {
 
 impl Plot {
     pub fn to_latex(&self, run: &SystemRunData) -> PlotOutput {
-        let instance_name: Vec<&str> = self.instance.split("_").collect();
+        let instance_name: Vec<&str> = self.instance.split('_').collect();
         let problem_name = ProblemName {
             domain: instance_name[0].to_string(),
             difficulty: instance_name[1].into(),
@@ -50,24 +50,19 @@ impl Plot {
 
         let mut y_min: f64 = 0.0;
         let mut y_max: f64 = 0.0;
-        for (_, (config_name, config_stat)) in stat
-            .inner
-            .iter()
-            .filter(|(name, _)| {
-                let name = name.to_string();
-                for c in &self.configs {
-                    if name.contains(c) {
-                        return true;
-                    }
+        for (config_name, config_stat) in stat.inner.iter().filter(|(name, _)| {
+            let name = name.to_string();
+            for c in &self.configs {
+                if name.contains(c) {
+                    return true;
                 }
-                false
-            })
-            .enumerate()
-        {
+            }
+            false
+        }) {
             let mut lines = vec!["Instance".to_string()];
             for field in &self.fields {
                 lines[0].push_str(format!(" {} {}E", field, field).as_str());
-                if let Some(stat) = config_stat.get(&field) {
+                if let Some(stat) = config_stat.get(field) {
                     instance = instance.max(stat.len());
                     for (i, stat) in stat.iter().enumerate() {
                         let i = i + 1;

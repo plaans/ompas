@@ -55,7 +55,7 @@ pub struct DeliberationManager {
 
 impl DeliberationManager {
     pub async fn get_select_mode(&self) -> SelectMode {
-        self.select_mode.read().await.clone()
+        *self.select_mode.read().await
     }
 
     pub async fn set_select_mode(&self, mode: SelectMode) {

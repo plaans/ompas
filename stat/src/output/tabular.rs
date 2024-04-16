@@ -314,7 +314,7 @@ impl Display for TabularOutput {
                         column: 1,
                         row: 1,
                         pre_sep: Some(' '),
-                        post_sep: cell.post_sep.clone()
+                        post_sep: cell.post_sep
                     }
                     .format(column_size[*i])
                 )?;
@@ -346,12 +346,12 @@ impl Display for TabularOutput {
                 }
                 if cell.row > 1 {
                     let max_line_span = line + cell.row - 1;
-                    println!("max_line_span = {}", max_line_span);
+                    //println!("max_line_span = {}", max_line_span);
                     line_span = Some((c_i, line + max_line_span, cell));
                 }
                 write_cell(cell, &mut c_i, f)?;
             }
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
         Ok(())
     }

@@ -1,0 +1,1119 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>OMPAS Documentation</title>
+        <meta name="robots" content="noindex" />
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <!-- MathJax -->
+        <script async type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="ompas.html"><strong aria-hidden="true">1.</strong> Operational Model Planning and Acting System (OMPAS)</a></li><li class="chapter-item expanded "><a href="run.html"><strong aria-hidden="true">2.</strong> How to run the system</a></li><li class="chapter-item expanded "><a href="system/intro.html"><strong aria-hidden="true">3.</strong> Acting System</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="system/repl.html"><strong aria-hidden="true">3.1.</strong> Interacting with the REPL</a></li><li class="chapter-item expanded "><a href="system/configuration.html"><strong aria-hidden="true">3.2.</strong> Configuring OMPAS</a></li></ol></li><li class="chapter-item expanded "><a href="language/al.html"><strong aria-hidden="true">4.</strong> Acting Language</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="language/scheme/intro.html"><strong aria-hidden="true">4.1.</strong> Scheme</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="language/scheme/modules/intro.html"><strong aria-hidden="true">4.1.1.</strong> Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="language/scheme/modules/module-io.html"><strong aria-hidden="true">4.1.1.1.</strong> Module IO</a></li><li class="chapter-item expanded "><a href="language/scheme/modules/module-string.html"><strong aria-hidden="true">4.1.1.2.</strong> Module String</a></li><li class="chapter-item expanded "><a href="language/scheme/modules/module-utils.html"><strong aria-hidden="true">4.1.1.3.</strong> Module Utils</a></li><li class="chapter-item expanded "><a href="language/scheme/modules/module-advanced-math.html"><strong aria-hidden="true">4.1.1.4.</strong> Module Advanced math</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="language/primitives.html"><strong aria-hidden="true">4.2.</strong> Acting primitives</a></li><li class="chapter-item expanded "><a href="language/resources.html"><strong aria-hidden="true">4.3.</strong> Resource management</a></li><li class="chapter-item expanded "><a href="language/advanced.html"><strong aria-hidden="true">4.4.</strong> Advanced acting functions</a></li></ol></li><li class="chapter-item expanded "><a href="gobot-sim/intro.html"><strong aria-hidden="true">5.</strong> Gobot-Sim</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">OMPAS Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="operational-model-planning-and-acting-system-ompas"><a class="header" href="#operational-model-planning-and-acting-system-ompas">Operational Model Planning and Acting System (OMPAS)</a></h1>
+<p><em>OMPAS</em> is a complete supervision solution for robotic platforms developed in the context of the thesis &quot;Planning from operational model for deliberative acting in robotics&quot;.
+This thesis is led by Jérémy Turi under the supervision of Arthur Bit-Monnot and Daniel Sidobre at LAAS-CNRS in the RIS team.
+This official documentation is updated as the project goes, but some shift may appear with the actual implementation.</p>
+<p>The system <em>OMPAS</em> is based on the Refinement Acting Engine, that it extends with a native support for tasks concurrency, with a dedicated resource management system. The system uses a Scheme-like language to describe the behavior of a robotic agent as hierarchical operational models.</p>
+<p>Several articles have been accepted in conferences and workshops.
+Here are the references of the paper:</p>
+<ul>
+<li><a href="https://hal.archives-ouvertes.fr/hal-03792874">Extending a Refinement Acting Engine for Fleet Management: Concurrency and Resources</a>(@@turiExtendingRefinementActing2022)</li>
+<li><a href="https://hal.archives-ouvertes.fr/hal-03690039">Guidance of a Refinement-based Acting Engine with a Hierarchical Temporal Planner</a> (@@turiGuidanceRefinementbasedActing2022)</li>
+</ul>
+<hr />
+<!---
+## Refinement Acting Engine (RAE)
+
+### Overview
+
+The Refinement Acting Engine is an acting engine first described in _Planning and Acting_ from Ghallab & Co. A first version has been developped by Sunandita in Python. This version integrates a first prototype of RAE working in simulation. The select method to refine a task was using RAEPlan, UPOM or UPOM with learning capabilities. The goal of my thesis is to work from operationnal models to generates plans using planning technics, and then executes the plan. In our scenario, planning is continuously working online in parallel of the execution. Previous works exist combining both approches to maximise long-term utility and prevent deadlock (Propice-Plan, FAPE, others?) The first step has been to look at the state-of-the-art in term of executing engine and their languages. From this preliminary search, the choice has been made to base the RAE Description Language (RAEDL) on Scheme. Once the language has been defined, we used it to build RAEDL on top of it. RAEDL is used to describe domains and the environment (as special functions and initial facts that can be asserted).
+
+### Architecture
+
+The executable of RAE is decomposed in several processus and asyncrhonous tasks. The following diagram gives an overview of the Architecture and how tasks are communicating, what object is shared between tasks and threads etc.
+
+*   The _main_ process is the process that is launched with the command `cargo run`, i.e  _OMPAS_
+
+    At initialization it launches a repl that communicates via a channel with the Scheme Interpreter task.
+
+    This task _await_ on a channel to receive raw (str) Scheme expression, that will be parsed, expanded and evaluated.
+
+    The result is then sent back to the REPL to be printed on stdout. Other processes can call the Scheme Interpreter to Evaluate Expressions.
+
+    However the return of the value is only available for the REPL Task (To be implemented later if future case need this feature...)
+* The task RAE is launched via the REPL with the command `(rae-launch)`. It will successively launch _rae\_main_ and the platform. In our case _godot3_ via command line loaded with an hardcoded scenario and options. The platform godot then opens a tcp connection to receive state updates and action status updates.
+*   The objects RAEState and Status are shared between the different tasks (using _Arc_).&#x20;
+
+--><div style="break-before: page; page-break-before: always;"></div><h1 id="how-to-run-the-system"><a class="header" href="#how-to-run-the-system">How to run the system</a></h1>
+<p>The system can be used in different manners.
+The project provides an API to define custom binaries linked to specific robotic platforms described in [link to how to create binaries].
+The actual project provides a simple binary to use OMPAS in simulation, by loading a domain with the description of the commands model.
+In simulation, OMPAS executes a command by executing the corresponding Scheme model.
+The project also provide an integration with <em>Gobot-Sim</em> a benchmark for acting and planning system, providing job shop scheduling problems. </p>
+<h2 id="ompas-in-simulation"><a class="header" href="#ompas-in-simulation">OMPAS in simulation</a></h2>
+<pre><code class="language-bash"># if needed go in the root folder of the project
+cd rae
+cargo run --bin ompas -- -d &lt;path-to-domain&gt; -p &lt;path-to-problem&gt;
+</code></pre>
+<h2 id="ompas-and-gobot-sim"><a class="header" href="#ompas-and-gobot-sim">OMPAS and Gobot-sim</a></h2>
+<pre><code class="language-bash"># if needed go in the root folder of the project
+cd gobot-sim
+cargo run
+</code></pre>
+<h2 id="basic-commands-in-ompas"><a class="header" href="#basic-commands-in-ompas">Basic commands in OMPAS</a></h2>
+<p>Running one of those binary will automatically launch a REPL.
+Here is a list of basic commands that you can use to interact with the system.
+The complete list is available <a href="rae/repl.html">here</a> :</p>
+<ul>
+<li><code>(launch)</code> launches RAE with and starts the platform.</li>
+<li><code>(get-state)</code> returns a map with all the state of RAE, perceived and internal.</li>
+<li><code>(trigger-task task p1 ... pn)</code> triggers a task with the parameters <em>(p1...pn)</em></li>
+<li><code>(get-env &lt;element&gt;)</code> returns the domain, or a specific element.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="acting-system"><a class="header" href="#acting-system">Acting System</a></h1>
+<p>The acting system is defined as OMPAS with an integration with any robotic platform.
+Most binaries provide a REPL, so a human operator can interact with the system, to monitor reports (state update, task status) and trigger tasks.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="interacting-with-the-repl"><a class="header" href="#interacting-with-the-repl">Interacting with the REPL</a></h1>
+<p>REPL stands for <strong>Read Evaluate Print Loop</strong>, which means raw expressions are sent to an interpreter which it will execute in real-time without prior compilation.
+Such systems are born with Lisp, and the most common language using this feature is Python.
+The present system proposes a number of primitives to interact with the system.</p>
+<hr />
+<h2 id="monitor"><a class="header" href="#monitor">Monitor</a></h2>
+<h3 id="principal-functions"><a class="header" href="#principal-functions">Principal functions</a></h3>
+<ul>
+<li>
+<p><code>(launch)</code> launches RAE. It will also launch the platform if defined.</p>
+</li>
+<li>
+<p><code>(stop)</code> stops RAE.</p>
+</li>
+<li>
+<p><code>(configure-platform e1...en)</code> A number of parameters passed to the platform when launched.</p>
+</li>
+<li>
+<p><code>(set-select &lt;select-mode&gt;)</code> configure the algorithm that will be used to select a method during the refinement process.
+The available select-mode are <em>greedy</em>, <em>planning</em>, <em>aries</em>, <em>aries-opt</em>, <em>rae-plan</em>, <em>c-choice</em>, <em>upom</em> (not yet implemented).</p>
+</li>
+<li>
+<p><code>(trigger-task &lt;label&gt; &lt;params&gt;)</code> trigger a task with instantiated parameters. Launch before triggering tasks.</p>
+</li>
+<li>
+<p><code>(add-task-to-execute &lt;label&gt; &lt;params)</code> define a task to execute before the launch of RAE. The task will be passed to RAE once the acting system is launched.</p>
+</li>
+</ul>
+<h3 id="monitoring"><a class="header" href="#monitoring">Monitoring</a></h3>
+<ul>
+<li><code>(get-state)</code> returns the whole state of RAE. Contains only initial facts if RAE is not launched yet.</li>
+<li><code>(get-resources)</code> returns the list of resources with some useful information, as the number of waiter for each resource.</li>
+<li><code>(get-monitors)</code> returns the list of dynamic expressions actually monitored.</li>
+<li><code>(get-env)</code> returns the environment of RAE.</li>
+<li><code>(get-methods)</code> returns the list of methods defined.</li>
+<li><code>(get-state-functions)</code> returns the list of state-function.</li>
+<li><code>(get-tasks)</code> returns the list of tasks.</li>
+<li><code>(get-config-platform)</code> returns the config of the platform.</li>
+<li><code>(get-select)</code> returns the select mode used by RAE.</li>
+<li><code>(get-agenda &lt;type&gt; &lt;status&gt;)</code> returns the status of all tasks and commands executed in RAE. The list can be sorted by <strong>type</strong> (task, command) or/and <strong>status</strong> (pending, running, done, failure).</li>
+<li><code>(get-task-network)</code> returns the network of tasks and commands.</li>
+<li><code>(get-type-hierarchy)</code> returns the type hierarchy.</li>
+<li><code>(get-stats)</code> returns a bunch of statistics on the current RAE run.</li>
+<li><code>(export-stats &lt;csv-file&gt;)</code> exports the stats in a <em>csv</em> file.</li>
+</ul>
+<h3 id="operational-model-extraction"><a class="header" href="#operational-model-extraction">Operational model extraction</a></h3>
+<p>Those functions are used to test and debug the extraction of planning models in the form of chronicles from the automated analysis of the method operational models and the command models. The planner used is Aries @@godetChroniclesRepresentingHierarchical2022, the project is available here : <a href="https://github.com/plaans/aries">https://github.com/plaans/aries</a></p>
+<ul>
+<li><code>(convert-expr e)</code> converts the expression <em>e</em> into a chronicle and prints it.</li>
+<li><code>(convert-domain)</code> converts the domain and prints it.</li>
+<li><code>(plan-task t p1...pn)</code> converts the domain and calls the planner <em>aries</em> </li>
+</ul>
+<hr />
+<h2 id="domain-definition"><a class="header" href="#domain-definition">Domain definition</a></h2>
+<h3 id="commands"><a class="header" href="#commands"><strong>Commands</strong></a></h3>
+<p>Commands are defined with the macro <code>def-command</code> that takes a symbol, and a list of typed parameters.</p>
+<pre><code class="language-lisp">(def-command pick (:params (?obj ball) (?room room) (?gripper gripper)))
+</code></pre>
+<p>A model can be provided and defined with the macro <code>def-command-pddl-model</code>. Here is an example for the command <em>pick</em>. The pre-conditions takes a list of dynamic expressions (expressions which result will depend on the current values of state-variables).</p>
+<pre><code class="language-lisp">(def-command-pddl-model pick
+    (:params (?obj ball) (?room room) (?gripper gripper))
+    (:pre-conditions
+        (= (at ?obj) ?room)
+        (= (at-robby) ?room)
+        (= (carry ?gripper) no_ball))
+    (:effects
+        ('carry ?gripper) ?obj)
+        ('at ?obj no_place)))
+</code></pre>
+<!--- This function creates a lambda that will be stored in the environment with this form:
+
+```lisp
+(lambda (?r) (rae-exec-command (quote pick) ?r))
+```
+-->
+<h3 id="tasks"><a class="header" href="#tasks"><strong>Tasks</strong></a></h3>
+<p>A task is defined with the macro <code>def-task</code> that takes a label, and a list of typed parameters.</p>
+<pre><code class="language-lisp">(def-task pick-and-drop (:params (?ball ball) (?room room)))
+</code></pre>
+<h3 id="methods"><a class="header" href="#methods"><strong>Methods</strong></a></h3>
+<p>A method is defined with the macro <code>def-method</code> that takes a label, the task it refines, a list of typed parameters, the first ones inherited from the task, a score to sort the method for the basic select of RAE, and the body that is the program executed by the platform is the method is selected.</p>
+<pre><code class="language-lisp">(def-method m1
+    (:task pick-and-drop)
+    (:params (?ball ball) (?room room) (?gripper gripper) (?departure room))
+    (:pre-conditions 
+        (= (at ?ball) (at-robby))
+        (= (carry ?gripper) no_ball)
+        (= ?departure (at-robby)))
+    (:score 0)
+    (:body
+        (do
+            (pick ?ball ?departure ?gripper)
+            (move ?departure ?room)
+            (drop ?ball ?room ?gripper))))
+
+</code></pre>
+<p><strong>State-function</strong></p>
+<p>A state function returns the value of state-variable at a given time.
+We define a state function with the macro <code>def-state-function</code> that takes a label, a list of typed parameters, and a result type.</p>
+<pre><code class="language-lisp">(def-state-function at (:params (?b ball)) (:result room))
+</code></pre>
+<h3 id="lambdas"><a class="header" href="#lambdas"><strong>Lambdas</strong></a></h3>
+<p>Lambdas can be defined in the evaluation environment of RAE, which is different from the environment of the REPL. A lambda is defined with the macro <code>def-lambda</code> that takes the label of the lambda, and a lambda.</p>
+<pre><code class="language-lisp">(def-lambda go_random
+    (lambda (?r ?l ?u)
+        (let ((x (rand-int-in-range ?l ?u))
+                (y (rand-int-in-range ?l ?u)))
+                (navigate_to ?r x y))))
+</code></pre>
+<h3 id="types"><a class="header" href="#types"><strong>Types</strong></a></h3>
+<p>The system supports the definition of new types, with a hierarchy of types. A type is defined with the macro <code>def-types</code> that takes a list of types.</p>
+<pre><code class="language-lisp">;adding new root types
+(def-types room gripper ball)
+;adding a new subtype to ball
+(def-types (football ball))
+</code></pre>
+<h3 id="objects"><a class="header" href="#objects"><strong>Objects</strong></a></h3>
+<p>Typed objects can be defined in the fact base of the system, in particular when using the system in simulation.
+We use the macro <code>def-objects</code> that takes lists of objects with their type defined as the last element of the list.</p>
+<pre><code class="language-lisp"> (def-objects
+    (bedroom kitchen living_room room)
+    (b1 b2 b3 b4 ball))
+</code></pre>
+<h3 id="initial-state"><a class="header" href="#initial-state"><strong>Initial-state</strong></a></h3>
+<p>To define an initial-state for some scenarios (for example to use RAE in simulation), we use the macro <code>def-initial-state</code> that takes a list of pair &lt;key,value&gt;.</p>
+<pre><code class="language-lisp">(def-initial-state
+    (at-robby living_room)
+    ((at b1) bedroom)
+    ((at b2) bedroom)
+    ((at b3) bedroom)
+    ((at b4) bedroom)
+    ((carry left) no_ball)
+    ((carry right) no_ball))
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="configuring-ompas"><a class="header" href="#configuring-ompas">Configuring OMPAS</a></h1>
+<p>OMPAS can take several options.</p>
+<ul>
+<li><code>-v, --view</code>: view the platform interface.</li>
+<li><code>-l, --log-path</code>: path to the directory of the log. The logs of the REPL and RAE will be stored in different files. RAE logs will contain logged message with useful information on the internal functioning of a RAE run.</li>
+<li><code>-p, --problem</code>: path to the problem file.</li>
+<li><code>-d, --domain</code>: path to the domain file.</li>
+<li><code>-r, --rae-log</code>: displays the RAE log in a dedicated window.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="acting-language"><a class="header" href="#acting-language">Acting Language</a></h1>
+<p>The system OMPAS uses a custom acting Language.
+It is a Lisp dialect and in particular a Scheme variant, with a limited set of primitives.
+On top of the basic Scheme, primitives for concurrency have been added, and interruptions are supported in the core language.
+From this reimplementation of Scheme, we propose an acting language that supports information gathering, reasoning on facts, execution and monitoring of commands as well as a specific resource management system.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="scheme"><a class="header" href="#scheme">Scheme</a></h1>
+<p>Scheme is derived from the functional language Lisp.
+Peter Norvig made a tutorial to implement a basic version in Python available at <a href="https://norvig.com/lispy.html">https://norvig.com/lispy.html</a> and <a href="https://norvig.com/lispy2.html">https://norvig.com/lispy2.html</a>.
+The Rust implementation is inspired by Lis.py and Lispy.py (the second version integrates advanced features) but differs on several aspects.</p>
+<h2 id="introduction-to-scheme"><a class="header" href="#introduction-to-scheme">Introduction to Scheme.</a></h2>
+<p>Scheme is a Lisp dialect that is based on the recursive evaluation of expressions that we call <em>LValue</em>. An <em>LValue</em> is either an Atom (symbol, boolean, number, function) or a list of expressions.
+A particularity of the language is that the boolean <em>false</em> is represented by the <em>LValue</em> <em>Nil</em> that represents also the empty list.
+An expression is evaluated in an environment, in which some symbols can be bound to LValues.
+Each expression is a new scope, which means that a new binding only lives in the scope it has been defined in, which makes the language way more simple.</p>
+<h2 id="core-language"><a class="header" href="#core-language">Core language</a></h2>
+<p>The core of the Scheme implementation has been both simplified, and extended for concurrency.
+The core language is composed of the following functions:</p>
+<ul>
+<li><code>begin</code> evaluates a list of expressions and returns the result of the last expression.</li>
+<li><code>define</code> defines in the current scope a new binding for a symbol.</li>
+<li><code>if</code> takes as argument an evaluation that returns a boolean <em>b</em>.
+In function of the value of <em>b</em>, either the second expression of the third will be executed.
+The result of the <em>if</em> expression is the result of the evaluated expression.</li>
+<li><code>lambda</code> creates a closure.
+A closure is defined by parameters and a body.
+The valid kind of parameters for a lambda are <em>nil</em> for no parameters, a simple symbol for an arbitrary number of parameters or a list of symbol for a defined number of parameters.</li>
+<li><code>quote</code> or <code>'</code> avoids the evaluation of an expression and returns the raw expression as result.</li>
+<li><code>quasiquote</code> (or `) and <code>unquote</code> (or <code>,</code>) are used to partially evaluate an expression. Those functions can be viewed as macros for the formatting of expressions using <em>quote</em> and <em>cons</em>.</li>
+<li><code>eval</code> evaluates an expression.</li>
+<li><code>parse</code> takes as input a string and returns the parsed and expanded expression.</li>
+<li><code>expand</code> expanses an expression.</li>
+<li><code>enr</code> evaluates an expression without evaluating the sub expressions.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (eval (cons zip (list (list 2 3) (list 4 5))))
+LI&gt;&gt; error: In eval, 2: Got int, expected fn
+&gt;&gt; (enr (cons zip (list (list 2 3) (list 4 5))))
+LI&gt;&gt; ((2 4) (3 5))
+</code></pre>
+<h3 id="errors"><a class="header" href="#errors">Errors</a></h3>
+<p>A specific <em>Err</em> <em>LValue</em> as been added in the current implementation for special cases were an err as result would escape the evaluation of an expression.</p>
+<ul>
+<li><code>do</code> similar to begin, but stops at the first err returned.
+The result of the expression is <em>err</em>.</li>
+<li><code>check</code> takes as argument a boolean.
+It returns true if the boolean is true, an <em>err</em> otherwise</li>
+</ul>
+<p>From those two functions, some interesting constructs can be programmed for code that should not return errors.</p>
+<h3 id="concurrency-and-interruption"><a class="header" href="#concurrency-and-interruption">Concurrency and interruption</a></h3>
+<p>To handle concurrency, we implemented an extension to Scheme inspired by asynchronous code from C++ and rust, using schedulers and futures.
+In addition, we define a new <em>LValue</em> named <em>handle</em> that represents an asynchronous evaluation.
+A handle can be manipulated with the following functions: </p>
+<ul>
+<li><code>async</code> takes as argument an expression, starts the evaluation in a new asynchronous process and returns a handle.</li>
+<li><code>await</code> takes as parameter a handle and returns the result of the expression evaluated in the asynchronous process.</li>
+<li><code>interrupt</code> takes as argument a handle, and sends an interruption signal to the asynchronous evaluation.
+The interruption signal is propagated recursively to all sub-expressions.</li>
+</ul>
+<p>In addition to those primitives, it is possible to define the interruptibility of an expression, by avoiding the interruption of some expressions with the keyword <em>uninterruptible</em>.
+Here is an example of such code:</p>
+<pre><code class="language-lisp">(begin
+    (define h
+    (async 
+        (begin
+        (uninterruptible (begin
+            (exec pick ?r ?o)
+            (exec move ?r ?l)
+            (exec drop ?r ?o)))
+        (exec inspect ?r ?o))))
+    (race 
+        (await h)
+        (begin
+            (sleep 10)
+            (interrupt h))))
+</code></pre>
+<h2 id="standard-library"><a class="header" href="#standard-library">Standard library</a></h2>
+<h3 id="functions-to-get-informations-on-the-environment"><a class="header" href="#functions-to-get-informations-on-the-environment">Functions to get informations on the environment</a></h3>
+<ul>
+<li><code>help</code> returns the list of functions defined in the environment along their documentation.
+An extended documentation can be given by giving as parameter a specific function to <code>help</code>.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (help)
+LI&gt;&gt; ¤ * : Takes 2+ arguments. Ret...
+¤ + : Takes 2+ arguments. Return t...
+¤ - : Takes 2 arguments. Return th...
+
+&gt;&gt; (help write)
+LI&gt;&gt; Write a LValue to a file
+Takes two arguments: the name of the file and the LValue
+Note: The path of the file is relative to the path of the executable
+
+</code></pre>
+<ul>
+<li><code>get_keys</code> returns the list of all elements defined in the environment.</li>
+<li><code>get_macros</code> returns the list of macros.</li>
+<li><code>get_macro</code> returns the expression of a given macro.</li>
+<li><code>get_contexts</code> returns the list of all contexts defined in the environment.</li>
+</ul>
+<h3 id="get-and-set-functions"><a class="header" href="#get-and-set-functions">Get and set functions</a></h3>
+<ul>
+<li><code>get</code> returns an element either from a list or a map. You can also use directly <code>get-list</code> and <code>get-map</code>.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (get (list 1 2 3) 1)
+LI&gt;&gt; 2
+&gt;&gt; (get (map '((ten 10) (twenty 20))) twenty)
+LI&gt;&gt; 20
+</code></pre>
+<ul>
+<li><code>set</code>: function to set an element in a list or a map</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (set (list 1 2 3) 1 1)
+LI&gt;&gt; 2
+&gt;&gt; (set (map '((ten 10) (twenty 20))) '(twenty twenty))
+LI&gt;&gt; twenty: twenty
+ten: 10
+</code></pre>
+<h3 id="functions-on-list"><a class="header" href="#functions-on-list">Functions on list</a></h3>
+<ul>
+<li><code>list</code>: constructs a list.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(list 1 2 3)
+LI&gt;&gt;(1 2 3)
+</code></pre>
+<ul>
+<li><code>car</code>: returns the first element of a list, nil if the list is empty.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(car '(3 4 5))
+LI&gt;&gt; 3
+</code></pre>
+<ul>
+<li><code>cdr</code>: returns list without the first element, nil if the list has one element.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(cdr '(3 4 5))
+LI&gt;&gt;(4 5)
+</code></pre>
+<ul>
+<li><code>first</code>: returns the first element of a list (same as <strong>car</strong>)</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(first (list 1 2 3))
+LI&gt;&gt; 1
+</code></pre>
+<ul>
+<li><code>second</code>: returns the second element of a list</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(second (list 1 2 3))
+LI&gt;&gt; 2
+</code></pre>
+<ul>
+<li><code>third</code>: returns the third element of a list</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(second (list 1 2 3))
+LI&gt;&gt; 3
+</code></pre>
+<ul>
+<li><code>rest</code>: returns the rest of a list (same as cdr)</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (rest '(1 2 3))
+LI&gt;&gt; (2 3)
+</code></pre>
+<ul>
+<li><code>last</code>: returns the last element of a list.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(last '(3 4 5))
+LI&gt;&gt;5
+</code></pre>
+<ul>
+<li><code>cons</code>: creates a cons of two elements</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (cons 3 nil)
+LI&gt;&gt; (3)
+&gt;&gt; (cons nil 3)
+LI&gt;&gt; (nil 3)
+&gt;&gt; (cons 4 '(3))
+LI&gt;&gt; (4 3)
+&gt;&gt; (cons '(4) '(3))
+LI&gt;&gt; ((4) 3)
+</code></pre>
+<ul>
+<li><code>len</code>: returns the length of a list of a map</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(len '(1 2 3))
+LI&gt;&gt; 3
+</code></pre>
+<ul>
+<li><code>empty</code>: returns true is a list or a map is empty</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (empty '())
+LI&gt;&gt; true
+</code></pre>
+<ul>
+<li><code>get-list</code> : get the element of the list at the given index (starts at 0). The first argument is a list, and the second the index</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (get-list (list 1 2 3) 1)
+LI&gt;&gt; 2
+</code></pre>
+<ul>
+<li><code>set-list</code> : set the element of the list at the given index (starts at 0).
+The first argument is a list, the second the value, and the third the index.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (set (list 1 2 3) 1 1)
+LI&gt;&gt; 2
+</code></pre>
+<ul>
+<li><code>append</code> : append two lists together</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (append (list 1 2 3) '(4 5))
+LI&gt;&gt; (1 2 3 4 5)
+</code></pre>
+<ul>
+<li><code>member</code> : It takes two arguments of which the second must be a list,
+if the first argument is a member of the second argument, and then it returns the remainder of the list beginning with the first argument.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (member 3 '(1 2 3 4 5))
+LI&gt;&gt; (3 4 5)
+</code></pre>
+<ul>
+<li><code>reverse</code> : reverse a list</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (reverse '(1 2 3 4 5))
+LI&gt;&gt; (5 4 3 2 1)
+</code></pre>
+<ul>
+<li><code>intersection</code> returns a list containing all elements present in all the lists passed as arguments.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (intersection '(1 2 3 4 5) '(1 2 3) '(3 4 2))
+LI&gt;&gt; (2 3)
+</code></pre>
+<h3 id="functions-on-map"><a class="header" href="#functions-on-map">Functions on map</a></h3>
+<ul>
+<li><code>map</code>: constructs a map.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (map '((ten 10) (twenty 20)))
+LI&gt;&gt; twenty: 20
+ten: 10
+</code></pre>
+<ul>
+<li><code>get-map</code>: get the value inside a map</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define m1 (map '((test . 10))))
+&gt;&gt; (get m1)
+LI&gt;&gt; test: 10
+&gt;&gt; (get-map m1 test)
+LI&gt;&gt; 10
+</code></pre>
+<ul>
+<li><code>set-map</code>: returns a map with the new value inserted.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define m1 (set-map m1 '(twenty . 20)))
+&gt;&gt; (get m1)
+LI&gt;&gt; twenty: 20
+test: 10
+</code></pre>
+<ul>
+<li><code>union-map</code> : unifies two maps</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define map1 (map '((ten 10) (twenty 20))))
+LI&gt;&gt; nil
+&gt;&gt; map1
+LI&gt;&gt; ten: 10
+twenty: 20
+
+&gt;&gt; (define map2 (map '((thirty 30) (fourty 40))))
+LI&gt;&gt; nil
+&gt;&gt; map2
+LI&gt;&gt; thirty: 30
+fourty: 40
+
+&gt;&gt; (define map3 (union-map map1 map2))
+LI&gt;&gt; nil
+&gt;&gt; map3
+LI&gt;&gt; thirty: 30
+twenty: 20
+fourty: 40
+ten: 10
+</code></pre>
+<ul>
+<li>̀<code>remove-map</code> : remove from the map an entry. The first argument is a map, and the second the key.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define map1 (map '((ten 10) (twenty 20))))
+LI&gt;&gt; nil
+&gt;&gt; (define map2 (map '((thirty 30) (fourty 40))))
+LI&gt;&gt; nil
+&gt;&gt; (define map3 (union-map map1 map2))
+LI&gt;&gt; nil
+&gt;&gt; (define map4 (remove-map map3 twenty))
+LI&gt;&gt; nil
+&gt;&gt; map4
+LI&gt;&gt; thirty: 30
+fourty: 40
+ten: 10
+</code></pre>
+<ul>
+<li><code>remove-key-value-map</code> : remove a key-value binding if it exists.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define map1 (map '((ten 10) (twenty 20))))
+LI&gt;&gt; nil
+&gt;&gt; (define map2 (remove-key-value-map map1 '(twenty 20)))
+LI&gt;&gt; nil
+&gt;&gt; map2
+LI&gt;&gt; ten: 10
+&gt;&gt; (define map2 (remove-key-value-map map1 '(ten 1)))
+LI&gt;&gt; error: In remove-key-value-map, map does not have key value (ten:1)
+</code></pre>
+<h3 id="mathematical-functions"><a class="header" href="#mathematical-functions">Mathematical functions</a></h3>
+<ul>
+<li>basic math functions:
+<ul>
+<li>not (!)</li>
+<li>add (+)</li>
+<li>sub (-)</li>
+<li>div (/)</li>
+<li>mul (*)</li>
+<li>eq (=)</li>
+<li>gt (&gt;)</li>
+<li>ge (&gt;=)</li>
+<li>lt (&lt;)</li>
+<li>le (&lt;=)</li>
+</ul>
+</li>
+</ul>
+<h3 id="type-verification"><a class="header" href="#type-verification">Type verification</a></h3>
+<ul>
+<li><code>lambda?</code> : returns true if the LValue is a lambda.</li>
+<li><code>integer?</code>: returns true if the LValue is an integer.</li>
+<li><code>float?</code>: returns true if the LValue is a float.</li>
+<li><code>nil?</code>: returns true if the LValue is nil.</li>
+<li><code>bool?</code>: returns true if the LValue is a boolean.</li>
+<li><code>symbol?</code>: returns true if the LValue is a symbol.</li>
+<li><code>fn?</code>: returns true if the LValue is a function.</li>
+<li><code>mut-fn?</code>: returns true if the LValue is a mutable function.</li>
+<li><code>quote?</code>: returns true if the LValue is a quote.</li>
+<li><code>map?</code>: returns true if the LValue is a map.</li>
+<li><code>list?</code>: returns true if the LValue is a list.</li>
+<li><code>pair?</code>: returns true if the LValue is a list with at least one element.</li>
+</ul>
+<p>All above functions are defined in the <em>root</em> environment.</p>
+<h2 id="error"><a class="header" href="#error">Error</a></h2>
+<ul>
+<li><code>err</code> construct an err value from a <em>LValue</em></li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (err test)
+LI&gt;&gt; (err (test))
+</code></pre>
+<ul>
+<li><code>err?</code> returns true if the <em>LValue</em> is a (Err &lt;lvalue&gt;), false if it is a (Ok &lt;lvalue&gt;)</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (err? (err test))
+LI&gt;&gt; true
+</code></pre>
+<ul>
+<li><code>interrupted?</code> returns true is the <em>LValue</em> is an err coming from an interruption. </li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="modules"><a class="header" href="#modules">Modules</a></h1>
+<p>A module is a collection of bindings that can be added to an environment to add functions, constants, lambdas etc.
+It also contains the documentation and contexts that can be used to use any shared object outside LValues.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="module-io"><a class="header" href="#module-io">Module IO</a></h1>
+<p>This module contains functions to load lisp code from file, write to files and print either on the console or in the log.</p>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
+<ul>
+<li><code>print</code>: print a LValue either in the console or in the interpreter log.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (print test)
+test
+</code></pre>
+<ul>
+<li><code>__read__</code>: reads a string from a file. Prefer using the macro <strong>read</strong>.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (__read__ &lt;path-to-file&gt;/&lt;name-file&gt;.scm)
+</code></pre>
+<ul>
+<li><code>write</code>: write a LValue to a file.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (write &lt;path-to-file&gt;/&lt;name-file&gt;.scm)
+</code></pre>
+<h2 id="macros"><a class="header" href="#macros">Macros</a></h2>
+<ul>
+<li><code>read</code> : macro used to read, parse and eval a lisp file.</li>
+</ul>
+<pre><code class="language-lisp">(load test.scm)
+=&gt; (eval (parse (__read__ test.scm)))
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="module-string"><a class="header" href="#module-string">Module String</a></h1>
+<p>This module contains functions to create and format strings. A string is a specific LValue that is different from a symbol.</p>
+<h2 id="functions-1"><a class="header" href="#functions-1">Functions</a></h2>
+<ul>
+<li><code>string</code> creates a string LValue.</li>
+<li><code>concatenate</code>: takes a list of args and concatenate them into a string.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (concatenate this is a test)
+LI&gt;&gt; thisisatest
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><hr />
+<h2 id="description-module-providing-utilitary-functions-useful-when-programming-it-also-provides-lambdas-and-macros"><a class="header" href="#description-module-providing-utilitary-functions-useful-when-programming-it-also-provides-lambdas-and-macros">description: Module providing utilitary functions useful when programming. It also provides lambdas and macros.</a></h2>
+<h1 id="module-utils"><a class="header" href="#module-utils">Module Utils</a></h1>
+<h2 id="macros-1"><a class="header" href="#macros-1">Macros</a></h2>
+<ul>
+<li><code>and</code> : conjunction of boolean expressions</li>
+</ul>
+<pre><code class="language-lisp">(and (&gt; x 3) (&lt; y 4))
+=&gt; (if (&gt; x 3)
+         (&lt; y 4)
+         nil)
+</code></pre>
+<ul>
+<li><code>or</code> : disjunction of boolean expressions
+(or (&gt; x 3) (&lt; y 4))
+=&gt; (if (&gt; x 3)
+true
+(&lt; y 4))</li>
+<li><code>caar</code> : takes the first element of the first element of a list</li>
+</ul>
+<pre><code class="language-lisp">(caar x) =&gt; (car (car x))
+</code></pre>
+<ul>
+<li><code>cadr</code> : takes the first element of the rest of a list</li>
+</ul>
+<pre><code class="language-lisp">(cadr x) =&gt; (car (cdr x))
+</code></pre>
+<ul>
+<li><code>cdar</code>, <code>cddr</code>, <code>cadar</code>, <code>cadar</code>, <code>caddr</code>, <code>cdadr</code>, <code>caadr</code>, <code>cadadr</code>, <code>cadaddr</code>, similar to <code>caar</code> and <code>cadr</code>.</li>
+<li><code>!=</code>, <code>neq</code> : not equal</li>
+</ul>
+<pre><code class="language-lisp">(!= x y) =&gt; (! (= x y))
+</code></pre>
+<ul>
+<li><code>await-async</code> await-async block to eval asynchronously while waiting directly for the result</li>
+</ul>
+<pre><code class="language-lisp">(await-async (+ 3 4))
+=&gt; (await (async (+ 3 4)))
+</code></pre>
+<ul>
+<li><code>apply</code> apply a function to a list</li>
+</ul>
+<pre><code class="language-lisp">(apply + (3 4))
+=&gt; (cons + (3 4))
+</code></pre>
+<p>Here is an example</p>
+<pre><code class="language-lisp">&gt;&gt; (apply + (10 6))
+LI&gt;&gt; 16
+</code></pre>
+<ul>
+<li><code>cond</code>: equivalent to successive <code>if ..  else if .. else</code></li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define weather 
+(lambda (x)
+    (cond ((&lt; x 10) '(It is cold!))
+        ((&lt; x 20) '(It is cool!))
+        ((&lt; x 30) '(It is warm!))
+        (else '(It is hot!)))))
+&gt;&gt; (weather 10)
+LI&gt;&gt; (It is cool!)
+&gt;&gt; (weather 9)
+LI&gt;&gt; (It is cold!)
+&gt;&gt; (weather 25)
+LI&gt;&gt; (It is warm!)
+&gt;&gt; (weather 36)
+LI&gt;&gt; (It is hot!)
+</code></pre>
+<p>Here is an example of how to use it.</p>
+<pre><code>&gt;&gt; (let ((x 3)
+         (y 4))
+       (+ x y))
+LI&gt;&gt; 7
+&gt;&gt; (let* ((x 3)
+          (y (x +1)))
+        (+ x y))
+LI&gt;&gt; 7
+</code></pre>
+<ul>
+<li><code>loop</code> : loop the evaluation of an expression</li>
+</ul>
+<pre><code class="language-lisp">(loop (print 'test))
+=&gt; (begin
+    (define __loop__
+        (lambda nil
+            (begin
+                (print 'test)
+                (__loop__))))
+    (__loop__))
+</code></pre>
+<ul>
+<li><code>let</code> and <code>let*</code> Used to evaluate a code with locally bound variables. The difference lies in the possibility to bind variables in function of previous bindings with <code>let*</code>.</li>
+</ul>
+<pre><code class="language-lisp">(let ((x 3)
+         (y 4))
+       (+ x y))
+=&gt; ((lambda (x y) (+ x y)) 3 4)
+
+(let* ((x 3)
+          (y (+ x 1)))
+        (+ x y))
+=&gt; ((lambda (x) 
+        ((lambda (y) (+ x y)) (+ x 1))) 3)
+</code></pre>
+<ul>
+<li><code>combine</code> : <em>todo</em></li>
+</ul>
+<h2 id="lambdas-1"><a class="header" href="#lambdas-1">Lambdas</a></h2>
+<ul>
+<li><code>zip</code> zips elements of two lists in pairs</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (zip '(1 2 3 4) '(5 6 7 8))
+LI&gt;&gt; ((1 5) (2 6) (3 7) (4 8))
+</code></pre>
+<ul>
+<li><code>unzip</code> undo a zipped list.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (define zipped (zip '(1 2 3 4) '(5 6 7 8)))
+&gt;&gt; zipped
+LI&gt;&gt; ((1 5) (2 6) (3 7) (4 8))
+&gt;&gt; (unzip zipped)
+LI&gt;&gt; ((1 2 3 4) (5 6 7 8))
+</code></pre>
+<ul>
+<li><code>mapf</code>: maps a function to a list of argument</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (mapf weather '(9 15 25 36))
+;defined in example of cond
+LI&gt;&gt; ((It is cold!) (It is cool!) (It is warm!) (It is hot!))
+</code></pre>
+<ul>
+<li><code>par</code> evaluates in parallel a list of expressions and awaits on all their result.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (par (+ 1 2) (+ 3 4))
+LI &gt;&gt; (3 7)
+</code></pre>
+<ul>
+<li><code>repeat</code> evaluates n time an expression and returns the result of the last evaluation.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (repeat '(print 1) 4)
+1
+1
+1
+1
+LI&gt;&gt; nil
+</code></pre>
+<ul>
+<li><code>retry-once</code> evaluates an expression, and evaluates it again if the result is an err.</li>
+</ul>
+<h2 id="functions-2"><a class="header" href="#functions-2">Functions</a></h2>
+<p>Provides a bunch of utility functions:</p>
+<ul>
+<li><code>rand-element</code> pick a random element from a list</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (rand-element '(10 2 6))
+LI&gt;&gt; 2
+&gt;&gt; (rand-element '(10 2 6))
+LI&gt;&gt; 10
+&gt;&gt; (rand-element '(10 2 6))
+LI&gt;&gt; 2
+&gt;&gt; (rand-element '(10 2 6))
+LI&gt;&gt; 6
+</code></pre>
+<ul>
+<li><code>enumerate</code> enumerates all possible sets of combination from several lists.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (enumerate '(1 2) '(3 4) '(5 6))
+LI&gt;&gt; ((1 3 5) (1 3 6) (1 4 5) (1 4 6) (2 3 5) (2 3 6) (2 4 5) (2 4 6))
+</code></pre>
+<ul>
+<li><code>contains</code> returns true if a list contains an element</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (contains '(1 2 3 4 5) 1)
+LI&gt;&gt; true
+&gt;&gt; (contains '(1 2 3 4 5) 6)
+LI&gt;&gt; nil
+&gt;&gt; (contains '(1 (2 3) 4 5) '(2 3))
+LI&gt;&gt; true
+</code></pre>
+<ul>
+<li><code>sublist</code> : returns a sublist of a list</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (sublist '(a b c d e f) 1)
+LI&gt;&gt; (b c d e f)
+&gt;&gt; (sublist '(a b c d e f) 1 3)
+LI&gt;&gt; (b c)
+</code></pre>
+<ul>
+<li><code>transform-in-singleton-list</code> : transforms a list of arguments in a list of singleton</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (transform-in-singleton-list 1 2 3 4)
+LI&gt;&gt; ((1) (2) (3) (4))
+</code></pre>
+<ul>
+<li><code>quote-list</code> : transform a list in list quoting each element</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (quote-list '(1 2 3 4))
+LI&gt;&gt; ((quote 1) (quote 2) (quote 3) (quote 4))
+</code></pre>
+<ul>
+<li><code>sleep</code> awaits that the defined time in second is elapsed to resume the evaluation of the next expressions.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="module-advanced-math"><a class="header" href="#module-advanced-math">Module Advanced Math</a></h1>
+<p>This module contains more advanced mathematical functions and objects.</p>
+<h3 id="functions-3"><a class="header" href="#functions-3"><strong>Functions</strong></a></h3>
+<ul>
+<li><code>sin</code> : computes the sin of a number</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (sin 0)
+LI&gt;&gt; 0
+&gt;&gt; (sin pi)
+LI&gt;&gt; 0.00000000000000012246467991473532
+&gt;&gt; (sin (/ pi 2))
+LI&gt;&gt; 1
+</code></pre>
+<ul>
+<li><code>cos</code> : computes the cos of a number</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (cos 0)
+LI&gt;&gt; 1
+&gt;&gt; (cos pi)
+LI&gt;&gt; -1
+&gt;&gt; (cos (/ pi 2))
+LI&gt;&gt; 0.00000000000000006123233995736766
+</code></pre>
+<ul>
+<li><code>pow</code> : computes a number to a certain power</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (pow 2 3)
+LI&gt;&gt; 8
+&gt;&gt; (pow 2 3.5)
+LI&gt;&gt; 11.313708498984761
+&gt;&gt; (pow 2.3 3.5)
+LI&gt;&gt; 18.45216910555504
+</code></pre>
+<ul>
+<li><code>square</code> : computes a number to the square.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (square 2)
+LI&gt;&gt; 4
+&gt;&gt; (square 2.3)
+LI&gt;&gt; 5.289999999999999
+</code></pre>
+<ul>
+<li><code>sqrt</code> computes the square root of a number</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (sqrt 4)
+LI&gt;&gt; 2
+</code></pre>
+<ul>
+<li><code>abs</code>: computes the absolute of a number</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (abs 2)
+LI&gt;&gt; 2
+&gt;&gt; (abs -2)
+LI&gt;&gt; 2
+</code></pre>
+<ul>
+<li><code>rand-int-in-range</code> : generates a random int in a range.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (rand-int-in-range 0 10)
+LI&gt;&gt; 6
+</code></pre>
+<ul>
+<li><code>rand-float-in-range</code> : generates a random float in a range.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt; (rand-float-in-range 0 10)
+LI&gt;&gt; 1.875527591323538
+</code></pre>
+<h3 id="constants"><a class="header" href="#constants"><strong>Constants</strong></a></h3>
+<ul>
+<li><code>pi</code>: value of constant <em>pi</em> in <em>f64</em></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="acting-primitives"><a class="header" href="#acting-primitives">Acting primitives</a></h1>
+<p>The acting language is built on top of the new implementation of Scheme with the following functions and lambdas:</p>
+<ul>
+<li><code>exec-command</code> sends an execution request to the platform a command and returns an execution handle.</li>
+</ul>
+<pre><code class="language-lisp">(exec-command pick r1) -&gt; handle
+</code></pre>
+<ul>
+<li><code>exec-task</code> executes a task thanks to the RAE algorithm.</li>
+<li><code>read-state</code> returns the current value of a state variable.</li>
+</ul>
+<pre><code class="language-lisp">(read-state at r1) -&gt; bedroom
+</code></pre>
+<ul>
+<li><code>arbitrary</code> : arbitrarily takes an element of a list using a function that can be passed as argument, the default behavior being to take the first element of the list.</li>
+</ul>
+<pre><code class="language-lisp">&gt;&gt;(arbitrary '(3 4 5))
+LI&gt;&gt; 3
+&gt;&gt;(arbitrary '(3 4 5) last)
+LI&gt;&gt; 5
+</code></pre>
+<ul>
+<li><code>+&gt;/assert</code> add/update a fact in the state.
+&lt;&gt; - <strong>-&gt;/retract:</strong> Delete a fact in the state.</li>
+<li><code>get-state</code> returns a map of the perceived state.</li>
+<li><code>get-facts</code> returns a map with the perceived state, the resources, and the instances.</li>
+<li><code>instance</code> is used to reason on the presence of objects, and their types.
+<ul>
+<li>If no argument is passed, the function will return a map with all the objects of each type.</li>
+<li>If one argument is passed, it should be a type, and the function will return all elements of the type, including elements of subtypes.</li>
+<li>If two arguments are passed, it should be an object and a type.
+The function returns true if the object is of the given type.</li>
+</ul>
+</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="resource-management"><a class="header" href="#resource-management">Resource management</a></h1>
+<p>To handle concurrency in the evaluation of tasks, the system provides a resource system. 
+We define a resource as an object with an initial capacity $C_{init}$.
+A resource $r$ can be acquired at time $t$ with an amount $c$ that is lower than or equal to the current capacity $C_t$.
+Upon acquisition, the acting engine ensures that no race-condition occurs that would result in an over allocation and the capacity is immediately decreased by the amount $c$.</p>
+<p>We distinguish <em>unary</em> and <em>divisible</em> resources.
+A <em>unary</em> resource can be acquired by only one task at a time, where initial capacity and requested amount are always one.
+A <em>divisible</em> resource with an initial capacity $C_{init}$ can be acquired with any $c_t \in[0, C_{init}]$.
+At the difference of real-time systems and mutexes, there is no guarantee on the order of access to resources, as it defers this decision to the acting engine and reasoning systems.
+When a resource is released, its capacity is increased by corresponding amount.</p>
+<ul>
+<li>
+<p><code>new-resource</code> declares a resource <em>r</em> of the resource, with an initial capacity <em>c</em> for a <em>divisible</em> resource.</p>
+</li>
+<li>
+<p><code>acquire</code> acquires a resource <em>r</em> with the quantity $c$ needed if $r$ is <em>divisible</em>.
+Once the acquisition has been validated by the system, the function returns a <em>resource-handle</em> $h$. If $h$ goes out of scope, the resource is automatically released.
+The acquisition of a resource can be interrupted to avoid blocking a program waiting too long on a resource.</p>
+</li>
+<li>
+<p><code>release</code> explicitly releases the resource using the <em>resource-handle</em> $h$.</p>
+</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="advanced-acting-functions"><a class="header" href="#advanced-acting-functions">Advanced acting functions</a></h1>
+<ul>
+<li><code>wait-for</code> takes a dynamic expression and awaits that the evaluation of the expression returns a <strong>true</strong> value.</li>
+</ul>
+<pre><code class="language-lisp">(wait-for `(= (robot.battery ,?r) 1)))))
+</code></pre>
+<ul>
+<li><code>monitor</code> opposite of wait-for</li>
+</ul>
+<pre><code class="language-lisp">(monitor `(&gt; (robot.battery ,?r) 0.4)))))
+</code></pre>
+<ul>
+<li><code>run-monitoring</code> evaluates an expression while a dynamic expression is true.</li>
+</ul>
+<pre><code class="language-lisp">(run-monitoring `(move ,?r) `(&gt; (robot.battery ,?r) 0.4))
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="gobot-sim"><a class="header" href="#gobot-sim">Gobot-Sim</a></h1>
+<p><em>todo</em></p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        <script type="text/javascript">
+        window.addEventListener('load', function() {
+            MathJax.Hub.Register.StartupHook('End', function() {
+                window.setTimeout(window.print, 100);
+            });
+        });
+        </script>
+    </body>
+</html>
